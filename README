@@ -1,0 +1,679 @@
+README,v 1.47 2010/03/03 01:04:04 lacos Exp
+
+
+Contents
+========
+
+License
+Installation
+Main module design
+Compressor design
+Decompressor design (multiple workers)
+Decompressor design (single worker)
+Bugs
+Correctness and performance
+  Test configuration
+  Test files
+  Test procedure
+  Correctness
+  Performance
+Decompression robustness
+Acknowledgements
+
+
+License
+=======
+
+lbzip2 Copyright (C) 2008, 2009, 2010 Laszlo Ersek.
+Released under the GNU GPL v2 or later.
+Contact: lacos@caesar.elte.hu
+
+
+Installation
+============
+
+Please enable SUSv2 conformance in your environment.
+
+(An easy way to do this on a GNU/Linux system, at least for the purposes of
+this document: (1) install the Debian Almquist Shell, (2) whenever "make" is
+mentioned, pass it the "SHELL=/path/to/dash" macro definition after any options
+but before any targets, (3) whenever "sh" is mentioned, use "dash".)
+
+You'll need a developer's installation of the bzip2 library version 1.x.y on
+your system, x.y being at least 0.5. This includes the static or shared library
+(libbz2) and the corresponding public header "bzlib.h".
+
+Then, if you have gcc and it cooperates with your system's getconf utility:
+
+$ make
+
+Otherwise, please use the portable Makefile.
+
+$ make -f Makefile.portable
+
+If you have GNU make, you can use the "-j" option to run multiple commands
+simultaneously, although the difference between the serial and parallel build
+times will be virtually undetectable.
+
+Then copy or move the following files into appropriate locations:
+- ChangeLog       - text file summarizing the history of changes,
+- GPL-2.0         - GNU General Public License, version 2.0,
+- GPL-3.0         - GNU General Public License, version 3.0,
+- README          - this file,
+- lbzip2          - the binary,
+- lbzip2.1        - the manual (hopefully portable),
+- malloc_trace.pl - see the "-t" command line option, eg. in the manual,
+- test.sh         - test script, please see section "Test procedure" below,
+- lfs.sh          - large file support script, ditto.
+
+Finally, you can point some links at the lbzip2 binary for alternative
+invocations:
+- lbunzip2              - to pre-set decompression mode,
+- lbzcat                - to pre-set decompression to standard output,
+- bzip2, bunzip2, bzcat - lbzip2 can work as a multi-threaded bzip2 replacement
+                          in most situations.
+
+
+Main module design
+==================
+
+The main module parses and removes those command line arguments that are
+options or arguments to options. The remaining arguments are treated as file
+operands. If no file operand remains, lbzip2 will work as a filter.
+
+For each output file, the main module recreates the muxer thread, which in turn
+creates the splitter and worker threads. While these sub-threads work, the main
+module waits for the SIGINT, SIGTERM, SIGUSR1 and SIGUSR2 signals. SIGINT and
+SIGTERM, sent asynchronously by the user or the init process, terminate the
+process. Sub-threads signal fatal errors to the main thread with SIGUSR1, and
+the muxer signals final success to the main thread with SIGUSR2, after having
+joined the splitter and the worker threads. The main thread joins the muxer
+thread in turn.
+
+SIGPIPE and SIGXFSZ are blocked in all sub-thread instances during the entire
+lifetime of the process. When a sub-thread encounters a fatal error, it
+promotes any SIGPIPE and/or SIGXFSZ pending on the thread to the process level,
+before generating SIGUSR1 for the whole process (effectively, the main thread)
+as written above.
+
+After SIGINT and/or SIGTERM signals are delivered to the main thread, it
+removes the current (interrupted) regular output file, if any, and terminates
+the process with a re-raised SIGINT or SIGTERM. If any sub-thread signalled a
+fatal error to the main thread with SIGUSR1, or the main thread itself
+encountered a fatal error, then the main thread cleans up the current
+(interrupted) regular output file, if any, and terminates the process. This
+termination occurs via SIGPIPE or SIGXFSZ (if such a signal with inherited
+SIG_DFL action was generated for, and promoted by, any thread), or it happens
+with status 1 (if no such signal is pending at the time of the fatal exit).
+
+
+Compressor design
+=================
+
+The splitter reads fixed size blocks from the input file, and passes them to
+the workers using a regular queue. For each block, the splitter needs a
+previously returned slot from the muxer.
+
+Each worker takes one input block from the queue, compresses it, and passes it
+to the muxer, using a head-only (unordered) list. Each single input block
+results in one compressed block (or, to be more exact, one full bzip2 stream
+containing one bzip2 block).
+
+The muxer regularly fetches the accumulated compressed blocks, reorders them in
+an internal red-black tree, and writes them to the output file. For each
+compressed block written, it returns one slot to the splitter. If the muxer is
+held up for some reason, it will stall the splitter, and that in turn will
+eventually stall the workers.
+
+The splitter and the muxer should be IO-bound, the workers CPU-bound.
+
+
+Decompressor design (multiple workers)
+======================================
+
+The figure below tries to demonstrate the architecture of the multiple-workers
+decompressor.
+
+
+    +-------------------------------------------------------+
+    |                                                       |
+    |   m2s_q               sw2w_q             w2m_q        |
+    |  +-----+             +------+           +-----+       |
+    +->| FSs |--+---LS---->| LSs  |------FS-->| FSs |--FSs--+
+       +-----+  ^    :     |      |---+   :   |     |   :
+                |    :     |      |   |   :   |     |   :
+                |....:  +->| RSs  |------DB-->| DBs |------>output file
+                |    :  |  +------+   |   :   +-----+   :
+    input file--+    :  |             |...:             :
+                     :  +----RS-------+   :             :
+                     :                    :             :
+                 SPLITTER              WORKERS        MUXER
+
+    FS: free slot
+    LS: loaded slot (scan task)
+    RS: reconstructed one-block bzip2 stream (decompress task)
+    DB: plaintext sub-block decompressed from a one-block bzip2 stream
+
+
+The splitter reads fixed size blocks from the input file, and passes them to
+the workers using a "tricky" queue. Each input block, produced by the splitter
+(marked as LS above) maintains a reference number. Each input block must be
+taken into consideration for bzip2 block extraction (ref1). Each input block
+(except the very first) is initially referenced by its predecessor (ref2).
+Although each input block (except a non-full block read in the end) is also
+temporarily referenced by the splitter -- where to attach the next produced
+input block --, this last reference doesn't need an explicit counter increment,
+because ref1 cannot be removed while the splitter is also referencing the input
+block as tail. Proof: ref1 is never removed before the worker switches to the
+next input block (see below), and the tail input block has no next block until
+the splitter atomically produces a new block and moves the tail pointer.
+
+Before producing an input block, the splitter needs a returned slot from the
+muxer (marked as FS in the figure above).
+
+The splitter grows the list in question (LSs) at the last produced full input
+block. The workers use a list-global pointer to choose the next input block to
+scan (ref1). After choosing the next input block, a worker immediately advances
+this pointer for the other workers. In the following paragraphs I'll possibly
+neglect the edge cases.
+
+
+    +------------+        +------------+        +------------+
+    |  ::   ::   |        |   ::      :|        |:   ::      |
+    |  ::   ::   |        |   ::      :|        |:   ::      |
+    |  ::   ::   |        |   ::      :|        |:   ::      |
+    +------------+        +------------+        +------------+
+
+
+The worker scans the input block (LS) for the first bzip2 block header. From
+then on, it submits bzip2 blocks (marked as RS in the architecture figure) for
+decompression as it finds the subsequent bzip2 block headers. When reaching the
+end of the input block, it switches to the next input block (ref2), and
+processes it up to the first bzip2 block header THAT WILL BE FOUND BY THE
+WORKER THAT STARTED (OR WILL START) ON THAT PAGE. Note that we can find, after
+leaving the first block, the next bzip2 header completed one bit into the
+second block. A bzip2 block header can be cut in two by an input block
+boundary. Such a header won't be found by the worker that starts on the second
+member of such a pair of blocks. Thus the inital parts of all (except the very
+first) input blocks are scanned by two workers: one looking for where to start
+extracting bzip2 blocks, and another one looking for where to stop extracting
+bzip2 blocks.
+
+The size of the input block ensures (*) that any full sized input block will
+completely embody at least one bzip2 block header, if the input is a valid
+sequence of bzip2 streams. (If it's not, then lbzip2 gives up; try it with eg.
+"lbzip2 -d </dev/zero".)
+
+The workers collectively decrement references on the input blocks as they go,
+and whenever a refno goes to zero, the input block gets deallocated. The
+released slot (marked as FS) is forwarded to the muxer, so that it can return
+it to the splitter.
+
+The workers also decompress the extracted, reconstructed, one-block bzip2
+streams (RS). Each worker synchronously multiplexes on both task lists
+(scanning and decompression). Decompression has priority above scanning when
+choosing a task; otherwise, decompression tasks could accrue without limit if
+both the splitter and the muxer were fast enough never to let the list holding
+scan tasks go empty.
+
+The muxer returns released slots to the splitter and writes decompressed blocks
+(DBs) to the output file. The latter are put to a head-only list by the
+workers, in the form of fixed size sub-blocks. (One bzip2 block may be
+decompressed into multiple sub-blocks.) The muxer internally reorders the
+decompressed sub-blocks and writes them to the output file. The passing of
+sub-blocks and the migration of released input slots from the workers to the
+muxer happen through independent channels.
+
+If the muxer is held up for some reason, it will soon stall the splitter, and
+that in turn will eventually stall the workers.
+
+The splitter and the muxer should be IO-bound, the workers CPU-bound.
+
+
+Decompressor design (single worker)
+===================================
+
+Although the multiple-workers decompressor also functions when only one worker
+thread is started, with a single worker the scanning of the initial part of
+each input block is superfluous and wastes CPU. Thus the single-worker
+decompressor was added.
+
+The splitter and the muxer provide simple input/output buffering for the single
+worker. The worker serially feeds all input blocks to libbz2's decompression
+routine, using libbz2 in a "canonical" way. This mode of decompression is
+unable to misrecognize bit-strings as block delimiters, since it doesn't look
+for block delimiters. Released input blocks flow first to the muxer (via a
+channel that is independent from the channel of decompressed sub-blocks), and
+only then back to the splitter, so that a blocked muxer throttles the
+decompression.
+
+
+Bugs
+====
+
+I struggled to be painstaking, but one can never be sure... You're encouraged
+always to use the "--keep" option and to verify the compressed or decompressed
+output(s) of lbzip2 before manually deleting its plaintext or compressed
+input(s), accordingly.
+
+The original combined CRC is never checked by the multiple-workers
+decompressor.
+
+The decompressor workers don't really parse the bzip2 blocks when scanning,
+they just look for block headers and end of stream markers. Furthermore, the
+used (bit-)string search algorithm is naive and slow.
+
+Lbzip2 doesn't discriminate between fatal errors it detects, it exits with exit
+status 1 in all such cases (or SIGPIPE/SIGXFSZ, if such a signal with inherited
+SIG_DFL action is pending at the time of termination). In particular, it
+doesn't report corrupt compressed input with a separate exit status, since I'm
+not sure if a misrecognized block header cannot lead to BZ_DATA_ERROR when the
+multiple-workers decompressor calls BZ2_bzDecompress().
+
+In order to spare the compressor's muxer a lot of cycles (bit-shifting), the
+muxer doesn't recombine the individual compressed bzip2 streams into a single
+bzip2 stream. Thus the output consists of a sequence of one-block bzip2
+streams, which comes with a bit of size penalty in comparison to a single,
+multi-block bzip2 stream. Additionally, no output-global combined CRC can be
+written, and applications calling BZ2_bzDecompress() will get a BZ_STREAM_END
+after each block.
+
+The compressed image of the empty file is special in that it doesn't contain
+any bzip2 block header. Its length is positive (14 bytes). Using this empty
+bzip2 stream, bz2 files can be constructed by way of concatenation where the
+maximum distance (if there is one) between adjacent bzip2 block headers exceeds
+any previously fixed limit. More precisely, the statement marked with (*) above
+MAY NOT hold for such a file, leading to its refusal on part of the
+multiple-workers decompressor. (The single-worker decompressor is immune.) Note
+that (1) neither official bzip2 nor lbzip2 produces such files, and (2) even
+the multiple-workers decompressor doesn't necessarily refuse such a file. For
+example, in the tests detailed below both of the single- and the
+multiple-workers decompressor successfully processed
+"pyflate-0.31+bzr20070122-empty.bz2", both as an individual bzip2 stream and as
+part of a concatenated bz2 file. It should be fairly rare to hit this design
+bug -- one would need to manually concatenate many empty bzip2 streams, or
+manually place an empty bzip2 stream between two bzip2 streams with big
+compressed blocks (produced for poorly compressible plain files) at an
+unfortunate position wrt. input block boundaries. I found this bug by
+speculation (after which I naturally verified it), not by trying and failing to
+decompress a file.
+
+Presently, I'm not certain whether "lbzip2 -d" universally supports bzip2
+streams created with "(l)bzip2 -1" to "-8", although lbunzip2 (an earlier
+version of "lbzip2 -d") successfully decompressed all such streams I used for
+testing. The question arises because in the recreated, one-block bzip2 streams
+I pass to libbz2 I always indicate an uncompressed blocksize switch of "-9".
+The bzip2 manual page suggests the block size stored in the stream header only
+influences the memory allocation of the decompressor. It should be safe to make
+libbz2 allocate more memory than strictly necessary. The source of bzip2recover
+seems to confirm this.
+
+Sub-threads are recreated separately for each file operand; at most one input
+file is worked on at any moment.
+
+Please report bugs to <lacos@caesar.elte.hu>. Thank you.
+
+
+Correctness and performance
+===========================
+
+Test configuration
+------------------
+
+"opteron":
+  CPU (/proc/cpuinfo): 2x Quad-Core AMD Opteron(tm) Processor 2352
+  RAM (free)         : 7904824K free, 8193980K total
+  distribution       : Debian GNU/Linux 4.0 (Etch)
+  uname              : Linux 2.6.18-6-amd64 #1 SMP x86_64 GNU/Linux
+  gcc                : gcc (GCC) 4.1.2 20061115 (prerelease) (Debian 4.1.1-21)
+  libc               : glibc-2.3.6.ds1-13etch7
+  bzip2              : Version 1.0.5, 10-Dec-2007
+  # of lbzip2 workers: 8
+
+"athlon":
+  CPU (/proc/cpuinfo): AMD Athlon(tm) 64 X2 Dual Core Processor 6000+
+  RAM (free)         : 3979528K free, 4150504K total
+  distribution       : Debian GNU/Linux 4.0 (Etch)
+  uname              : Linux 2.6.18-6-686-bigmem #1 SMP i686 GNU/Linux
+  gcc                : gcc (GCC) 4.1.2 20061115 (prerelease) (Debian 4.1.1-21)
+  libc               : glibc-2.3.6.ds1-13etch7
+  bzip2              : Version 1.0.3, 15-Feb-2005.
+  # of lbzip2 workers: 2
+
+"superdome" (independent testing, no results included below for now):
+  CPU                : 64x Dual-Core Intel(R) Itanium(R) 2 9150N
+  chipset            : HP sx2000
+  RAM (free)         : 2130657408K free, 2144254080K total
+  distribution       : SUSE(R) Linux Enterprise Server 11 (RC1)
+  uname              : Linux 2.6.27.8-1-default #1 SMP ia64 GNU/Linux
+  compiler           : gcc (SUSE Linux) 4.3.2 [gcc-4_3-branch revision 141291]
+  libc               : glibc-2.9-3.1
+  bzip2              : Version 1.0.5, 10-Dec-2007
+  # of lbzip2 workers: 128
+
+
+Test files
+----------
+
+I tested lbzip2 on the following Gentoo distfiles and pyflate test files:
+
+      Size  SHA1                                     Name
+      ----  ----                                     ----
+  59321957  d6ae7f024b99ba9b85f253fdeb00a9a1d6f1fc8d gcc-4.3.0.tar.bz2
+  58964610  6f1565280ed0a25256f5768f6dff2c96b6a25287 gcc-4.3.1.tar.bz2
+  58929447  787b566ad4f386a9896e2d5703e6ff5e7ccaca58 gcc-4.3.2.tar.bz2
+  48319543  18388e992c945d9245c7080eedaa1fdc226f1701 kdebase-runtime-4.0.4.tar.bz2
+  48424795  e8b15e2f134c7bd1555cd9f4759e5e5efd3d8073 kdebase-runtime-4.0.5.tar.bz2
+  56999028  891fb0a28ec3c4b070c4d6c2eae7fee1d2e37761 koffice-1.6.1.tar.bz2
+  57049103  a6a0dcc254f7a7f90d7e5b31f6ebecd54800f211 koffice-1.6.2.tar.bz2
+  56829391  de84214dec913eac1d47dab04dd93f3d81729fd3 koffice-1.6.3.tar.bz2
+  45488158  3a186adf13e44415796ab6381aa8979b16a5d5ca linux-2.6.23.tar.bz2
+  46735221  67ca1981239db104ce211647d13d8fbb28520948 linux-2.6.24.2.tar.bz2
+  46737783  351aebc784a5395fe4c92d1e514a89680482f7e2 linux-2.6.24.tar.bz2
+  48587815  b3be9e51b5b54fe0c576bad73263e2d216133a3b linux-2.6.25.2.tar.bz2
+  48601689  aa6187a1c212dd2d8bd906b023fcefdcf711f35e linux-2.6.25.tar.bz2
+  49454467  0d3b5c13c923d1aeec2c48799169317cb5252cab linux-2.6.26.4.tar.bz2
+  49441874  3f44384bf84f27add3b6c43ec68f974d7f7e9c67 linux-2.6.26.tar.bz2
+  51417982  1f9a30a69a4d306408f898a10cc95cdcf6173043 Linux-pdf-HOWTOs-20070322.tar.bz2
+  52425158  f7ebc43287c31008582c482d7f68a85db6f9f57e Linux-pdf-HOWTOs-20070811.tar.bz2
+  51553909  6ebce33d4436217c482c7bef8a5ac0c313f4730d Linux-ps-HOWTOs-20070322.tar.bz2
+  52889705  1a78695857ac0fd3aa4b5e072ec594854ae4aaf4 Linux-ps-HOWTOs-20070811.tar.bz2
+ 111691177  b4235a16b0edb8048bfd4173803d65712c618ac9 netbeans-5_5_1-ide_sources.tar.bz2
+ 109745446  255b863e41c23abc00678a228f881c697160bd2a netbeans-5_5-ide_sources.tar.bz2
+ 144156134  de189e03a329cdd334823a52b800fad0c033ab4d OOo_2.3.1_src_core.tar.bz2
+  79077332  004defae1496cf4b953a233abb20fd4c7e162423 OOo_2.3.1_src_l10n.tar.bz2
+ 153590855  1f775a0f2b755ad1c4cb7d14df93d86948424e7f OOo_2.4.0_src_core.tar.bz2
+  81193819  3ef13fbaa6c41ab920ba9a9f4494f6c4f805c28e OOo_2.4.0_src_l10n.tar.bz2
+ 153573457  170642263c32f614ee7e9439a8af30410e00d318 OOo_2.4.1_src_core.tar.bz2
+  81193580  b21f4531ea8182d87ff6f5f68809086c1c063295 OOo_2.4.1_src_l10n.tar.bz2
+  71183403  220cdff7ce2ba324902f67bae9ba13dac93311bc ooo300-m3-l10n.tar.bz2
+        46  e311e8c704742305f3406b5fcf4aa1520245ecb2 pyflate-0.31+bzr20070122-45MB-00.bz2
+        40  4f224e99194a525f592e49e4c779d20f8303600c pyflate-0.31+bzr20070122-45MB-fb.bz2
+        41  f74f1d95ed1aaa61093532a68399ec9b54c26622 pyflate-0.31+bzr20070122-510B.bz2
+        40  34796046baf13c3923c339fe8c0831398a6e801e pyflate-0.31+bzr20070122-765B.bz2
+        47  20e89178af105511ca9287a4b6f26132528dfbb5 pyflate-0.31+bzr20070122-aaa.bz2
+        14  64a543afbb5f4bf728636bdcbbe7a2ed0804adc2 pyflate-0.31+bzr20070122-empty.bz2
+        52  c28ee5a89fa5da8e51009fd28af23e06ede69afa pyflate-0.31+bzr20070122-hello-world.bz2
+  98584925  71acc53f5ec7bdc6abbc85409568d0d006a040e3 qt-x11-opensource-src-4.4.0.tar.bz2
+  99481677  b0087fe51271f81d4dc35d4cb7518ef84a36f3c2 qt-x11-opensource-src-4.4.1.tar.bz2
+----------
+2171643720
+
+
+Test procedure
+--------------
+
+The "corr-perf.sh" shell script contains the original correctness and
+performance test cases. It is neither very portable nor user-friendly -- it's
+mainly a developer aid.
+
+After installation, end-users are encouraged to test lbzip2 with the
+SUSv2-portable shell script "test.sh", which executes roughly the same types of
+tests as described below. It also checks for pbzip2 and 7za (from p7zip), and
+tries to compare lbzip2 with each one of them that it finds. Please run "sh
+test.sh" to get help (after enabling SUSv2 conformance in your environment).
+
+It is possible to initiate testing through the Makefile(s):
+
+$ make TESTFILE="DIR/UNCOMPRESSED-INPUT" check
+
+Please make sure that the pathname passed through the TESTFILE macro is
+portable.
+
+Using "test.sh" you can test lbzip2 later too, provided the following technical
+conditions are met:
+
+1. You invoke it as in
+
+$ sh test.sh "DIR/UNCOMPRESSED-INPUT"
+
+2. "perl" is not installed, or the current working directory contains the
+scripts "lfs.sh" and "malloc_trace.pl".
+
+
+Correctness (on "athlon", as of lbzip2-0.10)
+--------------------------------------------
+
+1. Decompress all downloaded files with official bunzip2, keeping originals.
+
+2. "We can eat what other, good cooks cook": decompress all downloaded files
+with lbzip2, checking the output against the decompressed originals (created in
+step 1).
+
+3. Repeat previous step with single-worker decompressor.
+
+4. "Others can eat what we cook": recompress the decompressed originals with
+lbzip2, decompress the output with official bunzip2, check against decompressed
+originals.
+
+5. "We can eat what we cook": decompress the recompressed files with lbzip2,
+check against decompressed originals.
+
+6. Repeat previous step with single-worker decompressor.
+
+7. Concatenated tests: concatenate all downloaded bz2 files into
+"orig.concat.bz2", and concatenate decompressed originals (created in step 1)
+into "orig.concat". (We trust official "bzip2 -d" to convert the former into
+the latter.) Then repeat steps 2-6.
+
+Whenever lbzip2 is executed, a memory allocation trace is saved, and then
+checked by way of the "malloc_trace.pl" perl script. Furthermore, the entire
+lbzip2 process is stalled once in the beginning by blocking output, and once
+later by blocking input.
+
+I also did some tests on "athlon" with streams coming from /dev/urandom, in
+order to confront lbzip2-0.06 with large compressed blocks.
+
+
+Performance (on "opteron", as of lbzip2-0.06)
+---------------------------------------------
+
+The "orig.concat" file is compressed in various modes, and the
+"orig.concat.bz2" file is decompressed in various modes.
+
+MODE               USER[s]  SYS[s]  CPU[%]  ELAPSED[m:s]  MAJPF     MINPF   VOLCS  INVOLCS  WRKSTALL[%]
+----               -------  ------  ------  ------------  -----  --------  ------  -------  -----------
+bzip2-shared       3255.43   11.11     100      54:26.36      1      2006      19     9685        -
+lbzip2 -v -n 1     3269.37   63.35     100      55:18.53      1  20647720  108046    42713        0.008
+lbzip2 -v -n 2     3468.87   65.23     200      29:20.01      0  20647744  124434     5530        0.017
+lbzip2 -v -n 3     3615.95   68.00     301      20:23.54      0  20647476  123853    48128        0.109
+lbzip2 -v -n 4     3525.46   67.41     401      14:55.36      0  20647822  130177    17509        0.344
+lbzip2 -v -n 5     3519.24   67.37     501      11:55.25      2  20647892  139622    43651        0.402
+lbzip2 -v -n 6     3577.73   68.64     601      10:06.15      2  20630857  143045    59155        0.527
+lbzip2 -v -n 7     3640.95   71.29     701       8:49.55      2  20647849  149622    61263        1.287
+lbzip2 -v -n 8     3712.41   72.56     797       7:54.74      4  20647786  148895    83587        2.693
+
+bzip2-shared -d     533.79    1.94     100       8:55.70      1     27732      13     1140        -
+lbzip2 -v -d -n 1   542.78   10.27     100       9:09.53      0   3173224   41941      930        0.042
+lbzip2 -v -d -n 2   740.43   33.69     200       6:26.69      0  12725041   63822     1278        0.042
+lbzip2 -v -d -n 3   724.76   34.76     299       4:13.75      0  12725378   81465     4857        0.105
+lbzip2 -v -d -n 4   742.55   35.99     397       3:15.79      0  12726115  101088     1500        0.084
+lbzip2 -v -d -n 5   777.52   37.58     495       2:44.53      0  12727118  121027     1343        0.104
+lbzip2 -v -d -n 6   777.18   38.15     592       2:17.70      0  12728073  137033    17697        0.334
+lbzip2 -v -d -n 7   792.68   39.69     688       2:00.91      0  12729098  156501    23690        0.084
+lbzip2 -v -d -n 8   807.67   40.20     782       1:48.32      0  12730179  176793    32170        0.167
+
+
+Decompression robustness (as of lbzip2-0.18 with libbz2-1.0.5)
+==============================================================
+
+The question at this point is: "how do we react to what BAD cooks cook, in
+comparison to official bunzip2?"
+
+I downloaded "c10-archive-r1.iso" from
+http://www.ee.oulu.fi/research/ouspg/protos/testing/c10/archive/. I extracted
+the bzip2 test cases (321818 files), and tried to decompress them with "bzip2
+-d", "lbzip2 -d -n 1" and "lbzip2 -d" (all on "athlon").
+
+
+Category I.1
+------------
+
+Files decompressed by both bzip2-1.0.3 and single-worker lbzip2: there were 175
+such files. For each file, the bzip2 decompression output was identical to the
+lbzip2 decompression output, and neither of bzip2 or lbzip2 produced any error
+output.
+
+
+Category I.2
+------------
+
+Files decompressed by bzip2 but NOT by single-worker lbzip2:
+
+# of files   where bzip2-1.0.3 said (but exited with zero status)  while lbzip2 said (and failed)
+----------   ----------------------------------------------------  ------------------------------
+        45   (stdin): trailing garbage after EOF ignored           stdin: BZ2_bzDecompress(): BZ_DATA_ERROR_MAGIC
+
+
+
+Category I.3
+------------
+
+Files "decompressed" by single-worker lbzip2 but NOT by bzip2-1.0.3: there was
+no such file.
+
+
+Category I.4
+------------
+
+Files decompressed neither by bzip2 nor by single-worker lbzip2:
+
+# of files  where bzip2-1.0.3 said (and failed)               while lbzip2 said (and failed)
+----------  -----------------------------------               ------------------------------
+    210671  Data integrity error when decompressing.          stdin: BZ2_bzDecompress(): BZ_DATA_ERROR
+    100912  (stdin) is not a bzip2 file.                      stdin: BZ2_bzDecompress(): BZ_DATA_ERROR_MAGIC
+     10013  Compressed file ends unexpectedly;                stdin: premature EOF
+         1  Compressed file ends unexpectedly;                stdin: file empty
+         1  Caught a SIGSEGV or SIGBUS whilst decompressing.  stdin: BZ2_bzDecompress(): BZ_DATA_ERROR
+----------
+    321598
+
+The SIGSEGV should be due to a bug in libbz2-1.0.3, which was fixed in version
+1.0.5. The bug is triggered by "1203ea663ea8545c9b66ad3ef46425d0.bz2".
+
+Conclusion: single-worker "lbzip2 -d" behaves like standard "bzip2 -d" even
+when facing these files, with the following exception: lbzip2 refuses trailing
+garbage. Thus, lbzip2 is stricter.
+
+
+Category II.1
+-------------
+
+Files decompressed by both bzip2-1.0.3 and multiple-workers lbzip2: both
+decompressors created the same output for these few (186) files. In case of 175
+files, official bzip2 didn't complain. For the remaining 11, it said "(stdin):
+trailing garbage after EOF ignored". Lbzip2 didn't produce any error output for
+any of these 186 files.
+
+
+Category II.2
+-------------
+
+Files decompressed by bzip2 but NOT by multiple-workers lbzip2:
+
+# of files   where bzip2-1.0.3 said (but exited with zero status)  while lbzip2 said (and failed)
+----------   ----------------------------------------------------  ------------------------------
+        20   (stdin): trailing garbage after EOF ignored           stdin: BZ2_bzDecompress(): BZ_DATA_ERROR
+         8   (stdin): trailing garbage after EOF ignored           stdin: unterminated bzip2 block in short first input block
+         4   (stdin): trailing garbage after EOF ignored           stdin: compressed block too short
+         2   (stdin): trailing garbage after EOF ignored           stdin: misrecognized a bit-sequence as a block delimiter
+----------
+        34
+
+Strictly speaking, these files were not valid bzip2 streams, even if bzip2
+didn't choke on them.
+
+
+Category II.3
+-------------
+
+Files "decompressed" by multiple-workers lbzip2 but NOT by bzip2:
+
+# of files  where bzip2-1.0.3 said (and failed)
+----------  -----------------------------------
+       145  Data integrity error when decompressing.
+       142  Compressed file ends unexpectedly;
+----------
+       287
+
+Lbzip2 (since it doesn't parse the bzip2 stream "deeply") didn't notice that
+these files are invalid as bzip2 streams. After lbzip2 found bit-strings it
+believed to be block headers and EOS markers, the made-up one-block bzip2
+streams turned out to be "decompressible" by the bzip2 library, resulting in
+nonsensical output.
+
+
+Category II.4
+-------------
+
+Files decompressed neither by bzip2 nor by multiple-workers lbzip2:
+
+# of files  where bzip2-1.0.3 said (and failed)               while lbzip2 said (and failed)
+----------  -----------------------------------               ------------------------------
+    107488  Data integrity error when decompressing.          stdin doesn't start like a bzip2 stream
+    100912  (stdin) is not a bzip2 file.                      stdin doesn't start like a bzip2 stream
+     86581  Data integrity error when decompressing.          stdin: BZ2_bzDecompress(): BZ_DATA_ERROR
+     15345  Data integrity error when decompressing.          stdin: unterminated bzip2 block in short first input block
+      5964  Compressed file ends unexpectedly;                stdin: unterminated bzip2 block in short first input block
+      3793  Compressed file ends unexpectedly;                stdin: misrecognized a bit-sequence as a block delimiter
+       560  Data integrity error when decompressing.          stdin: misrecognized a bit-sequence as a block delimiter
+       552  Data integrity error when decompressing.          stdin: compressed block too short
+        58  Compressed file ends unexpectedly;                stdin doesn't start like a bzip2 stream
+        52  Compressed file ends unexpectedly;                stdin: BZ2_bzDecompress(): BZ_DATA_ERROR
+         5  Compressed file ends unexpectedly;                stdin: compressed block too short
+         1  Caught a SIGSEGV or SIGBUS whilst decompressing.  stdin: BZ2_bzDecompress(): BZ_DATA_ERROR
+----------
+    321311
+
+Conclusion: I believe that (multiple-workers) "lbzip2 -d" is usable for valid
+bzip2 files. For other files, one may experience different results than with
+official "bzip2 -d".
+
+The number of files in the "problematic" Category II.3, ie. where lbzip2
+silently and wrongly creates an output file from a file that is actually not a
+bz2 file, was dramatically reduced with lbzip2-0.18 (from 141065 to 287).
+Considering that these input files were "falsely" named bz2 files, and that
+their contents was produced by actively malicious fuzzing, I reckon such
+incidents should occur fairly infrequently in everyday use. When in doubt, use
+"--keep".
+
+It seems that "lbzip2 -d" didn't crash, hang, or ate up resources in this test.
+
+
+Acknowledgements
+================
+
+I'd like to thank
+
+- Adam Maulis at ELTE IIG, for fruitful discussions; for inspiring me to
+parallelize the bit-shifting part of the decompressor, thus rendering the
+splitter fully IO-bound; for inspiring me to create the single-worker
+decompressor; and also for letting me test on "opteron";
+
+- Julian Seward for writing bzip2;
+
+- Paul Sladen for his Wikipedia contributions on bzip2, eg.
+http://en.wikipedia.org/wiki/Bzip2#File_format, and for his pyflate test data
+(http://www.paul.sladen.org/projects/pyflate/);
+
+- Michael Thomas from Caltech HEP for allowing me to test the earlier lbunzip2
+on their Itanium 2 machines;
+
+- Bryan Stillwell for testing and retesting lbzip2 on "superdome"; his results
+inspired me to remove the bottleneck in the multiple-workers decompressor that
+proved significant on many-core machines;
+
+- Zsolt Bartos-Elekes and Imre Csatlos for sending test reports, see
+http://lacos.hu/,
+
+- Gabor Kovesdan for creating the FreeBSD port,
+
+- Paul Wise for reporting a possible (but mostly harmless) "read access to a
+trap representation" bug
+(http://lists.debian.org/debian-mentors/2009/10/msg00470.html),
+
+- Paolo Bonzini for discussing SIGPIPE/EPIPE behavior with me.
+
+I'd also like to thank the Department of Electrical and Information Engineering
+at the University of Oulu, for making available their invaluable PROTOS Genome
+Test Suite c10-archive under the GPL.
