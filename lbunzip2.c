@@ -5,8 +5,9 @@
 #include <unistd.h>       /* read() */
 #include <errno.h>        /* errno */
 #include <string.h>       /* memcpy() */
-#include <bzlib.h>        /* bz_stream */
 #include <signal.h>       /* SIGUSR2 */
+
+#include "yambi/compat.h" /* bz_stream */
 
 #include "main.h"         /* pname */
 #include "lbunzip2.h"     /* lbunzip2() */
@@ -698,7 +699,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
   strm.bzfree = lbzfreef;
   strm.opaque = 0;
 
-  bzret = BZ2_bzDecompressInit(
+  bzret = BZ2_like_bzDecompressInit(
       &strm,
       0, /* verbosity */
       0  /* small */
@@ -717,7 +718,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
     strm.next_out = (char *)w2m_blk->decompr;
     strm.avail_out = sizeof w2m_blk->decompr;
 
-    bzret = BZ2_bzDecompress(&strm);
+    bzret = BZ2_like_bzDecompress(&strm);
 
     switch (bzret) {
 #define CASE(x) case x: \
@@ -785,7 +786,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
     xunlock(&w2m_q->av_or_ex_or_rel);
   } while (BZ_OK == bzret);
 
-  bzret = BZ2_bzDecompressEnd(&strm);
+  bzret = BZ2_like_bzDecompressEnd(&strm);
   assert(BZ_OK == bzret);
 }
 
