@@ -14,7 +14,6 @@
 #include <utime.h>           /* utime() */
 
 #include "main.h"            /* pname */
-#include "lbunzip2_single.h" /* lbunzip2_single_wrap() */
 #include "lbunzip2.h"        /* lbunzip2_wrap() */
 #include "lbzip2.h"          /* lbzip2_wrap() */
 
@@ -1477,7 +1476,6 @@ process(const struct opts *opts, unsigned num_slot, int infd, const char *isep,
 
   union
   {
-    struct lbunzip2_single_arg lbunzip2_single;
     struct lbunzip2_arg        lbunzip2;
     struct lbzip2_arg          lbzip2;
   } muxer_arg;
@@ -1490,29 +1488,16 @@ process(const struct opts *opts, unsigned num_slot, int infd, const char *isep,
   }
 
   if (opts->decompress) {
-    if (1u == opts->num_worker) {
-      muxer_arg.lbunzip2_single.num_slot = num_slot;
-      muxer_arg.lbunzip2_single.print_cctrs = opts->print_cctrs;
-      muxer_arg.lbunzip2_single.infd = infd;
-      muxer_arg.lbunzip2_single.isep = isep;
-      muxer_arg.lbunzip2_single.ifmt = ifmt;
-      muxer_arg.lbunzip2_single.outfd = outfd;
-      muxer_arg.lbunzip2_single.osep = osep;
-      muxer_arg.lbunzip2_single.ofmt = ofmt;
-      xcreate(&muxer, lbunzip2_single_wrap, &muxer_arg.lbunzip2_single);
-    }
-    else {
-      muxer_arg.lbunzip2.num_worker = opts->num_worker;
-      muxer_arg.lbunzip2.num_slot = num_slot;
-      muxer_arg.lbunzip2.print_cctrs = opts->print_cctrs;
-      muxer_arg.lbunzip2.infd = infd;
-      muxer_arg.lbunzip2.isep = isep;
-      muxer_arg.lbunzip2.ifmt = ifmt;
-      muxer_arg.lbunzip2.outfd = outfd;
-      muxer_arg.lbunzip2.osep = osep;
-      muxer_arg.lbunzip2.ofmt = ofmt;
-      xcreate(&muxer, lbunzip2_wrap, &muxer_arg.lbunzip2);
-    }
+    muxer_arg.lbunzip2.num_worker = opts->num_worker;
+    muxer_arg.lbunzip2.num_slot = num_slot;
+    muxer_arg.lbunzip2.print_cctrs = opts->print_cctrs;
+    muxer_arg.lbunzip2.infd = infd;
+    muxer_arg.lbunzip2.isep = isep;
+    muxer_arg.lbunzip2.ifmt = ifmt;
+    muxer_arg.lbunzip2.outfd = outfd;
+    muxer_arg.lbunzip2.osep = osep;
+    muxer_arg.lbunzip2.ofmt = ofmt;
+    xcreate(&muxer, lbunzip2_wrap, &muxer_arg.lbunzip2);
   }
   else {
     muxer_arg.lbzip2.num_worker = opts->num_worker;
