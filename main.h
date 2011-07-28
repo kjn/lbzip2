@@ -78,12 +78,10 @@ void *
 xalloc(size_t size);
 
 /*
-  Allocation function pointers, set up by the main thread before starting any
-  threads. They may call log_info().
+  Memory deallocation function pointer, set up by the main thread before
+  starting any threads. It may call log_info().
 */
-extern void (*freef)(void *ptr),
-    *(*lbzallocf)(void *ignored, int n, int m),
-    (*lbzfreef)(void *ignored, void *ptr);
+extern void (*freef)(void *ptr);
 
 
 /*

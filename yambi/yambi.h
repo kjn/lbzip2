@@ -23,9 +23,10 @@
 #ifndef YB_VERSION
 #define YB_VERSION 1
 
-#include <stddef.h>
+#include <stddef.h>  /* size_t */
 
 
+/* Data types. */
 typedef struct YBibs_s YBibs_t;  /* IBS (input bit-stream) */
 typedef struct YBobs_s YBobs_t;  /* OBS (output bit-stream) */
 typedef struct YBdec_s YBdec_t;  /* decoder */
@@ -38,13 +39,11 @@ typedef unsigned long  YBcrc_t;  /* CRC32 */
 #define YB_HEADER_SIZE     4u
 #define YB_TRAILER_SIZE    10u
 
-
-#define YB_OK          0
-#define YB_UNDERFLOW (-1)
-#define YB_OVERFLOW  (-2)
-#define YB_DONE      (-3)
-#define YB_CANCELED  (-4)
-
+#define YB_OK          0   /* operation completed successfully */
+#define YB_UNDERFLOW (-1)  /* not enought input space */
+#define YB_OVERFLOW  (-2)  /* not enought output space */
+#define YB_DONE      (-3)  /* nothing more to do */
+#define YB_CANCELED  (-4)  /* pperation canceled */
 
 #define YB_ERR_MAGIC    (-101)  /* invalid stream header magic */
 #define YB_ERR_HEADER   (-102)  /* invalid block header magic */
@@ -63,40 +62,54 @@ typedef unsigned long  YBcrc_t;  /* CRC32 */
 
 
 /* Allocate and initialise an YBibs_t structure, and return a pointer to it.
-   If there is not enough memory, return NULL.
 */
 YBibs_t *YBibs_init(void);
 
 
 /* Allocate and initialise an YBdec_t structure, and return a pointer to it.
-   If there is not enough memory, return NULL.
 */
 YBdec_t *YBdec_init(void);
 
 
 /* Decode a single block from the memory buffer.
 
+   buf points to the input buffer. Available space in the buffer
+   is determined by *buf_sz, which is uodated on return.
+
    Return values:
-   YB_OK if a block was successfully decoded
-   YB_UNDERFLOW - all bytes were consumed and need more bytes to finish
-   decoding the current block
-   YB_DONE - if there are no more blocks in this ibs (no bytes are consumed
-   in this case)
-   otherwise - data format error
+     YB_OK        - if a block was successfully decoded
+     YB_UNDERFLOW - all bytes were consumed and need more bytes to finish
+                    decoding the current block
+     YB_DONE      - if there are no more blocks in this ibs (no bytes
+                    are consumed in this case)
+     otherwise    - data format error
 */
 int YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec,
                    const void *buf, size_t *buf_sz);
 
 
-/* return 0 on ok, < 0 on error */
+/* Decode the block.  If everything goes OK, return YB_OK.
+   Any other return value indicated a decode error·
+*/
 int YBdec_work(YBdec_t *d);
 
 
-/* return < -1 on error, -1 on underflow, >= 0 on successfull emit
-   (retval is number of bytes remaining in buffer) */
+/* Write decompressed data in to the memory buffer.
+
+   buf points to the output buffer.  Available space in the buffer
+   is determined by *buf_sz, which is uodated on return.
+
+   Return values:
+     YB_OK       - if the block was successfully emitted
+     YB_OVERFLOW - all bytes were consumed and need more bytes to finish
+                   decoding the current block
+     otherwise   - data format error
+*/
 int YBdec_emit(YBdec_t *d, void *buf, size_t *buf_sz);
 
 
+/* Inform 
+*/
 void YBdec_join(YBdec_t *d);
 
 

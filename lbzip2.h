@@ -14,7 +14,8 @@ struct lbzip2_arg
   int outfd;
   const char *osep,
       *ofmt;
-  int bs100k;
+  int bs100k,
+      exponential;
 };
 
 void *

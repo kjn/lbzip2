@@ -25,14 +25,14 @@
   are met:
    1. Redistributions of source code must retain the above copyright
       notice, this list of conditions and the following disclaimer.
-   2. The origin of this software must not be misrepresented; you must 
-      not claim that you wrote the original software.  If you use this 
-      software in a product, an acknowledgment in the product 
+   2. The origin of this software must not be misrepresented; you must
+      not claim that you wrote the original software.  If you use this
+      software in a product, an acknowledgment in the product
       documentation would be appreciated but is not required.
    3. Altered source versions must be plainly marked as such, and must
       not be misrepresented as being the original software.
-   4. The name of the author may not be used to endorse or promote 
-      products derived from this software without specific prior written 
+   4. The name of the author may not be used to endorse or promote
+      products derived from this software without specific prior written
       permission.
 
   THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
@@ -87,7 +87,7 @@ ptr      - 3433k
 ftab     -  256k \ / bucket - 3443k
 quadrant - 1717k / \
 
-bhtab    -  110k  
+bhtab    -  110k
 
 
 */
@@ -181,8 +181,6 @@ naive_sort(Int *P, Byte *B, Int *U, Int n)
 }
 
 
-
-
 /* Compare two different rotations of the block.
    Return 1 if j-th rotation preceeds i-th one.
    Otherwise return 0 (even in case both rotations are equal).
@@ -200,15 +198,15 @@ fullGt(SInt   i,
 
   assert (i != j);
 
-#define ITER(ii)					\
-  {							\
-    Byte c1, c2;					\
-    Short s1, s2;					\
-    if ((c1 = block[i]) != (c2 = block[j]))		\
-      return (c1 > c2);					\
-    if ((s1 = quadrant[i]) != (s2 = quadrant[j]))	\
-      return (s1 > s2);					\
-    i++; j++;						\
+#define ITER(ii)                                        \
+  {                                                     \
+    Byte c1, c2;                                        \
+    Short s1, s2;                                       \
+    if ((c1 = block[i]) != (c2 = block[j]))             \
+      return (c1 > c2);                                 \
+    if ((s1 = quadrant[i]) != (s2 = quadrant[j]))       \
+      return (s1 > s2);                                 \
+    i++; j++;                                           \
   }
 
  compare_slowly:
@@ -222,8 +220,8 @@ fullGt(SInt   i,
   k = nblock;
   do {
     if ((*(Long *)(   block+i  ) ^ *(Long *)(   block+j  )) |
-	(*(Long *)(quadrant+i  ) ^ *(Long *)(quadrant+j  )) |
-	(*(Long *)(quadrant+i+4) ^ *(Long *)(quadrant+j+4)))
+        (*(Long *)(quadrant+i  ) ^ *(Long *)(quadrant+j  )) |
+        (*(Long *)(quadrant+i+4) ^ *(Long *)(quadrant+j+4)))
       goto compare_slowly;
     i += 8; j += 8;
     if (i > nblock) i -= nblock;
@@ -263,18 +261,18 @@ fullGt(SInt   i,
 --*/
 static
 SInt incs[14] = { 1, 4, 13, 40, 121, 364, 1093, 3280,
-		  9841, 29524, 88573, 265720,
-		  797161, 2391484 };
+                  9841, 29524, 88573, 265720,
+                  797161, 2391484 };
 
 static inline void
 shell_sort(Int   *ptr,
-	   Byte  *block,
-	   Short *quadrant,
-	   SInt   nblock,
-	   SInt   lo, 
-	   SInt   hi, 
-	   SInt   d,
-	   SLong *budget)
+           Byte  *block,
+           Short *quadrant,
+           SInt   nblock,
+           SInt   lo,
+           SInt   hi,
+           SInt   d,
+           SLong *budget)
 {
   SInt i, j, h, bigN, hp;
   Int v;
@@ -292,23 +290,23 @@ shell_sort(Int   *ptr,
     i = lo + h;
     while (1) {
 
-#define ITER							\
-      {								\
-	SInt t,u;						\
-	if (i > hi) break;					\
-	v = ptr[i];						\
-	j = i;							\
-	u = j-h;						\
-	while (fullGt((t = ptr[u])+d, v+d, block, quadrant,	\
-		      nblock, budget))				\
-	  {							\
-	    ptr[j] = t;						\
-	    j = u;						\
-	    u -= h;						\
-	    if (u <= lo - 1) break;				\
-	  }							\
-	ptr[j] = v;						\
-	i++;							\
+#define ITER                                                    \
+      {                                                         \
+        SInt t,u;                                               \
+        if (i > hi) break;                                      \
+        v = ptr[i];                                             \
+        j = i;                                                  \
+        u = j-h;                                                \
+        while (fullGt((t = ptr[u])+d, v+d, block, quadrant,     \
+                      nblock, budget))                          \
+          {                                                     \
+            ptr[j] = t;                                         \
+            j = u;                                              \
+            u -= h;                                             \
+            if (u <= lo - 1) break;                             \
+          }                                                     \
+        ptr[j] = v;                                             \
+        i++;                                                    \
       }
 
       ITER; ITER; ITER;
@@ -328,19 +326,19 @@ shell_sort(Int   *ptr,
    Sedgewick and Jon L. Bentley.
 --*/
 
-#define mswap(zzt, zz1, zz2)			\
+#define mswap(zzt, zz1, zz2)                    \
   zzt = zz1; zz1 = zz2; zz2 = zzt;
 
-#define mvswap(zzp1, zzp2, zzn)			\
-  {						\
-    SInt yyp1 = (zzp1);				\
-    SInt yyp2 = (zzp2);				\
-    SInt yyn  = (zzn);				\
-    SInt yyt;					\
-    while (yyn > 0) {				\
-      mswap(yyt, ptr[yyp1], ptr[yyp2]);		\
-      yyp1++; yyp2++; yyn--;			\
-    }						\
+#define mvswap(zzp1, zzp2, zzn)                 \
+  {                                             \
+    SInt yyp1 = (zzp1);                         \
+    SInt yyp2 = (zzp2);                         \
+    SInt yyn  = (zzn);                          \
+    SInt yyt;                                   \
+    while (yyn > 0) {                           \
+      mswap(yyt, ptr[yyp1], ptr[yyp2]);         \
+      yyp1++; yyp2++; yyn--;                    \
+    }                                           \
   }
 
 static inline Byte
@@ -348,7 +346,7 @@ mmed3 ( Byte a, Byte b, Byte c )
 {
   Byte t;
   if (a > b) { t = a; a = b; b = t; };
-  if (b > c) { 
+  if (b > c) {
     b = c;
     if (a > b) b = a;
   }
@@ -366,7 +364,6 @@ mmed3 ( Byte a, Byte b, Byte c )
                          lz = stack[--sp]; }
 
 
-
 #define BZ_N_RADIX 2
 #define BZ_N_QSORT 16
 #define BZ_N_SHELL 18
@@ -378,13 +375,13 @@ mmed3 ( Byte a, Byte b, Byte c )
 
 static inline void
 quick_sort(Int   *ptr,
-	   Byte  *block,
-	   Short *quadrant,
-	   SInt   nblock,
-	   SInt   lo, 
-	   SInt   hi, 
-	   SInt   d,
-	   SLong *budget)
+           Byte  *block,
+           Short *quadrant,
+           SInt   nblock,
+           SInt   lo,
+           SInt   hi,
+           SInt   d,
+           SLong *budget)
 {
   SInt unLo;  /* unique to low */
   SInt unHi;  /* unique to high */
@@ -409,7 +406,7 @@ quick_sort(Int   *ptr,
       mpop(lo, hi, d);
     }
 
-    med = (SInt) 
+    med = (SInt)
       mmed3 ( block[ptr[ lo         ]+d],
               block[ptr[ hi         ]+d],
               block[ptr[ (lo+hi)>>1 ]+d] );
@@ -422,9 +419,9 @@ quick_sort(Int   *ptr,
       while (1) {
         if (unLo > unHi) break;
         n = ((SInt)block[ptr[unLo]+d]) - med;
-        if (n == 0) { 
-          mswap(t, ptr[unLo], ptr[ltLo]); 
-          ltLo++; unLo++; continue; 
+        if (n == 0) {
+          mswap(t, ptr[unLo], ptr[ltLo]);
+          ltLo++; unLo++; continue;
         }
         if (n >  0) break;
         unLo++;
@@ -432,9 +429,9 @@ quick_sort(Int   *ptr,
       while (1) {
         if (unLo > unHi) break;
         n = ((SInt)block[ptr[unHi]+d]) - med;
-        if (n == 0) { 
-          mswap(t, ptr[unHi], ptr[gtHi]); 
-          gtHi--; unHi--; continue; 
+        if (n == 0) {
+          mswap(t, ptr[unHi], ptr[gtHi]);
+          gtHi--; unHi--; continue;
         }
         if (n <  0) break;
         unHi--;
@@ -509,19 +506,19 @@ quick_sort(Int   *ptr,
 */
 
 /* NOTE: I'm not quite sure if this code is endian-neutral. */
-#define BUCKET_SORT(op)				\
-  {						\
-    Int i = 0;					\
-    Int i_lim = nblock & 0xFFFF8;		\
-    Int a0, a1, b0, b1, c0, c1, d0, d1;		\
-    Int e0, e1, f0, f1, g0, g1, h0, h1;		\
-    Int s, u;					\
-    Long w;					\
-						\
-    s = block[nblock - 1] << 8;			\
-						\
-    while (i+8 <= i_lim)			\
-    {						\
+#define BUCKET_SORT(op)                         \
+  {                                             \
+    Int i = 0;                                  \
+    Int i_lim = nblock & 0xFFFF8;               \
+    Int a0, a1, b0, b1, c0, c1, d0, d1;         \
+    Int e0, e1, f0, f1, g0, g1, h0, h1;         \
+    Int s, u;                                   \
+    Long w;                                     \
+                                                \
+    s = block[nblock - 1] << 8;                 \
+                                                \
+    while (i+8 <= i_lim)                        \
+    {                                           \
       /* Little endian code:                    \
       w = *(Long *)(block + i);                 \
       a1 = (w <<  8) & 0xFF00;                  \
@@ -539,7 +536,7 @@ quick_sort(Int   *ptr,
       g1 = (w >> 40) & 0xFF00;                  \
       g0 = (w >> 48) & 0x00FF;                  \
       h1 = (w >> 48) & 0xFF00;                  \
-      h0 = (w >> 56);				\
+      h0 = (w >> 56);                           \
       */                                        \
       a0 = block[i  ]; a1 = a0 << 8;            \
       b0 = block[i+1]; b1 = b0 << 8;            \
@@ -549,32 +546,32 @@ quick_sort(Int   *ptr,
       f0 = block[i+5]; f1 = f0 << 8;            \
       g0 = block[i+6]; g1 = g0 << 8;            \
       h0 = block[i+7]; h1 = h0 << 8;            \
-						\
-      u = s  | a0; op; i++;			\
-      u = a1 | b0; op; i++;			\
-      u = b1 | c0; op; i++;			\
-      u = c1 | d0; op; i++;			\
-      u = d1 | e0; op; i++;			\
-      u = e1 | f0; op; i++;			\
-      u = f1 | g0; op; i++;			\
-      u = g1 | h0; op; i++;			\
-      s = h1;					\
-    }						\
-						\
-    while (i < nblock)				\
-    {						\
-      a0 = block[i];				\
-      a1 = a0 << 8;				\
-      u = s | a0; op; i++;			\
-      s = a1;					\
-    }						\
+                                                \
+      u = s  | a0; op; i++;                     \
+      u = a1 | b0; op; i++;                     \
+      u = b1 | c0; op; i++;                     \
+      u = c1 | d0; op; i++;                     \
+      u = d1 | e0; op; i++;                     \
+      u = e1 | f0; op; i++;                     \
+      u = f1 | g0; op; i++;                     \
+      u = g1 | h0; op; i++;                     \
+      s = h1;                                   \
+    }                                           \
+                                                \
+    while (i < nblock)                          \
+    {                                           \
+      a0 = block[i];                            \
+      a1 = a0 << 8;                             \
+      u = s | a0; op; i++;                      \
+      s = a1;                                   \
+    }                                           \
   }
 
 static void
 bucket_sort(Int  *ptr,
-	    Byte *block,
-	    Int  *ftab,
-	    Int   nblock)
+            Byte *block,
+            Int  *ftab,
+            Int   nblock)
 {
   Int f;
   Int i;
@@ -584,55 +581,55 @@ bucket_sort(Int  *ptr,
 #if 0
   BUCKET_SORT(ftab[u]++);
 #else
-  {						
-    Int i = 0;					
-    Int i_lim = nblock & 0xFFFF8;		
-    Int a0, a1, b0, b1, c0, c1, d0, d1;		
-    Int e0, e1, f0, f1, g0, g1, h0, h1;		
-    Int s, u;					
-    Long w;					
-						
-    s = block[nblock - 1] << 8;			
-						
-    while (i+8 <= i_lim)			
-    {						
-      w = *(Long *)(block + i);                 
-						
-      a1 = (w <<  8) & 0xFF00;                  
-      a0 = (w      ) & 0x00FF;                  
-      b1 = (w      ) & 0xFF00;                  
-      b0 = (w >>  8) & 0x00FF;                  
-      c1 = (w >>  8) & 0xFF00;                  
-      c0 = (w >> 16) & 0x00FF;                  
-      d1 = (w >> 16) & 0xFF00;                  
-      d0 = (w >> 24) & 0x00FF;                  
-      e1 = (w >> 24) & 0xFF00;                  
-      e0 = (w >> 32) & 0x00FF;                  
-      f1 = (w >> 32) & 0xFF00;                  
-      f0 = (w >> 40) & 0x00FF;                  
-      g1 = (w >> 40) & 0xFF00;                  
-      g0 = (w >> 48) & 0x00FF;                  
-      h1 = (w >> 48) & 0xFF00;                  
-      h0 = (w >> 56);				
-						
-      u = s  | a0; ftab[u]++; i++;			
-      u = a1 | b0; ftab[u]++; i++;			
-      u = b1 | c0; ftab[u]++; i++;			
-      u = c1 | d0; ftab[u]++; i++;			
-      u = d1 | e0; ftab[u]++; i++;			
-      u = e1 | f0; ftab[u]++; i++;			
-      u = f1 | g0; ftab[u]++; i++;			
-      u = g1 | h0; ftab[u]++; i++;			
-      s = h1;					
-    }						
-						
-    while (i < nblock)				
-    {						
-      a0 = block[i];				
-      a1 = a0 << 8;				
-      u = s | a0; ftab[u]++; i++;			
-      s = a1;					
-    }						
+  {
+    Int i = 0;
+    Int i_lim = nblock & 0xFFFF8;
+    Int a0, a1, b0, b1, c0, c1, d0, d1;
+    Int e0, e1, f0, f1, g0, g1, h0, h1;
+    Int s, u;
+    Long w;
+
+    s = block[nblock - 1] << 8;
+
+    while (i+8 <= i_lim)
+    {
+      w = *(Long *)(block + i);
+
+      a1 = (w <<  8) & 0xFF00;
+      a0 = (w      ) & 0x00FF;
+      b1 = (w      ) & 0xFF00;
+      b0 = (w >>  8) & 0x00FF;
+      c1 = (w >>  8) & 0xFF00;
+      c0 = (w >> 16) & 0x00FF;
+      d1 = (w >> 16) & 0xFF00;
+      d0 = (w >> 24) & 0x00FF;
+      e1 = (w >> 24) & 0xFF00;
+      e0 = (w >> 32) & 0x00FF;
+      f1 = (w >> 32) & 0xFF00;
+      f0 = (w >> 40) & 0x00FF;
+      g1 = (w >> 40) & 0xFF00;
+      g0 = (w >> 48) & 0x00FF;
+      h1 = (w >> 48) & 0xFF00;
+      h0 = (w >> 56);
+
+      u = s  | a0; ftab[u]++; i++;
+      u = a1 | b0; ftab[u]++; i++;
+      u = b1 | c0; ftab[u]++; i++;
+      u = c1 | d0; ftab[u]++; i++;
+      u = d1 | e0; ftab[u]++; i++;
+      u = e1 | f0; ftab[u]++; i++;
+      u = f1 | g0; ftab[u]++; i++;
+      u = g1 | h0; ftab[u]++; i++;
+      s = h1;
+    }
+
+    while (i < nblock)
+    {
+      a0 = block[i];
+      a1 = a0 << 8;
+      u = s | a0; ftab[u]++; i++;
+      s = a1;
+    }
   }
 #endif
 
@@ -643,37 +640,37 @@ bucket_sort(Int  *ptr,
 #if 0
   BUCKET_SORT(ptr[--ftab[u]] = i-1);
 #else
-  {						
-    Int i = 0;					
-    Int i_lim = nblock & 0xFFFF8;		
-    Int a0, a1, b0, b1, c0, c1, d0, d1;		
-    Int e0, e1, f0, f1, g0, g1, h0, h1;		
-    Int s, u;					
-    Long w;					
-						
-    s = block[nblock - 1] << 8;			
-						
-    while (i+8 <= i_lim)			
-    {						
-      w = *(Long *)(block + i);                 
-						
-      a1 = (w <<  8) & 0xFF00;                  
-      a0 = (w      ) & 0x00FF;                  
-      b1 = (w      ) & 0xFF00;                  
-      b0 = (w >>  8) & 0x00FF;                  
-      c1 = (w >>  8) & 0xFF00;                  
-      c0 = (w >> 16) & 0x00FF;                  
-      d1 = (w >> 16) & 0xFF00;                  
-      d0 = (w >> 24) & 0x00FF;                  
-      e1 = (w >> 24) & 0xFF00;                  
-      e0 = (w >> 32) & 0x00FF;                  
-      f1 = (w >> 32) & 0xFF00;                  
-      f0 = (w >> 40) & 0x00FF;                  
-      g1 = (w >> 40) & 0xFF00;                  
-      g0 = (w >> 48) & 0x00FF;                  
-      h1 = (w >> 48) & 0xFF00;                  
-      h0 = (w >> 56);				
-						
+  {
+    Int i = 0;
+    Int i_lim = nblock & 0xFFFF8;
+    Int a0, a1, b0, b1, c0, c1, d0, d1;
+    Int e0, e1, f0, f1, g0, g1, h0, h1;
+    Int s, u;
+    Long w;
+
+    s = block[nblock - 1] << 8;
+
+    while (i+8 <= i_lim)
+    {
+      w = *(Long *)(block + i);
+
+      a1 = (w <<  8) & 0xFF00;
+      a0 = (w      ) & 0x00FF;
+      b1 = (w      ) & 0xFF00;
+      b0 = (w >>  8) & 0x00FF;
+      c1 = (w >>  8) & 0xFF00;
+      c0 = (w >> 16) & 0x00FF;
+      d1 = (w >> 16) & 0xFF00;
+      d0 = (w >> 24) & 0x00FF;
+      e1 = (w >> 24) & 0xFF00;
+      e0 = (w >> 32) & 0x00FF;
+      f1 = (w >> 32) & 0xFF00;
+      f0 = (w >> 40) & 0x00FF;
+      g1 = (w >> 40) & 0xFF00;
+      g0 = (w >> 48) & 0x00FF;
+      h1 = (w >> 48) & 0xFF00;
+      h0 = (w >> 56);
+
       u = s  | a0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
       u = a1 | b0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
       u = b1 | c0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
@@ -682,28 +679,26 @@ bucket_sort(Int  *ptr,
       u = e1 | f0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
       u = f1 | g0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
       u = g1 | h0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      s = h1;					
-    }						
-						
-    while (i < nblock)				
-    {						
-      a0 = block[i];				
-      a1 = a0 << 8;				
+      s = h1;
+    }
+
+    while (i < nblock)
+    {
+      a0 = block[i];
+      a1 = a0 << 8;
       u = s | a0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      s = a1;					
-    }						
+      s = a1;
+    }
   }
 #endif
   ptr[f-1] = nblock-1;
 }
 
 
-
 #define BIGFREQ(b) (ftab[((b)+1) << 8] - ftab[(b) << 8])
 /* A flag indicating that a small bucket is done. */
 #define SETMASK (1 << 20)
 #define CLEARMASK (~SETMASK)
-
 
 
 /* return 1 if failed, 0 if success */
@@ -808,7 +803,7 @@ shallow_sort(Int *ptr,
     /*--
       Step 1:
       Complete the big bucket [ss] by quicksorting
-      any unsorted small buckets [ss, j], for j != ss.  
+      any unsorted small buckets [ss, j], for j != ss.
       Hopefully previous pointer-scanning phases have already
       completed many of the small buckets [ss, j], so
       we don't have to sort them at all.
@@ -824,8 +819,8 @@ shallow_sort(Int *ptr,
           SInt hi = (ftab[sb+1] & CLEARMASK) - 1;
           if (hi > lo)
           {
-            quick_sort(ptr, block, quadrant, nblock, 
-                       lo, hi, BZ_N_RADIX, &budget);   
+            quick_sort(ptr, block, quadrant, nblock,
+                       lo, hi, BZ_N_RADIX, &budget);
             if (budget < 0)
               return 1;
           }
@@ -859,7 +854,7 @@ shallow_sort(Int *ptr,
     {
       k = ptr[j]-1; if (k < 0) k += nblock;
       c1 = block[k];
-      if (!bigDone[c1]) 
+      if (!bigDone[c1])
         ptr[ copyEnd[c1]-- ] = k;
     }
 
@@ -882,7 +877,7 @@ shallow_sort(Int *ptr,
       necessary.
 
       The quadrant array provides a way to incrementally
-      cache sort orderings, as they appear, so as to 
+      cache sort orderings, as they appear, so as to
       make subsequent comparisons in fullGt() complete
       faster.  For repetitive blocks this makes a big
       difference (but not big enough to be able to avoid
@@ -892,9 +887,9 @@ shallow_sort(Int *ptr,
 
       for 0 <= i < nblock and 0 <= j <= nblock
 
-      if block[i] != block[j], 
+      if block[i] != block[j],
 
-      then the relative values of quadrant[i] and 
+      then the relative values of quadrant[i] and
       quadrant[j] are meaningless.
 
       else {
@@ -934,11 +929,6 @@ shallow_sort(Int *ptr,
 }
 
 
-
-
-
-
-
 /*---------------------------------------------*/
 /*--- Fallback O(N log(N)^2) sorting        ---*/
 /*--- algorithm, for repetitive blocks      ---*/
@@ -946,9 +936,9 @@ shallow_sort(Int *ptr,
 
 /*---------------------------------------------*/
 static
-void fallbackSimpleSort ( Int* fmap, 
-                          Int* eclass, 
-                          SInt   lo, 
+void fallbackSimpleSort ( Int* fmap,
+                          Int* eclass,
+                          SInt   lo,
                           SInt   hi )
 {
    SInt i, j, tmp;
@@ -982,13 +972,13 @@ void fallbackSimpleSort ( Int* fmap,
 
 #define fvswap(zzp1, zzp2, zzn)       \
 {                                     \
-  SInt yyp1 = (zzp1);		      \
-  SInt yyp2 = (zzp2);		      \
-  SInt yyn  = (zzn);		      \
-  while (yyn > 0) {		      \
+  SInt yyp1 = (zzp1);                 \
+  SInt yyp2 = (zzp2);                 \
+  SInt yyn  = (zzn);                  \
+  while (yyn > 0) {                   \
     fswap(fmap[yyp1], fmap[yyp2]);    \
-    yyp1++; yyp2++; yyn--;	      \
-  }				      \
+    yyp1++; yyp2++; yyn--;            \
+  }                                   \
 }
 
 
@@ -1007,9 +997,9 @@ void fallbackSimpleSort ( Int* fmap,
 
 
 static
-void fallbackQSort3 ( Int* fmap, 
+void fallbackQSort3 ( Int* fmap,
                       Int* eclass,
-                      SInt   loSt, 
+                      SInt   loSt,
                       SInt   hiSt )
 {
    SInt unLo, unHi, ltLo, gtHi, n, m;
@@ -1034,9 +1024,9 @@ void fallbackQSort3 ( Int* fmap,
       }
 
       /* Random partitioning.  Median of 3 sometimes fails to
-         avoid bad cases.  Median of 9 seems to help but 
+         avoid bad cases.  Median of 9 seems to help but
          looks rather expensive.  This too seems to work but
-         is cheaper.  Guidance for the magic constants 
+         is cheaper.  Guidance for the magic constants
          7621 and 32768 is taken from Sedgewick's algorithms
          book, chapter 35.
       */
@@ -1053,10 +1043,10 @@ void fallbackQSort3 ( Int* fmap,
          while (1) {
             if (unLo > unHi) break;
             n = (SInt)eclass[fmap[unLo]] - (SInt)med;
-            if (n == 0) { 
-               fswap(fmap[unLo], fmap[ltLo]); 
-               ltLo++; unLo++; 
-               continue; 
+            if (n == 0) {
+               fswap(fmap[unLo], fmap[ltLo]);
+               ltLo++; unLo++;
+               continue;
             }
             if (n > 0) break;
             unLo++;
@@ -1064,10 +1054,10 @@ void fallbackQSort3 ( Int* fmap,
          while (1) {
             if (unLo > unHi) break;
             n = (SInt)eclass[fmap[unHi]] - (SInt)med;
-            if (n == 0) { 
-               fswap(fmap[unHi], fmap[gtHi]); 
-               gtHi--; unHi--; 
-               continue; 
+            if (n == 0) {
+               fswap(fmap[unHi], fmap[gtHi]);
+               gtHi--; unHi--;
+               continue;
             }
             if (n < 0) break;
             unHi--;
@@ -1181,7 +1171,7 @@ static int X_UNALIGNED_BH(Int *bhtab, Int nblock, Int zz)
 
 static void
 deep_sort(Int *fmap,
-          Int *eclass, 
+          Int *eclass,
           Int *ftab,
           Long *bhtab,
           Int nblock)
@@ -1288,12 +1278,16 @@ YBpriv_block_sort(YBenc_t *s)
                             s->nblock, s->shallow_factor);
   if (failed)
   {
+    Int *bucket;
+
     Trace((stderr,
            "Block is too repetitive; switching to BPR algorithm...\n"));
-    deep_sort(s->ptr, s->bucket, s->ftab, s->bhtab, s->nblock);
+
+    bucket = xalloc(s->nblock * sizeof(Int));
+    deep_sort(s->ptr, bucket, s->ftab, s->bhtab, s->nblock);
+    xfree(bucket);
   }
 }
-
 
 
 /* Local Variables: */

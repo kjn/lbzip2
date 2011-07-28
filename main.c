@@ -412,28 +412,6 @@ trace_free(void *ptr)
 }
 
 
-void *(*lbzallocf)(void *ignored, int n, int m);
-
-
-static void *
-trace_bzalloc(void *ignored, int n, int m)
-{
-  assert(0 < n && 0 < m);
-  assert((size_t)-1 / (size_t)n >= (size_t)m);
-  return trace_malloc((size_t)n * (size_t)m);
-}
-
-
-void (*lbzfreef)(void *ignored, void *ptr);
-
-
-static void
-trace_bzfree(void *ignored, void *ptr)
-{
-  trace_free(ptr);
-}
-
-
 /* (IV) Threading utilities. */
 
 void
@@ -610,6 +588,7 @@ struct opts
   enum outmode outmode; /* How to store output, -c/-t. */
   int decompress,       /* Run in bunzip2 mode, -d/-z. */
       bs100k,           /* Blocksize switch for compression, -1 .. -9. */
+      exponential,      /* Use an alternative block-sorting algorithm. */
       force,            /* Open anything / break links / remove output, -f. */
       keep,             /* Don't rm FILE oprnds / open rf with >1 links, -k. */
       verbose,          /* Print a msg. each time when starting a muxer, -v. */
@@ -652,7 +631,8 @@ usage(unsigned mx_worker)
   log_info(
     "lbzip2: Parallel bzip2 utility.\n"
     "Copyright (C) 2008, 2009, 2010 Laszlo Ersek.\n"
-    "Released under the GNU GPLv2+.\n"
+    "Copyright (C) 2011 Mikolaj Izdebski.\n"
+    "Released under the GNU GPLv3+.\n"
     "Version %s.\n"
     "\n"
     "Usage:\n"
@@ -708,27 +688,27 @@ usage(unsigned mx_worker)
     "                       output file before opening it.\n"
     "  -v, --verbose      : Log each (de)compression start to stderr.\n"
     "  -S                 : Print condition variable statistics to stderr.\n"
+    "  --exponential      : Use an alternative block-sorting algorithm.\n"
     "  -s, --small,\n"
     "  -q, --quiet,\n"
     "  --repetitive-fast,\n"
     "  --repetitive-best  : Accepted for compatibility, otherwise ignored.\n"
     "  -h, --help,\n"
-    "  -L, --license,\n"
-    "  -V, --version      : Print this help and exit successfully.\n"
-    "\n"
-    "Operands:\n");
+    "  -L, --license,\n");
 
   log_info(
+    "  -V, --version      : Print this help and exit successfully.\n"
+    "\n"
+    "Operands:\n"
     "  FILE               : Specify files to compress or decompress. If no\n"
     "                       FILE is given, work as a filter. FILEs with\n"
     "                       \".bz2\", \".tbz\", \".tbz2\" and \".tz2\" name\n"
     "                       suffixes will be skipped when compressing. When\n"
     "                       decompressing, \".bz2\" suffixes will be removed\n"
-    "                       in output filenames; \".tbz\", \".tbz2\" and\n"
-    "                       \".tz2\" suffixes will be replaced by \".tar\";\n"
-  );
+    "                       in output filenames; \".tbz\", \".tbz2\" and\n");
 
   log_info(
+    "                       \".tz2\" suffixes will be replaced by \".tar\";\n"
     "                       other filenames will be suffixed with \".out\".\n"
   );
 
@@ -846,6 +826,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
     }
   }
   opts->bs100k = 9;
+  opts->exponential = 0;
   opts->force = 0;
   opts->keep = 0;
   opts->verbose = 0;
@@ -901,6 +882,9 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
           }
           else if (0 == strcmp("fast", argscan)) {
             opts->bs100k = 1;
+          }
+          else if (0 == strcmp("exponential", argscan)) {
+            opts->exponential = 1;
           }
           else if (0 == strcmp("best", argscan)) {
             opts->bs100k = 9;
@@ -1510,6 +1494,7 @@ process(const struct opts *opts, unsigned num_slot, int infd, const char *isep,
     muxer_arg.lbzip2.osep = osep;
     muxer_arg.lbzip2.ofmt = ofmt;
     muxer_arg.lbzip2.bs100k = opts->bs100k;
+    muxer_arg.lbzip2.exponential = opts->exponential;
     xcreate(&muxer, lbzip2_wrap, &muxer_arg.lbzip2);
   }
 
@@ -1623,8 +1608,6 @@ main(int argc, char **argv)
     if (0 != ev_val && '\0' != *ev_val) {
       mallocf = trace_malloc;
       freef = trace_free;
-      lbzallocf = trace_bzalloc;
-      lbzfreef = trace_bzfree;
     }
     else {
       mallocf = malloc;

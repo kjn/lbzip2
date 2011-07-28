@@ -506,18 +506,18 @@ generate_initial_trees(YBenc_t *s, int nmtf, int alphaSize, Int nGroups)
       aFreq += s->lookup[0][ge];
     }
 
-    if (ge > gs 
-        && nPart != nGroups && nPart != 1 
+    if (ge > gs
+        && nPart != nGroups && nPart != 1
         && ((nGroups-nPart) % 2 == 1)) {
       aFreq -= s->lookup[0][ge];
       ge--;
     }
 
     for (v = 0; v < alphaSize; v++)
-      if (v >= gs && v <= ge) 
+      if (v >= gs && v <= ge)
         s->length[nPart-1][v] = 0; else
         s->length[nPart-1][v] = 1;
- 
+
     nPart--;
     gs = ge+1;
     remF -= aFreq;
@@ -709,7 +709,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
   }
 
   s->num_trees = nGroups;
- 
+
 
   cost = 0;
 

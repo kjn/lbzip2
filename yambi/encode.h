@@ -56,9 +56,9 @@ struct YBenc_s
   Int *ftab;
   Long *bhtab;
   Int *ptr;
-  Int *bucket;
   Byte *block;
   Short *quadrant;
+  Short *mtfv;
 };
 
 

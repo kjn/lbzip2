@@ -82,30 +82,30 @@ do_mtf(ptr, block, inuse, mtffreq, nblock, idx)
   for (i = 1; i < ninuse; i++)
     order[i-1] = i;
 
-#define RUN()					\
-  if (unlikely(k))				\
+#define RUN()                                   \
+  if (unlikely(k))                              \
     do {                                        \
-      mtffreq[*mtfv++ = --k & 1]++;		\
-      k >>= 1;					\
-    } while (k);				\
+      mtffreq[*mtfv++ = --k & 1]++;             \
+      k >>= 1;                                  \
+    } while (k);                                \
 
-#define MTF()					\
-  {						\
-    Byte *p = order;				\
-    t  = *p;					\
-    *p = u;					\
-    for (;;)					\
-    {						\
+#define MTF()                                   \
+  {                                             \
+    Byte *p = order;                            \
+    t  = *p;                                    \
+    *p = u;                                     \
+    for (;;)                                    \
+    {                                           \
       if (c == t) {u=t;break;}                  \
-      u  = *++p;				\
-      *p = t;					\
-      if (c == u) break;			\
-      t  = *++p;				\
-      *p = u;					\
-    }						\
+      u  = *++p;                                \
+      *p = t;                                   \
+      if (c == u) break;                        \
+      t  = *++p;                                \
+      *p = u;                                   \
+    }                                           \
     t = p - order + 2;                          \
-    *mtfv++ = t;				\
-    mtffreq[t]++;				\
+    *mtfv++ = t;                                \
+    mtffreq[t]++;                               \
   }
 
   for (i = 0; likely((jj = ptr[i]) != 0); i++)
@@ -183,7 +183,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
     + 00  /* {tree} */
     + 00; /* {mtfv} */
 
-  cost += YBpriv_prefix(s, (Short *)s->ptr, s->nmtf);
+  cost += YBpriv_prefix(s, s->mtfv, s->nmtf);
 
   sp = s->selector;
   smp = s->selectorMTF;

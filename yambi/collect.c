@@ -97,12 +97,13 @@ YBenc_init(unsigned long max_block_size,
   s->cmap = xalloc(256 * sizeof(Byte));
   s->selector = xalloc((18000+1+1) * sizeof(Byte));
   s->selectorMTF = xalloc((18000+1+7) * sizeof(Byte));
-  s->ftab = xalloc(65537 * sizeof(Int));
   s->bhtab = xalloc((900000+2*64+63)/64 * sizeof(Long));
   s->ptr = xalloc(900000 * sizeof(Int));
-  s->bucket = xalloc(900000 * sizeof(Int));
   s->block = xalloc((900000+1000) * sizeof(Byte));
+  s->ftab = xalloc(65537 * sizeof(Int));
   s->quadrant = xalloc((900000+1000) * sizeof(Short));
+  s->mtfv = (Short *)s->ptr;
+
 
   for (i = 0; i < 256; i++)
     s->cmap[i] = 0;
@@ -119,11 +120,10 @@ YBenc_destroy(YBenc_t *enc)
   xfree(enc->cmap);
   xfree(enc->selector);
   xfree(enc->selectorMTF);
-  xfree(enc->ftab);
   xfree(enc->bhtab);
   xfree(enc->ptr);
-  xfree(enc->bucket);
   xfree(enc->block);
+  xfree(enc->ftab);
   xfree(enc->quadrant);
 
   xfree(enc);

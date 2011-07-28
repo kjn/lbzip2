@@ -58,9 +58,9 @@
    minimum-redundancy prefix codes" by Alistair Moffat and Andrew Turpin. */
 static int
 make_tree(YBibs_t *ibs,
-	  int t,
-	  Byte L[],
-	  Int n)
+          int t,
+          Byte L[],
+          Int n)
 {
   Int   *C;  /* code length count; C[0] is a sentinel (always zero) */
   Long  *B;  /* left-justified base */
@@ -185,71 +185,71 @@ make_tree(YBibs_t *ibs,
 
 
 
-#define REFILL(ss)				\
+#define REFILL(ss)                              \
   do                                            \
   {                                             \
     if (in_avail < 4)                           \
     {                                           \
-      togo = 4;					\
+      togo = 4;                                 \
       ibs->recv_state = ss;                     \
-    case ss:					\
+    case ss:                                    \
       while (in_avail && togo)                  \
       {                                         \
         w += 8;                                 \
-        v |= (Long)*in++ << (64-w);		\
-        in_avail--;				\
+        v |= (Long)*in++ << (64-w);             \
+        in_avail--;                             \
         togo--;                                 \
-      }						\
-      if (togo)					\
-        goto save_and_ret;			\
+      }                                         \
+      if (togo)                                 \
+        goto save_and_ret;                      \
     }                                           \
     else                                        \
     {                                           \
       /* TODO: endiannes optimization */        \
-      v |= ((Long)in[0] << (64-w-8)) |		\
-        ((Long)in[1] << (64-w-16)) |		\
-        ((Long)in[2] << (64-w-24)) |		\
-        ((Long)in[3] << (64-w-32));		\
-      w += 32;					\
-      in += 4;					\
-      in_avail -= 4;				\
+      v |= ((Long)in[0] << (64-w-8)) |          \
+        ((Long)in[1] << (64-w-16)) |            \
+        ((Long)in[2] << (64-w-24)) |            \
+        ((Long)in[3] << (64-w-32));             \
+      w += 32;                                  \
+      in += 4;                                  \
+      in_avail -= 4;                            \
     }                                           \
   }                                             \
   while (0)
 
-#define REFILL_1(ss)				\
+#define REFILL_1(ss)                            \
   do                                            \
   {                                             \
     if (in_avail < 1)                           \
     {                                           \
-      togo = 1;					\
+      togo = 1;                                 \
       ibs->recv_state = ss;                     \
-    case ss:					\
+    case ss:                                    \
       while (in_avail && togo)                  \
       {                                         \
         w += 8;                                 \
-        v |= (Long)*in++ << (64-w);		\
-        in_avail--;				\
+        v |= (Long)*in++ << (64-w);             \
+        in_avail--;                             \
         togo--;                                 \
-      }						\
-      if (togo)					\
-        goto save_and_ret;			\
+      }                                         \
+      if (togo)                                 \
+        goto save_and_ret;                      \
     }                                           \
     else                                        \
     {                                           \
-      v |= (Long)in[0] << (64-w-8);		\
-      w += 8;					\
-      in += 1;					\
-      in_avail -= 1;				\
+      v |= (Long)in[0] << (64-w-8);             \
+      w += 8;                                   \
+      in += 1;                                  \
+      in_avail -= 1;                            \
     }                                           \
   }                                             \
   while (0)
 
 #define GET(vv,nn,ss)                           \
   do                                            \
-  {						\
-    if (w < (nn)) { REFILL(ss); }		\
-    (vv) = v >> (64-(nn));			\
+  {                                             \
+    if (w < (nn)) { REFILL(ss); }               \
+    (vv) = v >> (64-(nn));                      \
     w -= (nn);                                  \
     v <<= (nn);                                 \
   }                                             \
@@ -257,9 +257,9 @@ make_tree(YBibs_t *ibs,
 
 #define GET_SLOW(vv,nn,ss)                      \
   do                                            \
-  {						\
-    while (w < (nn)) { REFILL_1(ss); }		\
-    (vv) = v >> (64-(nn));			\
+  {                                             \
+    while (w < (nn)) { REFILL_1(ss); }          \
+    (vv) = v >> (64-(nn));                      \
     w -= (nn);                                  \
     v <<= (nn);                                 \
   }                                             \
@@ -437,15 +437,6 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
   in = (const Byte *)buf;
   in_avail = *buf_sz;
-
-  __builtin_prefetch(in, 0, 0);
-  __builtin_prefetch(in+64, 0, 0);
-  __builtin_prefetch(in+128, 0, 0);
-  __builtin_prefetch(in+192, 0, 0);
-  __builtin_prefetch(in+256, 0, 0);
-  __builtin_prefetch(in+320, 0, 0);
-  __builtin_prefetch(in+384, 0, 0);
-  __builtin_prefetch(in+448, 0, 0);
 
 
   /*=== RESTORE SAVED AUTOMATIC VARIABLES ===*/
@@ -756,8 +747,6 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
     for (g = 0; g < ibs->num_selectors; g++)
     {
-      __builtin_prefetch(in+256, 0, 0);
-
       /* We started a new group, time to (possibly) switch to a new tree.
          We check the selector table to determine which tree to use.
          If the value we looked up is 6 or 7, it means decode error

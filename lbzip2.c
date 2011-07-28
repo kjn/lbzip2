@@ -260,18 +260,18 @@ split_wrap(void *v_split_arg)
 
 static void
 work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
-    const char *isep, const char *ifmt)
+    int exponential, const char *isep, const char *ifmt)
 {
   struct w2m_blk *w2m_blk;
   char *ibuf;    /* pointer to a next, not yet consumed, input byte */
   size_t ileft;  /* input bytes left (not yet consumed) */
   size_t sub_i;  /* current subblock index */
-  int rv;        /* return value from yambi YBenc_collect() */
 
   w2m_blk = xalloc(sizeof(struct w2m_blk));
 
   ibuf = (char *)(s2w_blk + 1);
   ileft = s2w_blk->loaded;
+  assert(ileft > 0);
 
   sub_i = 0;
   do {
@@ -285,13 +285,12 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
     /* Allocate a yambi encoder with given block size and default parameters.
      */
-    assert(ileft > 0);
-    enc = YBenc_init(bs100k * 100000, YB_DEFAULT_SHALLOW, YB_DEFAULT_PREFIX);
+    enc = YBenc_init(bs100k * 100000,
+        exponential ? 0 : YB_DEFAULT_SHALLOW, YB_DEFAULT_PREFIX);
 
     /* Collect as much data as we can. */
     consumed = ileft;
-    rv = YBenc_collect(enc, ibuf, &ileft);
-    assert(rv == YB_OK || rv == YB_OVERFLOW);
+    YBenc_collect(enc, ibuf, &ileft);
     consumed -= ileft;
     ibuf += consumed;
 
@@ -309,8 +308,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
     w2m_blk->subblock[sub_i].buf = buf;
     w2m_blk->subblock[sub_i].size = size;
     sub_i++;
-  } while (rv == YB_OVERFLOW);
-  assert(ileft == 0);
+  } while (ileft > 0);
 
   w2m_blk->n_subblocks = sub_i;
   w2m_blk->id = s2w_blk->id;
@@ -327,7 +325,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
 
 static void
-work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k,
+work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential,
     const char *isep, const char *ifmt)
 {
   for (;;) {
@@ -350,7 +348,7 @@ work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k,
     }
     xunlock(&s2w_q->av_or_eof);
 
-    work_compr(s2w_blk, w2m_q, bs100k, isep, ifmt);
+    work_compr(s2w_blk, w2m_q, bs100k, exponential, isep, ifmt);
     (*freef)(s2w_blk);
   }
 
@@ -367,7 +365,8 @@ struct work_arg
 {
   struct s2w_q *s2w_q;
   struct w2m_q *w2m_q;
-  int bs100k;
+  int bs100k,
+      exponential;
   const char *isep,
       *ifmt;
 };
@@ -383,6 +382,7 @@ work_wrap(void *v_work_arg)
       work_arg->s2w_q,
       work_arg->w2m_q,
       work_arg->bs100k,
+      work_arg->exponential,
       work_arg->isep,
       work_arg->ifmt
   );
@@ -419,7 +419,7 @@ generic_write(int outfd, const char *osep, const char *ofmt,
 		      ? (size_t)SSIZE_MAX : size);
       if (-1 == written) {
 	log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
-		  err2str(errno));
+	    err2str(errno));
       }
 
       size -= (size_t)written;
@@ -563,7 +563,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
 static void
 lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
     const char *isep, const char *ifmt, int outfd, const char *osep,
-    const char *ofmt, int bs100k)
+       const char *ofmt, int bs100k, int exponential)
 {
   struct s2w_q s2w_q;
   struct w2m_q w2m_q;
@@ -575,6 +575,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
   unsigned i;
 
   assert(1 <= bs100k && bs100k <= 9);
+  assert(exponential == !!exponential);
 
   s2w_q_init(&s2w_q);
   w2m_q_init(&w2m_q, num_worker);
@@ -613,6 +614,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
   work_arg.s2w_q = &s2w_q;
   work_arg.w2m_q = &w2m_q;
   work_arg.bs100k = bs100k;
+  work_arg.exponential = exponential;
   work_arg.isep = isep;
   work_arg.ifmt = ifmt;
 
@@ -688,7 +690,8 @@ lbzip2_wrap(void *v_lbzip2_arg)
       lbzip2_arg->outfd,
       lbzip2_arg->osep,
       lbzip2_arg->ofmt,
-      lbzip2_arg->bs100k
+      lbzip2_arg->bs100k,
+      lbzip2_arg->exponential
   );
 
   xraise(SIGUSR2);
