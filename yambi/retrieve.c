@@ -3,7 +3,7 @@
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 2 of the License, or
+  the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
   This program is distributed in the hope that it will be useful,
@@ -16,8 +16,6 @@
 */
 
 #include "decode.h"
-
-#include <stdlib.h>  /* malloc() */
 
 
 #define Trace(x)
@@ -295,11 +293,7 @@ YBibs_init()
 {
   YBibs_t *ibs;
 
-  /* TODO: consider using calloc as almost all member variables
-     need to be zeroed anyways. */
-  ibs = (YBibs_t *)malloc(sizeof(YBibs_t));
-  if (ibs == NULL)
-    return NULL;
+  ibs = xalloc(sizeof(YBibs_t));
 
   ibs->dec = NULL;
   ibs->recv_state = S_NEW_STREAM;
@@ -337,9 +331,7 @@ YBdec_init()
 {
   YBdec_t *dec;
 
-  dec = (YBdec_t *)malloc(sizeof(YBdec_t));
-  if (dec == NULL)
-    return NULL;
+  dec = xalloc(sizeof(YBdec_t));
 
   dec->ibs = NULL;
 
@@ -350,16 +342,16 @@ YBdec_init()
 void
 YBibs_destroy(YBibs_t *ibs)
 {
-  assert(ibs != NULL);
-  free(ibs);
+  assert(ibs != 0);
+  xfree(ibs);
 }
 
 
 void
 YBdec_destroy(YBdec_t *dec)
 {
-  assert(dec != NULL);
-  free(dec);
+  assert(dec != 0);
+  xfree(dec);
 }
 
 
@@ -381,7 +373,7 @@ YBdec_join(YBdec_t *dec)
 }
 
 
-ptrdiff_t
+int
 YBibs_check(YBibs_t *ibs)
 {
   assert(ibs != NULL);
@@ -405,8 +397,8 @@ YBibs_check(YBibs_t *ibs)
 /* TODO: add optimization similar to inflate_fast from gzip. */
 /* TODO: add endianness optimization. */
 /* TODO: add prefetchnta to avoid lookup tables pollution. */
-ptrdiff_t
-YBibs_recv(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t buf_sz)
+int
+YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 {
   /* These two used to be function parameters, but the function
      prototype changed since then. */
@@ -444,7 +436,16 @@ YBibs_recv(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t buf_sz)
   assert(ibs->dec == NULL || ibs->dec == dec);
 
   in = (const Byte *)buf;
-  in_avail = (Int)buf_sz;
+  in_avail = *buf_sz;
+
+  __builtin_prefetch(in, 0, 0);
+  __builtin_prefetch(in+64, 0, 0);
+  __builtin_prefetch(in+128, 0, 0);
+  __builtin_prefetch(in+192, 0, 0);
+  __builtin_prefetch(in+256, 0, 0);
+  __builtin_prefetch(in+320, 0, 0);
+  __builtin_prefetch(in+384, 0, 0);
+  __builtin_prefetch(in+448, 0, 0);
 
 
   /*=== RESTORE SAVED AUTOMATIC VARIABLES ===*/
@@ -476,6 +477,7 @@ YBibs_recv(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t buf_sz)
   switch (ibs->recv_state)
   {
   case S_DONE:
+    *buf_sz = in_avail;
     return YB_DONE;
 
   case S_NEW_STREAM:
@@ -508,11 +510,13 @@ YBibs_recv(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t buf_sz)
         ibs->recv_state = S_DONE;
         ibs->save_v = v;
         ibs->save_w = w;
-        return in_avail;
+        *buf_sz = in_avail;
+        return YB_OK;
       }
 
       assert(w == 0);
-      return YB_EMPTY;
+      *buf_sz = in_avail;
+      return YB_DONE;
     }
 
     if (magic1 != HEADER_MAGIC_HI ||
@@ -528,7 +532,8 @@ YBibs_recv(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t buf_sz)
       ibs->recv_state = S_DATA_BLOCK;
       ibs->save_v = v;
       ibs->save_w = w;
-      return in_avail;
+      *buf_sz = in_avail;
+      return YB_OK;
     }
 
 
@@ -751,6 +756,8 @@ YBibs_recv(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t buf_sz)
 
     for (g = 0; g < ibs->num_selectors; g++)
     {
+      __builtin_prefetch(in+256, 0, 0);
+
       /* We started a new group, time to (possibly) switch to a new tree.
          We check the selector table to determine which tree to use.
          If the value we looked up is 6 or 7, it means decode error
@@ -866,6 +873,7 @@ save_and_ret:
   SAVE(has_block);
 #undef SAVE
 
+  *buf_sz = in_avail;
   return YB_UNDERFLOW;
 }
 

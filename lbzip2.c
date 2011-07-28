@@ -4,8 +4,9 @@
 #include <assert.h>       /* assert() */
 #include <unistd.h>       /* read() */
 #include <errno.h>        /* errno */
-#include <bzlib.h>        /* bz_stream */
 #include <signal.h>       /* SIGUSR2 */
+
+#include "yambi/yambi.h"  /* YBenc_t */
 
 #include "main.h"         /* pname */
 #include "lbzip2.h"       /* lbzip2() */
@@ -69,10 +70,12 @@ struct w2m_blk            /* Workers to muxer. */
 {
   uint64_t id;            /* Block index as read from infd. */
   struct w2m_blk *next;   /* Next block in list (unordered). */
-  size_t produced;        /* Number of bytes in compr. */
-#if 0
-  char unsigned compr[1]; /* Data to write to outfd, alloc.: sizeof_compr. */
-#endif
+  size_t n_subblocks;
+  struct {
+    void *buf;
+    size_t size;
+    YBcrc_t crc;
+  } subblock[2];
 };
 
 
@@ -181,8 +184,8 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
           err2str(errno));
     }
 
-    if (sizeof_plain == vacant && 0u < id) {
-      /* EOF on first read, but not for first input block. */
+    if (sizeof_plain == vacant) {
+      /* EOF on first read. */
       (*freef)(s2w_blk);
       xlock(&m2s_q->av);
       ++m2s_q->num_free;
@@ -202,7 +205,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
       xbroadcast(&s2w_q->av_or_eof);
     }
 
-    if (sizeof_plain > vacant || 0u == id) {
+    if (sizeof_plain > vacant) {
       if (0 == s2w_q->tail) {
         s2w_q->head = s2w_blk;
       }
@@ -257,46 +260,59 @@ split_wrap(void *v_split_arg)
 
 static void
 work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
-    const char *isep, const char *ifmt,
-    const size_t sizeof_compr, const size_t sizeof_w2m_blk)
+    const char *isep, const char *ifmt)
 {
   struct w2m_blk *w2m_blk;
-  bz_stream strm;
-  int bzret;
+  char *ibuf;    /* pointer to a next, not yet consumed, input byte */
+  size_t ileft;  /* input bytes left (not yet consumed) */
+  size_t sub_i;  /* current subblock index */
+  int rv;        /* return value from yambi YBenc_collect() */
 
-  assert(0u < s2w_blk->loaded || 0u == s2w_blk->id);
+  w2m_blk = xalloc(sizeof(struct w2m_blk));
 
-  w2m_blk = xalloc(sizeof_w2m_blk);
+  ibuf = (char *)(s2w_blk + 1);
+  ileft = s2w_blk->loaded;
 
-  strm.next_in = (char *)(s2w_blk + 1);
-  strm.avail_in = s2w_blk->loaded;
-  strm.next_out = (char *)(w2m_blk + 1);
-  strm.avail_out = sizeof_compr;
-  strm.bzalloc = lbzallocf;
-  strm.bzfree = lbzfreef;
-  strm.opaque = 0;
+  sub_i = 0;
+  do {
+    size_t size;      /* compressed block size */
+    size_t consumed;  /* number of input bytes consumed */
+    YBcrc_t crc;      /* currebt block's CRC */
+    void *buf;        /* allocated output buffer */
+    YBenc_t *enc;     /* encoder */
 
-  bzret = BZ2_bzCompressInit(
-      &strm,
-      bs100k,
-      0, /* verbosity */
-      0  /* workFactor */
-  );
-  assert(BZ_MEM_ERROR == bzret || BZ_OK == bzret);
+    assert(sub_i <= 2);
 
-  if (BZ_MEM_ERROR == bzret) {
-    log_fatal("%s: %s%s%s: BZ2_bzCompressInit(): BZ_MEM_ERROR\n", pname, isep,
-        ifmt, isep);
-  }
+    /* Allocate a yambi encoder with given block size and default parameters.
+     */
+    assert(ileft > 0);
+    enc = YBenc_init(bs100k * 100000, YB_DEFAULT_SHALLOW, YB_DEFAULT_PREFIX);
 
-  bzret = BZ2_bzCompress(&strm, BZ_FINISH);
-  assert(BZ_STREAM_END == bzret);
+    /* Collect as much data as we can. */
+    consumed = ileft;
+    rv = YBenc_collect(enc, ibuf, &ileft);
+    assert(rv == YB_OK || rv == YB_OVERFLOW);
+    consumed -= ileft;
+    ibuf += consumed;
 
-  w2m_blk->produced = sizeof_compr - strm.avail_out;
+    /* Do the hard work. */
+    size = YBenc_work(enc, &w2m_blk->subblock[sub_i].crc);
 
-  bzret = BZ2_bzCompressEnd(&strm);
-  assert(bzret == BZ_OK);
+    /* Now we know the exact compressed block size.
+       Allocate the output buffer and transmit the block into it. */
+    buf = xalloc(size);
+    YBenc_transmit(enc, buf);
 
+    /* The encoder is no longer needed.  Release memory. */
+    YBenc_destroy(enc);
+
+    w2m_blk->subblock[sub_i].buf = buf;
+    w2m_blk->subblock[sub_i].size = size;
+    sub_i++;
+  } while (rv == YB_OVERFLOW);
+  assert(ileft == 0);
+
+  w2m_blk->n_subblocks = sub_i;
   w2m_blk->id = s2w_blk->id;
 
   /* Push block to muxer. */
@@ -312,8 +328,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
 static void
 work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k,
-    const char *isep, const char *ifmt,
-    const size_t sizeof_compr, const size_t sizeof_w2m_blk)
+    const char *isep, const char *ifmt)
 {
   for (;;) {
     struct s2w_blk *s2w_blk;
@@ -335,8 +350,7 @@ work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k,
     }
     xunlock(&s2w_q->av_or_eof);
 
-    work_compr(s2w_blk, w2m_q, bs100k, isep, ifmt, sizeof_compr,
-        sizeof_w2m_blk);
+    work_compr(s2w_blk, w2m_q, bs100k, isep, ifmt);
     (*freef)(s2w_blk);
   }
 
@@ -356,8 +370,6 @@ struct work_arg
   int bs100k;
   const char *isep,
       *ifmt;
-  size_t sizeof_compr,
-      sizeof_w2m_blk;
 };
 
 
@@ -372,9 +384,7 @@ work_wrap(void *v_work_arg)
       work_arg->w2m_q,
       work_arg->bs100k,
       work_arg->isep,
-      work_arg->ifmt,
-      work_arg->sizeof_compr,
-      work_arg->sizeof_w2m_blk
+      work_arg->ifmt
   );
   return 0;
 }
@@ -395,8 +405,34 @@ reord_dealloc(void *ptr, void *ignored)
 
 
 static void
+generic_write(int outfd, const char *osep, const char *ofmt,
+	      void *buf, size_t size)
+{
+  if (-1 != outfd) {
+    char unsigned *cp;
+
+    cp = buf;
+    while (size > 0u) {
+      ssize_t written;
+
+      written = write(outfd, cp, size > (size_t)SSIZE_MAX
+		      ? (size_t)SSIZE_MAX : size);
+      if (-1 == written) {
+	log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
+		  err2str(errno));
+      }
+
+      size -= (size_t)written;
+      cp += written;
+    }
+  }
+}
+
+
+static void
 mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
-    uint64_t *reord_needed, int outfd, const char *osep, const char *ofmt)
+	  uint64_t *reord_needed, int outfd, const char *osep,
+	  const char *ofmt, YBobs_t *obs)
 {
   assert(0 != *reord);
 
@@ -407,6 +443,7 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
   do {
     struct lacos_rbtree_node *reord_head;
     struct w2m_blk *reord_w2m_blk;
+    size_t sub_i;
 
     reord_head = lacos_rbtree_min(*reord);
     assert(0 != reord_head);
@@ -417,24 +454,14 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
     }
 
     /* Write out "reord_w2m_blk". */
-    if (-1 != outfd) {
-      char unsigned *cp;
+    sub_i = 0;
+    do {
+      generic_write(outfd, osep, ofmt, reord_w2m_blk->subblock[sub_i].buf,
+		    reord_w2m_blk->subblock[sub_i].size);
 
-      cp = (char unsigned *)(reord_w2m_blk + 1);
-      while (reord_w2m_blk->produced > 0u) {
-        ssize_t written;
-
-        written = write(outfd, cp, reord_w2m_blk->produced > (size_t)SSIZE_MAX
-            ? (size_t)SSIZE_MAX : reord_w2m_blk->produced);
-        if (-1 == written) {
-          log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
-              err2str(errno));
-        }
-
-        reord_w2m_blk->produced -= (size_t)written;
-        cp += written;
-      }
-    }
+      (*freef)(reord_w2m_blk->subblock[sub_i].buf);
+      YBobs_join(obs, &reord_w2m_blk->subblock[sub_i].crc);
+    } while (++sub_i < reord_w2m_blk->n_subblocks);
 
     ++*reord_needed;
 
@@ -460,10 +487,17 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
 
 static void
 mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
-    const char *ofmt)
+    const char *ofmt, int bs100k)
 {
   struct lacos_rbtree_node *reord;
   uint64_t reord_needed;
+  char header[YB_HEADER_SIZE];
+  char trailer[YB_TRAILER_SIZE];
+  YBobs_t *obs;
+
+  /* Write stream header. */
+  obs = YBobs_init(100000 * bs100k, header);
+  generic_write(outfd, osep, ofmt, header, YB_HEADER_SIZE);
 
   reord = 0;
   reord_needed = 0u;
@@ -509,12 +543,18 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
     } while (0 != w2m_blk);
 
     /* Write out initial continuous sequence of reordered blocks. */
-    mux_write(m2s_q, &reord, &reord_needed, outfd, osep, ofmt);
+    mux_write(m2s_q, &reord, &reord_needed, outfd, osep, ofmt, obs);
 
     xlock_pred(&w2m_q->av_or_exit);
     w2m_q->needed = reord_needed;
   }
   xunlock(&w2m_q->av_or_exit);
+
+  /* Write stream trailer. */
+  YBobs_finish(obs, trailer);
+  generic_write(outfd, osep, ofmt, trailer, YB_TRAILER_SIZE);
+
+  YBobs_destroy(obs);
 
   assert(0 == reord);
 }
@@ -565,18 +605,16 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
   split_arg.infd = infd;
   split_arg.isep = isep;
   split_arg.ifmt = ifmt;
-  SIZES(s2w_blk, plain, (unsigned)bs100k * 100u * 1000u - 20u + 1u, split);
+  SIZES(s2w_blk, plain, (unsigned)bs100k * 100u * 1000u, split);
   xcreate(&splitter, split_wrap, &split_arg);
+
+#undef SIZES
 
   work_arg.s2w_q = &s2w_q;
   work_arg.w2m_q = &w2m_q;
   work_arg.bs100k = bs100k;
   work_arg.isep = isep;
   work_arg.ifmt = ifmt;
-  SIZES(w2m_blk, compr,
-      ((unsigned)split_arg.sizeof_plain * 101u + 99u) / 100u + 600u, work);
-
-#undef SIZES
 
   assert(0u < num_worker);
   assert((size_t)-1 / sizeof *worker >= num_worker);
@@ -585,7 +623,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
     xcreate(&worker[i], work_wrap, &work_arg);
   }
 
-  mux(&w2m_q, &m2s_q, outfd, osep, ofmt);
+  mux(&w2m_q, &m2s_q, outfd, osep, ofmt, bs100k);
 
   i = num_worker;
   do {

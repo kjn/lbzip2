@@ -7,7 +7,7 @@
 #include <string.h>       /* memcpy() */
 #include <signal.h>       /* SIGUSR2 */
 
-#include "yambi/compat.h" /* bz_stream */
+#include "yambi/yambi.h"  /* YBdec_t */
 
 #include "main.h"         /* pname */
 #include "lbunzip2.h"     /* lbunzip2() */
@@ -686,69 +686,54 @@ static void
 work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
     const char *ifmt)
 {
+  int ybret;
   uint64_t decompr_blk_id;
-  bz_stream strm;
-  int bzret;
+  YBibs_t *ibs;
+  YBdec_t *dec;
+  void *ibuf, *obuf;
+  size_t ileft, oleft;
 
   decompr_blk_id = 0u;
-  strm.next_in = (char *)w2w_blk->streamdata;
-  strm.avail_in = w2w_blk->reconstructed;
-  strm.next_out = 0; /* safety */
-  strm.avail_out = 0u; /* safety */
-  strm.bzalloc = lbzallocf;
-  strm.bzfree = lbzfreef;
-  strm.opaque = 0;
 
-  bzret = BZ2_like_bzDecompressInit(
-      &strm,
-      0, /* verbosity */
-      0  /* small */
-  );
-  assert(BZ_MEM_ERROR == bzret || BZ_OK == bzret);
+  ibs = YBibs_init();
+  dec = YBdec_init();
 
-  if (BZ_MEM_ERROR == bzret) {
-    log_fatal("%s: %s%s%s: BZ2_bzDecompressInit(): BZ_MEM_ERROR\n", pname,
-        isep, ifmt, isep);
-  }
+  ibuf = w2w_blk->streamdata;
+  ileft = w2w_blk->reconstructed;
+  ybret = YBibs_retrieve(ibs, dec, ibuf, &ileft);
+  if (ybret == YB_UNDERFLOW)
+    log_fatal("%s: %s%s%s: misrecognized a bit-sequence as a block"
+	      " delimiter\n", pname, isep, ifmt, isep);
+  if (ybret != YB_OK)
+    log_fatal("%s: %s%s%s: data error while retrieving block\n",
+	      pname, isep, ifmt, isep);
+
+  ybret = YBdec_work(dec);
+  if (ybret != YB_OK)
+    log_fatal("%s: %s%s%s: data error while decompressing block: %d\n",
+	      pname, isep, ifmt, isep, ybret);
 
   do {
     struct w2m_blk *w2m_blk;
 
     w2m_blk = xalloc(sizeof *w2m_blk);
-    strm.next_out = (char *)w2m_blk->decompr;
-    strm.avail_out = sizeof w2m_blk->decompr;
 
-    bzret = BZ2_like_bzDecompress(&strm);
-
-    switch (bzret) {
-#define CASE(x) case x: \
-                  log_fatal("%s: %s%s%s: BZ2_bzDecompress(): " #x "\n", \
-                      pname, isep, ifmt, isep)
-      CASE(BZ_DATA_ERROR);
-      CASE(BZ_MEM_ERROR);
-#undef CASE
-
-      case BZ_STREAM_END:
-        /* The scanners find real block headers and EOS markers for sure. */
-        assert(0u == strm.avail_in);
-        break;
-
-      case BZ_OK:
-        /* If what's needed can't be output space, we fail. */
-        if (0u < strm.avail_out) {
-          log_fatal("%s: %s%s%s: misrecognized a bit-sequence as a block"
-              " delimiter\n", pname, isep, ifmt, isep);
-        }
-        break;
-
-      default:
-        assert(0);
+    obuf = w2m_blk->decompr;
+    oleft = sizeof w2m_blk->decompr;
+    ybret = YBdec_emit(dec, obuf, &oleft);
+    if (ybret == YB_OK) {
+      YBdec_join(dec);
+      ybret = YBibs_check(ibs);
+      assert(ybret == YB_OK);
     }
+    else if (ybret != YB_UNDERFLOW)
+      log_fatal("%s: %s%s%s: data error while emitting block: %d\n",
+		pname, isep, ifmt, isep, ybret);
 
     w2m_blk->id.w2w_blk_id = w2w_blk->id;
     w2m_blk->id.decompr_blk_id = decompr_blk_id++;
-    w2m_blk->id.last_decompr = (BZ_STREAM_END == bzret);
-    w2m_blk->produced = sizeof w2m_blk->decompr - strm.avail_out;
+    w2m_blk->id.last_decompr = (ybret == YB_OK);
+    w2m_blk->produced = sizeof w2m_blk->decompr - ileft;
 
     /*
       Push decompressed sub-block to muxer.
@@ -784,10 +769,10 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
       xsignal(&w2m_q->av_or_ex_or_rel);
     }
     xunlock(&w2m_q->av_or_ex_or_rel);
-  } while (BZ_OK == bzret);
+  } while (ybret == YB_UNDERFLOW);
 
-  bzret = BZ2_like_bzDecompressEnd(&strm);
-  assert(BZ_OK == bzret);
+  YBdec_destroy(dec);
+  YBibs_destroy(ibs);
 }
 
 

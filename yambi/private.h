@@ -1,13 +1,21 @@
-#include <assert.h>
-#include <inttypes.h>
+#include <assert.h>    /* assert() */
+#include <inttypes.h>  /* uint32_t */
 
 #include "yambi.h"
+
+
+/* Memoty allocation stuff, provided by lbzip2. */
+void *xalloc(size_t size);
+void (*freef)(void *ptr);
+#define xfree(x) ((*freef)(x))
 
 
 typedef uint8_t  Byte;
 typedef uint16_t Short;
 typedef uint32_t Int;
+typedef int32_t  SInt;
 typedef uint64_t Long;
+typedef int64_t  SLong;
 
 
 /* Explicit static branch prediction to help compiler generating faster code.
