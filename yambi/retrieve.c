@@ -15,6 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <arpa/inet.h>  /* ntohl() */
 #include "decode.h"
 
 
@@ -205,11 +206,7 @@ make_tree(YBibs_t *ibs,
     }                                           \
     else                                        \
     {                                           \
-      /* TODO: endiannes optimization */        \
-      v |= ((Long)in[0] << (64-w-8)) |          \
-        ((Long)in[1] << (64-w-16)) |            \
-        ((Long)in[2] << (64-w-24)) |            \
-        ((Long)in[3] << (64-w-32));             \
+      v |= (Long)ntohl(*(Int *)in) << (32-w);   \
       w += 32;                                  \
       in += 4;                                  \
       in_avail -= 4;                            \
@@ -285,6 +282,7 @@ make_tree(YBibs_t *ibs,
 #define S_DELTA_TAG      22
 #define S_DELTA_INC      23
 #define S_PREFIX         24
+#define S_CRC2           25
 
 
 
@@ -295,7 +293,7 @@ YBibs_init()
 
   ibs = xalloc(sizeof(YBibs_t));
 
-  ibs->dec = NULL;
+  ibs->dec = 0;
   ibs->recv_state = S_NEW_STREAM;
   ibs->crc = 0;
   ibs->next_shift = 0;
@@ -310,10 +308,7 @@ YBibs_init()
   ibs->save_s = 0;
   ibs->save_r = 0;
   ibs->save_j = 0;
-  ibs->save_S = 0;
-  ibs->save_B = 0;
-  ibs->save_C = 0;
-  ibs->save_P = 0;
+  ibs->save_T = 0;
   ibs->save_x = 0;
   ibs->save_k = 0;
   ibs->save_g = 0;
@@ -333,7 +328,7 @@ YBdec_init()
 
   dec = xalloc(sizeof(YBdec_t));
 
-  dec->ibs = NULL;
+  dec->ibs = 0;
 
   return dec;
 }
@@ -358,8 +353,8 @@ YBdec_destroy(YBdec_t *dec)
 void
 YBdec_join(YBdec_t *dec)
 {
-  assert(dec != NULL);
-  assert(dec->ibs != NULL);
+  assert(dec != 0);
+  assert(dec->ibs != 0);
 
   if (dec->rle_state != 0xDEAD)
   {
@@ -376,7 +371,7 @@ YBdec_join(YBdec_t *dec)
 int
 YBibs_check(YBibs_t *ibs)
 {
-  assert(ibs != NULL);
+  assert(ibs != 0);
 
   if (ibs->canceled)
     return YB_CANCELED;
@@ -395,7 +390,6 @@ YBibs_check(YBibs_t *ibs)
 
 
 /* TODO: add optimization similar to inflate_fast from gzip. */
-/* TODO: add endianness optimization. */
 /* TODO: add prefetchnta to avoid lookup tables pollution. */
 int
 YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
@@ -415,10 +409,7 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
   int r;  /* run length */
   Int j;
 
-  Short *S;  /* start table (as described by Moffat and Turpin) */
-  Long *B;   /* left-justified base table */
-  Int *C;    /* code length count table */
-  Short *P;  /* symbol permutation (symbols sorted stably by code length) */
+  struct Tree *T;
 
   Short x; /* lookahead bits */
   int k;   /* code length */
@@ -429,11 +420,11 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
   int has_block;  /* bool, another block is present after current block */
 
 
-  assert(dec != NULL);
-  assert(ibs != NULL);
-  assert(buf != NULL);
-  assert(dec->ibs == NULL || dec->ibs == ibs);
-  assert(ibs->dec == NULL || ibs->dec == dec);
+  assert(dec != 0);
+  assert(ibs != 0);
+  assert(buf != 0);
+  assert(dec->ibs == 0 || dec->ibs == ibs);
+  assert(ibs->dec == 0 || ibs->dec == dec);
 
   in = (const Byte *)buf;
   in_avail = *buf_sz;
@@ -451,10 +442,7 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
   RESTORE(s);
   RESTORE(r);
   RESTORE(j);
-  RESTORE(S);
-  RESTORE(B);
-  RESTORE(C);
-  RESTORE(P);
+  RESTORE(T);
   RESTORE(x);
   RESTORE(k);
   RESTORE(g);
@@ -491,10 +479,11 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
   block_header:
     GET(magic1, 24, S_HEADER_1);
     GET(magic2, 24, S_HEADER_2);
-    GET_SLOW(ibs->next_crc, 32, S_CRC);
 
     if (magic1 == TRAILER_MAGIC_HI && magic2 == TRAILER_MAGIC_LO)
     {
+      GET_SLOW(ibs->next_crc, 32, S_CRC);
+
       if (has_block)
       {
         has_block = 0;
@@ -516,6 +505,8 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
       Trace(("invalid header magic.\n"));
       return YB_ERR_HEADER;
     }
+
+    GET(ibs->next_crc, 32, S_CRC2);
 
     if (has_block)
     {
@@ -550,9 +541,6 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
     /*=== RETRIEVE BITMAP ===*/
 
-#if 1
-    /* Added in Feb 2011.  The following code is experimental.
-       The previous (well-tested) code is included after #else.  */
     k = 0;
     j = 0;
     GET(big, 16, S_BITMAP_BIG);
@@ -566,24 +554,6 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
       } while (j & 0xF);
       big <<= 1;
     } while (j < 256);
-#else
-    GET(big, 16, S_BITMAP_BIG);
-
-    k = 0;
-    for (i = 0; i < 16; i++)
-    {
-      if (big & (1 << (15-i)))
-      {
-        GET(small, 16, S_BITMAP_SMALL);
-
-        for (j = 0; j < 16; j++)
-        {
-          if (small & (1 << (15-j)))
-            dec->imtf_slide[IMTF_SLIDE_LENGTH - 256 + k++] = 16*i + j;
-        }
-      }
-    }
-#endif
 
     if (k == 0)
     {
@@ -657,10 +627,6 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
       for (s = 0; s < dec->alpha_size; s++)
       {
-#if 1
-        /* Added in Feb 2011.  The following code is experimental.
-           The previous (well-tested) code is included after #else.  */
-
         /* Pattern L[] R[]
            0xxxxx   1   0
            100xxx   3  +1
@@ -704,23 +670,7 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
           v <<= k;
         }
         while (unlikely(k == 6));
-#else
-        /* Original (unoptimized code). */
-        for (;;)
-        {
-          if (unlikely(x < MIN_CODE_LENGTH || x > MAX_CODE_LENGTH))
-          {
-            Trace(("bad code length\n"));
-            return YB_ERR_DELTA;
-          }
-          GET(k, 1, S_DELTA_TAG);
-          if (k == 0)
-            break;
-          GET(k, 1, S_DELTA_INC);
-          if (k == 0) x++;
-          else x--;
-        }
-#endif
+
         ((Byte *)ibs->tree[t].start)[s] = x;
       }
       r = make_tree(ibs, t, (Byte *)ibs->tree[t].start,
@@ -744,6 +694,10 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
      */
 
     j = 0;
+
+    /* Bound selectors at 18001 so they don't overflow tt16[]. */
+    if (ibs->num_selectors > 18001)
+      ibs->num_selectors = 18001;
 
     for (g = 0; g < ibs->num_selectors; g++)
     {
@@ -773,13 +727,7 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
       }
       ibs->mtf[0] = t;
 
-      /* TODO: change that to use only one pointer
-         (this can reduce machine register usage).
-       */
-      S = ibs->tree[t].start;
-      B = ibs->tree[t].base;
-      C = ibs->tree[t].count;
-      P = ibs->tree[t].perm;
+      T = &ibs->tree[t];
 
       /* There are up to GROUP_SIZE codes in any group. */
       assert(i == 0);
@@ -794,7 +742,7 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
            For lengths <= SW, this table always gives precise reults.
            For lengths > SW, some additional iterations must be performed
            to determine the exact code length. */
-        x = S[v >> (64 - SW)];
+        x = T->start[v >> (64 - SW)];
         k = x & 0x1F;
 
         /* Distinguish between complete and incomplete lookup table entries.
@@ -805,9 +753,10 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
           s = x >> 5;
         else
         {
-          while (v >= B[k+1])
+          while (v >= T->base[k+1])
             k++;  /* iterate to determine the exact code length */
-          s = P[C[k] + ((v - B[k]) >> (64-k))];  /* cannonical decode */
+          /* cannonical decode */
+          s = T->perm[T->count[k] + ((v - T->base[k]) >> (64-k))];
         }
 
         /* At this point we know the prefix code is exactly k-bit long,
@@ -818,6 +767,8 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
         if (unlikely(s == 0))
         {
+          assert(j < 900050);
+
           if (j == 0)
           {
             Trace(("empty block\n"));
@@ -826,7 +777,7 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
           dec->num_mtfv = j;
           has_block = 1;
-          ibs->dec = NULL;
+          ibs->dec = 0;
           goto block_header;
         }
 
@@ -849,10 +800,7 @@ save_and_ret:
   SAVE(s);
   SAVE(r);
   SAVE(j);
-  SAVE(S);
-  SAVE(B);
-  SAVE(C);
-  SAVE(P);
+  SAVE(T);
   SAVE(x);
   SAVE(k);
   SAVE(g);

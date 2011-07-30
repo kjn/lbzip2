@@ -277,7 +277,6 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
   do {
     size_t size;      /* compressed block size */
     size_t consumed;  /* number of input bytes consumed */
-    YBcrc_t crc;      /* currebt block's CRC */
     void *buf;        /* allocated output buffer */
     YBenc_t *enc;     /* encoder */
 

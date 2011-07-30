@@ -27,6 +27,13 @@
 #define IMTF_SLIDE_LENGTH 8192
 
 
+struct Tree {
+  Short start[1 << HUFF_START_WIDTH];
+  Long base[MAX_CODE_LENGTH + 2];  /* two sentinels (at first and last pos) */
+  Int count[MAX_CODE_LENGTH + 1];  /* one sentinel (at first pos) */
+  Short perm[MAX_ALPHA_SIZE];
+};
+
 struct YBibs_s
 {
   YBdec_t *dec;
@@ -47,10 +54,7 @@ struct YBibs_s
   Int save_s;
   int save_r;
   Int save_j;
-  Short *save_S;
-  Long *save_B;
-  Int *save_C;
-  Short *save_P;
+  struct Tree *save_T;
   Short save_x;
   int save_k;
   int save_g;
@@ -59,19 +63,11 @@ struct YBibs_s
   Int save_magic2;
   int save_has_block;
 
+  Byte selector[32767];
   int num_trees;
   int num_selectors;
-  Byte selector[32767];
-  struct {
-    Short start[1 << HUFF_START_WIDTH];
-    /* two sentinels (at first and last pos) */
-    Long base[MAX_CODE_LENGTH + 2];
-    /* one sentinel (at first pos) */
-    Int count[MAX_CODE_LENGTH + 1];
-    Short perm[MAX_ALPHA_SIZE];
-  } tree[MAX_TREES];
-
   int mtf[MAX_TREES];
+  struct Tree tree[MAX_TREES];
 };
 
 
@@ -82,14 +78,6 @@ struct YBdec_s
   /* Block sequence number modulo 32. It's required only to compute
      the stream CRC */
   unsigned block_shift;
-
-  /* Big arrays. */
-  Short tt16[900001];
-  Int tt[900000];
-
-  /* Stuff for IMTF. */
-  Byte *imtf_row[IMTF_NUM_ROWS];
-  Byte imtf_slide[IMTF_SLIDE_LENGTH];
 
   /* Stuff for UnRLE. */
   Int rle_index;  /* current index in the IBWT list */
@@ -106,6 +94,14 @@ struct YBdec_s
   Int num_mtfv;        /* number of MTF values */
   Int alpha_size;      /* number of distinct prefix codes */
   Int expect_crc;      /* expected block CRC */
+
+  /* Stuff for IMTF. */
+  Byte *imtf_row[IMTF_NUM_ROWS];
+  Byte imtf_slide[IMTF_SLIDE_LENGTH];
+
+  /* Big arrays. */
+  Short tt16[900050];
+  Int tt[900000];
 };
 
 

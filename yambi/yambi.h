@@ -34,8 +34,8 @@ typedef struct YBenc_s YBenc_t;  /* encoder */
 typedef unsigned long  YBcrc_t;  /* CRC32 */
 
 
-#define YB_DEFAULT_SHALLOW 16u
-#define YB_DEFAULT_PREFIX  16u
+#define YB_DEFAULT_SHALLOW 8u
+#define YB_DEFAULT_PREFIX  8u
 #define YB_HEADER_SIZE     4u
 #define YB_TRAILER_SIZE    10u
 

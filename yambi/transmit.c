@@ -15,14 +15,14 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
+#include <arpa/inet.h>  /* htonl() */
 #include "encode.h"
 
 #define SEND(n,v)                               \
   b = (b << (n)) | (v);                         \
   if ((k += n) >= 32) {                         \
     Int w = (Int)(b >> (k -= 32));              \
-    p[0]=w>>24; p[1]=w>>16; p[2]=w>>8; p[3]=w;  \
+    *(Int *)p = htonl(w);                       \
     p += 4;                                     \
   }
 

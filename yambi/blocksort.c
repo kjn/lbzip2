@@ -578,119 +578,13 @@ bucket_sort(Int  *ptr,
 
   /*-- set up the 2-byte frequency table --*/
   for (i = 0; i <= 65536; i++) ftab[i] = 0;
-#if 0
   BUCKET_SORT(ftab[u]++);
-#else
-  {
-    Int i = 0;
-    Int i_lim = nblock & 0xFFFF8;
-    Int a0, a1, b0, b1, c0, c1, d0, d1;
-    Int e0, e1, f0, f1, g0, g1, h0, h1;
-    Int s, u;
-    Long w;
-
-    s = block[nblock - 1] << 8;
-
-    while (i+8 <= i_lim)
-    {
-      w = *(Long *)(block + i);
-
-      a1 = (w <<  8) & 0xFF00;
-      a0 = (w      ) & 0x00FF;
-      b1 = (w      ) & 0xFF00;
-      b0 = (w >>  8) & 0x00FF;
-      c1 = (w >>  8) & 0xFF00;
-      c0 = (w >> 16) & 0x00FF;
-      d1 = (w >> 16) & 0xFF00;
-      d0 = (w >> 24) & 0x00FF;
-      e1 = (w >> 24) & 0xFF00;
-      e0 = (w >> 32) & 0x00FF;
-      f1 = (w >> 32) & 0xFF00;
-      f0 = (w >> 40) & 0x00FF;
-      g1 = (w >> 40) & 0xFF00;
-      g0 = (w >> 48) & 0x00FF;
-      h1 = (w >> 48) & 0xFF00;
-      h0 = (w >> 56);
-
-      u = s  | a0; ftab[u]++; i++;
-      u = a1 | b0; ftab[u]++; i++;
-      u = b1 | c0; ftab[u]++; i++;
-      u = c1 | d0; ftab[u]++; i++;
-      u = d1 | e0; ftab[u]++; i++;
-      u = e1 | f0; ftab[u]++; i++;
-      u = f1 | g0; ftab[u]++; i++;
-      u = g1 | h0; ftab[u]++; i++;
-      s = h1;
-    }
-
-    while (i < nblock)
-    {
-      a0 = block[i];
-      a1 = a0 << 8;
-      u = s | a0; ftab[u]++; i++;
-      s = a1;
-    }
-  }
-#endif
 
   /*-- Complete the initial radix sort --*/
   for (i = 0; i < 65536; i++) ftab[i+1] += ftab[i];
   assert(ftab[65536] == nblock);
   f = ftab[(block[nblock-1] << 8) | block[0]];
-#if 0
   BUCKET_SORT(ptr[--ftab[u]] = i-1);
-#else
-  {
-    Int i = 0;
-    Int i_lim = nblock & 0xFFFF8;
-    Int a0, a1, b0, b1, c0, c1, d0, d1;
-    Int e0, e1, f0, f1, g0, g1, h0, h1;
-    Int s, u;
-    Long w;
-
-    s = block[nblock - 1] << 8;
-
-    while (i+8 <= i_lim)
-    {
-      w = *(Long *)(block + i);
-
-      a1 = (w <<  8) & 0xFF00;
-      a0 = (w      ) & 0x00FF;
-      b1 = (w      ) & 0xFF00;
-      b0 = (w >>  8) & 0x00FF;
-      c1 = (w >>  8) & 0xFF00;
-      c0 = (w >> 16) & 0x00FF;
-      d1 = (w >> 16) & 0xFF00;
-      d0 = (w >> 24) & 0x00FF;
-      e1 = (w >> 24) & 0xFF00;
-      e0 = (w >> 32) & 0x00FF;
-      f1 = (w >> 32) & 0xFF00;
-      f0 = (w >> 40) & 0x00FF;
-      g1 = (w >> 40) & 0xFF00;
-      g0 = (w >> 48) & 0x00FF;
-      h1 = (w >> 48) & 0xFF00;
-      h0 = (w >> 56);
-
-      u = s  | a0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = a1 | b0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = b1 | c0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = c1 | d0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = d1 | e0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = e1 | f0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = f1 | g0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      u = g1 | h0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      s = h1;
-    }
-
-    while (i < nblock)
-    {
-      a0 = block[i];
-      a1 = a0 << 8;
-      u = s | a0; assert(u >= 0 && u < 65536); ptr[--ftab[u]] = i-1; i++;
-      s = a1;
-    }
-  }
-#endif
   ptr[f-1] = nblock-1;
 }
 
