@@ -913,7 +913,7 @@ shallow_sort(Int *ptr,
       SInt bbSize  = (ftab[(ss+1) << 8] & CLEARMASK) - bbStart;
       SInt shifts  = 0;
 
-      while ((bbSize >> shifts) > 65536) shifts++;
+      while (((bbSize-1) >> shifts) >= 65536) shifts++;
 
       for (j = bbSize-1; j >= 0; j--) {
         SInt a2update     = ptr[bbStart + j];
