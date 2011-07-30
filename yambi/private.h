@@ -6,7 +6,7 @@
 
 /* Memoty allocation stuff, provided by lbzip2. */
 void *xalloc(size_t size);
-void (*freef)(void *ptr);
+extern void (*freef)(void *ptr);
 #define xfree(x) ((*freef)(x))
 
 

@@ -733,7 +733,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
     w2m_blk->id.w2w_blk_id = w2w_blk->id;
     w2m_blk->id.decompr_blk_id = decompr_blk_id++;
     w2m_blk->id.last_decompr = (ybret == YB_OK);
-    w2m_blk->produced = sizeof w2m_blk->decompr - ileft;
+    w2m_blk->produced = sizeof w2m_blk->decompr - oleft;
 
     /*
       Push decompressed sub-block to muxer.
