@@ -705,13 +705,13 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
     log_fatal("%s: %s%s%s: misrecognized a bit-sequence as a block"
         " delimiter\n", pname, isep, ifmt, isep);
   if (ybret != YB_OK)
-    log_fatal("%s: %s%s%s: data error while retrieving block\n",
-        pname, isep, ifmt, isep);
+    log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
+        pname, isep, ifmt, isep, YBerr_detail(ybret));
 
   ybret = YBdec_work(dec);
   if (ybret != YB_OK)
-    log_fatal("%s: %s%s%s: data error while decompressing block: %d\n",
-        pname, isep, ifmt, isep, ybret);
+    log_fatal("%s: %s%s%s: data error while decompressing block: %s\n",
+        pname, isep, ifmt, isep, YBerr_detail(ybret));
 
   do {
     struct w2m_blk *w2m_blk;
@@ -727,8 +727,8 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
       assert(ybret == YB_OK);
     }
     else if (ybret != YB_UNDERFLOW)
-      log_fatal("%s: %s%s%s: data error while emitting block: %d\n",
-          pname, isep, ifmt, isep, ybret);
+      log_fatal("%s: %s%s%s: data error while emitting block: %s\n",
+          pname, isep, ifmt, isep, YBerr_detail(ybret));
 
     w2m_blk->id.w2w_blk_id = w2w_blk->id;
     w2m_blk->id.decompr_blk_id = decompr_blk_id++;

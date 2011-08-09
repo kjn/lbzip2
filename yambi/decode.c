@@ -151,7 +151,7 @@ YBdec_work(YBdec_t *state)
        Zero-length run is possible only at the beginning, once per block,
        so any optimizations inolving zero-length runs are pointless. */
     if (unlikely(j + r > state->ibs->max_block_size))
-      return -1;
+      return YB_ERR_OVERFLOW;
     ftab[runChar] += r;
     while (r--)
       state->tt[j++] = runChar;
@@ -164,7 +164,7 @@ YBdec_work(YBdec_t *state)
   /* At this point we must have an unfinished run, let's finish it. */
   assert(r > 0);
   if (unlikely(j + r > state->ibs->max_block_size))
-    return -100;
+    return YB_ERR_OVERFLOW;
   ftab[runChar] += r;
   while (r--)
     state->tt[j++] = runChar;
@@ -174,7 +174,7 @@ YBdec_work(YBdec_t *state)
 
   /* Sanity-check the BWT primary index. */
   if (state->bwt_idx >= state->block_size)
-    return -1;
+    return YB_ERR_BWTIDX;
 
   /* Transform counts into indices (cumulative counts). */
   cum = 0;
@@ -208,9 +208,43 @@ YBdec_work(YBdec_t *state)
 
   /* FIXME: So far there is no support for ramdomized blocks !!! */
   if (state->rand)
-    return -100;
+  {
+    extern void log_fatal(const char *fmt, ...);
+    log_fatal("lbzip2 has found a radomized block within the stream.\n"
+              "This version of lbzip2 doesn't support randomized blocks.\n"
+              "You can use lbzip2 version 0.23 to decompress the file.\n");
+  }
 
   return 0;
+}
+
+
+const char *
+YBerr_detail(int code)
+{
+  static const char *msg_table[] = {
+    "bad stream header magic", /* YB_ERR_MAGIC */
+    "bad block header magic",  /* YB_ERR_HEADER */
+    "empty source alphabet",   /* YB_ERR_BITMAP */
+    "bad number of trees",     /* YB_ERR_TREES */
+    "no coding groups",        /* YB_ERR_GROUPS */
+    "invalid selector",        /* YB_ERR_SELECTOR */
+    "invalid delta code",      /* YB_ERR_DELTA */
+    "invalid prefix code",     /* YB_ERR_PREFIX */
+    "incomplete prefix code",  /* YB_ERR_INCOMPLT */
+    "empty block",             /* YB_ERR_EMPTY */
+    "unterminated block",      /* YB_ERR_UNTERM */
+    "missing run length",      /* YB_ERR_RUNLEN */
+    "block CRC mismatch",      /* YB_ERR_BLKCRC */
+    "stream CRC mismatch",     /* YB_ERR_STRMCRC */
+    "block overflow",          /* YB_ERR_OVERFLOW */
+    "primary index too large", /* YB_ERR_BWTIDX */
+  };
+
+  /* It's the caller's responsibility to check non-error cases. */
+  assert(code <= YB_ERR_MAGIC && code >= YB_ERR_BWTIDX);
+
+  return msg_table[-code + YB_ERR_MAGIC];
 }
 
 
