@@ -28,14 +28,6 @@ typedef int64_t  SLong;
 # define unlikely(x) (x)
 #endif
 
-#ifdef __GNUC__
-# define inline __inline__ __attribute__((__always_inline__))
-#else
-# define inline
-#endif
-
-#define unreach() assert(!"unreachable reached")
-
 
 /* Minimal and maximal alphabet size used in prefix coding.
    We always have 2 RLE symbols, 0-255 MTF values and 1 EOF symbol. */
@@ -52,29 +44,3 @@ typedef int64_t  SLong;
 
 
 extern Int YB_crc_table[256];
-
-
-
-/*
-uncompressed block
-min length: 1
-max length: (256+4)*(900000/5)
-
-(RLE)
-
-source string
-min length: 1
-max length: 900000
-
-RT (Reversible Transformation, BWT+MTF+ZRLE)
-
-mtf values (mtfv)
-number of distinct mtf values = alphabet size
-min number: 2
-max number: 900001
-
-(Prefix Coding)
-
-prefix codes
-min: 
-*/

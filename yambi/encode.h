@@ -43,6 +43,9 @@ struct YBenc_s
   Int shallow_factor;
   Int prefix_factor;
 
+  Byte *block;
+  Short *mtfv;
+
   Byte *selector;
   Byte *selectorMTF;
   Int num_selectors;
@@ -51,14 +54,6 @@ struct YBenc_s
   Byte length[6][259];
   Int lookup[6][259];
   Int rfreq[6][259];
-
-
-  Int *ftab;
-  Long *bhtab;
-  Int *ptr;
-  Byte *block;
-  Short *quadrant;
-  Short *mtfv;
 };
 
 

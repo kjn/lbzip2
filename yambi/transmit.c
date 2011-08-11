@@ -77,7 +77,7 @@ YBenc_transmit(YBenc_t *s, void *buf)
     SEND(v, (1<<v)-2);
   }
 
-  mtfv = (Short *)s->ptr;
+  mtfv = s->mtfv;
   as = mtfv[nmtf-1]+1;
   ns = (nmtf + GROUP_SIZE - 1) / GROUP_SIZE;
 

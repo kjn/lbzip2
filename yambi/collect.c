@@ -73,7 +73,7 @@ YBobs_finish(YBobs_t *obs, void *buf)
 
 YBenc_t *
 YBenc_init(unsigned long max_block_size,
-	   unsigned shallow_factor,
+           unsigned shallow_factor,
            unsigned prefix_factor)
 {
   int i;
@@ -97,12 +97,9 @@ YBenc_init(unsigned long max_block_size,
   s->cmap = xalloc(256 * sizeof(Byte));
   s->selector = xalloc((18000+1+1) * sizeof(Byte));
   s->selectorMTF = xalloc((18000+1+7) * sizeof(Byte));
-  s->bhtab = xalloc((900000+2*64+63)/64 * sizeof(Long));
-  s->ptr = xalloc(900000 * sizeof(Int));
-  s->block = xalloc((900000+1000) * sizeof(Byte));
-  s->ftab = xalloc(65537 * sizeof(Int));
-  s->quadrant = xalloc((900000+1000) * sizeof(Short));
-  s->mtfv = (Short *)s->ptr;
+  s->block = xalloc((max_block_size+1000) * sizeof(Byte));
+  /* +1000 because mtfv is also used to store quadrants */
+  s->mtfv = xalloc((max_block_size+1000) * sizeof(Short));
 
 
   for (i = 0; i < 256; i++)
@@ -120,11 +117,8 @@ YBenc_destroy(YBenc_t *enc)
   xfree(enc->cmap);
   xfree(enc->selector);
   xfree(enc->selectorMTF);
-  xfree(enc->bhtab);
-  xfree(enc->ptr);
+  xfree(enc->mtfv);
   xfree(enc->block);
-  xfree(enc->ftab);
-  xfree(enc->quadrant);
 
   xfree(enc);
 }
@@ -170,24 +164,24 @@ state0:
   ch = *p++;
   CRC(ch);
 
-#define S1					\
-  cmap[ch] = 1;					\
-  *q++ = ch;					\
-  if (unlikely(q > qMax))			\
-  {						\
-    s->rle_state = RUN_DONE;			\
+#define S1                                      \
+  cmap[ch] = 1;                                 \
+  *q++ = ch;                                    \
+  if (unlikely(q > qMax))                       \
+  {                                             \
+    s->rle_state = RUN_DONE;                    \
     goto done;                                  \
-  }						\
-  if (unlikely(p == pLim))			\
-  {						\
-    s->rle_state = 1;				\
-    s->rle_character = ch;			\
+  }                                             \
+  if (unlikely(p == pLim))                      \
+  {                                             \
+    s->rle_state = 1;                           \
+    s->rle_character = ch;                      \
     goto done;                                  \
-  }						\
-  last = ch;					\
-  ch = *p++;					\
-  CRC(ch);					\
-  if (unlikely(ch == last))			\
+  }                                             \
+  last = ch;                                    \
+  ch = *p++;                                    \
+  CRC(ch);                                      \
+  if (unlikely(ch == last))                     \
     goto state2
 
 state1:
@@ -218,7 +212,7 @@ state2:
   *q++ = ch;
 
   if (unlikely(q >= qMax &&
-	       (q > qMax || (p < pLim && *p == last))))
+               (q > qMax || (p < pLim && *p == last))))
   {
     s->rle_state = RUN_DONE;
     goto done;

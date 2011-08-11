@@ -48,39 +48,31 @@ make_map_e(Byte *cmap, const Byte *inuse)
 /*---------------------------------------------------*/
 /* returns nmtf */
 static Int
-do_mtf(ptr, block, inuse, mtffreq, nblock, idx)
-  Int *ptr;
+do_mtf(mtfv, block, mtffreq, cmap, nblock, EOB)
+  Short *mtfv;
   Byte *block;
-  Byte *inuse;
   Int *mtffreq;
+  Byte *cmap;
   Int nblock;
-  Int *idx;
+  SInt EOB;
 {
   Byte order[255];
   SInt i;
   SInt k;
-  SInt EOB;
   SInt t;
   Int jj;
   Byte c;
-
   Byte u;
+  Short *mtfv0 = mtfv;
 
-  Short *mtfv = (Short *)ptr;
-  Byte cmap[256];
-
-  Int ninuse = make_map_e(cmap, inuse);
-  assert(ninuse >= 1);
-  assert(ninuse <= 256);
-  EOB = ninuse+1;
 
   for (i = 0; i <= EOB; i++)
     mtffreq[i] = 0;
 
   k = 0;
   u = 0;
-  for (i = 1; i < ninuse; i++)
-    order[i-1] = i;
+  for (i = 0; i < 255; i++)
+    order[i] = i+1;
 
 #define RUN()                                   \
   if (unlikely(k))                              \
@@ -108,19 +100,9 @@ do_mtf(ptr, block, inuse, mtffreq, nblock, idx)
     mtffreq[t]++;                               \
   }
 
-  for (i = 0; likely((jj = ptr[i]) != 0); i++)
+  for (i = 0; i < nblock; i++)
   {
-    if ((c = cmap[block[jj-1]]) == u) { k++; continue; }
-    RUN(); MTF();
-  }
-
-  if ((c = cmap[block[nblock-1]]) == u) k++;
-  else { RUN(); MTF(); }
-  *idx = i;
-
-  while (likely(++i < nblock))
-  {
-    if ((c = cmap[block[ptr[i]-1]]) == u)
+    if ((c = cmap[block[i]]) == u)
     { k++; continue; }
     RUN(); MTF();
   }
@@ -130,7 +112,7 @@ do_mtf(ptr, block, inuse, mtffreq, nblock, idx)
   *mtfv++ = EOB;
   mtffreq[EOB]++;
 
-  return mtfv - (Short *)ptr;
+  return mtfv - mtfv0;
 
 #undef RUN
 #undef MTF
@@ -149,6 +131,8 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   Byte c;  /* value before MTF */
   Byte j;  /* value after MTF */
   Int p;   /* MTF state */
+  Int EOB;
+  Byte cmap[256];
 
 
   /* Finalise initial RLE. */
@@ -164,12 +148,18 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   /* Sort block. */
   YBpriv_block_sort(s);
 
-  for (i = 0; i < s->nblock; i++)
-    assert(s->ptr[i] < s->nblock);
+  {
+    Int ninuse = make_map_e(cmap, s->cmap);
+    assert(ninuse >= 1);
+    assert(ninuse <= 256);
+    EOB = ninuse+1;
 
-  s->nmtf = do_mtf(s->ptr, s->block, s->cmap,
-                   s->lookup[0], s->nblock, &s->bwt_idx);
-  assert(s->bwt_idx < s->nblock);
+    /*for (i = 0; i < s->nblock; i++) {
+      s->block[i] = cmap[s->block[i]];
+      }*/
+  }
+
+  s->nmtf = do_mtf(s->mtfv, s->block, s->lookup[0], cmap, s->nblock, EOB);
 
   cost =
     + 48  /* header */
@@ -194,7 +184,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   */
 
   /* Set up initial MTF state. */
-  p = 0x543210; 
+  p = 0x543210;
 
   while ((c = *sp) != MAX_TREES)
   {
