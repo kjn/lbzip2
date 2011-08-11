@@ -56,9 +56,9 @@ P - sorted order permutation
    from The Art of Computer Programming by D. Knuth (vol. 3, chap. 5).
  */
 static void
-shell_sort(P, n)
-  Long P[];  /* sorted order */
-  Int n;     /* input alphabet size */
+shell_sort(
+  Long P[],  /* sorted order */
+  Int n)     /* input alphabet size */
 {
   static const SInt H[] = { 1, 4, 10, 23, 57, 132 };
 
@@ -99,10 +99,10 @@ shell_sort(P, n)
    (one for leaves and one for internal nodes) will suffice.
  */
 static void
-build_tree(T, P, n)
-  Int T[];
-  Long P[];
-  Int n;
+build_tree(
+  Int T[],
+  Long P[],
+  SInt n)
 {
   SInt r;  /* index of next tree in the queue */
   SInt s;  /* index of next singleton leaf (negative if no more left) */
@@ -151,10 +151,10 @@ build_tree(T, P, n)
  * Compute counts from given Huffman tree.  The tree itself is clobbered.
  */
 static void
-compute_depths(C, T, n)
-  Int C[];
-  Int T[];
-  Int n;
+compute_depths(
+  Int C[],
+  Int T[],
+  Int n)
 {
   Int a;     /* total number of nodes at current level */
   Int u;     /* number of internal nodes */
@@ -259,9 +259,9 @@ package_merge(Int *C, Long *Pr, Int n)
   Int i;
   Int d;
 
-  int jP;
-  int szP;
-  int szL;
+  unsigned jP;
+  unsigned szP;
+  unsigned szL;
   struct Pkg *P;
   struct Pkg *L;
   struct Pkg *T;
@@ -379,11 +379,11 @@ package_merge(Int *C, Long *Pr, Int n)
 /* ===========================================================================
  */
 static void
-make_code_lengths(C, L, P0, n)
-  Int C[];
-  Byte L[];
-  Int P0[];
-  Int n;  /* alphabet size */
+make_code_lengths(
+  Int C[],
+  Byte L[],
+  Int P0[],
+  Int n)  /* alphabet size */
 {
   Int i;
   SInt k;
@@ -471,11 +471,11 @@ make_code_lengths(C, L, P0, n)
 
 
 static void
-assign_codes(C, L, B, n)
-  Int C[];
-  Int L[];
-  Byte B[];
-  Int n;
+assign_codes(
+  Int C[],
+  Int L[],
+  Byte B[],
+  Int n)
 {
   /* Assign prefix-free codes. */
   Int i;
@@ -528,10 +528,10 @@ generate_initial_trees(YBenc_t *s, int nmtf, int alphaSize, Int nGroups)
    Returns number from 0 to nGroups-1 identifing the selected tree.
 */
 static int
-find_best_tree(gs, nGroups, len)
-  const Short *gs;
-  SInt nGroups;
-  const Long *len;
+find_best_tree(
+  const Short *gs,
+  SInt nGroups,
+  const Long *len)
 {
   SInt c, bc;   /* code length, best code length */
   SInt t, bt;   /* tree, best tree */
@@ -570,9 +570,9 @@ find_best_tree(gs, nGroups, len)
 }
 
 static void
-increment_freqs(gs, rf)
-  Short *gs;
-  Int *rf;
+increment_freqs(
+  Short *gs,
+  Int *rf)
 {
   rf[gs[ 0]]++; rf[gs[ 1]]++; rf[gs[ 2]]++; rf[gs[ 3]]++; rf[gs[ 4]]++;
   rf[gs[ 5]]++; rf[gs[ 6]]++; rf[gs[ 7]]++; rf[gs[ 8]]++; rf[gs[ 9]]++;
@@ -589,7 +589,7 @@ increment_freqs(gs, rf)
 Int
 YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
 {
-  SInt alphaSize;
+  Int alphaSize;
   Int nGroups;
   Int iter, i;
   Int rfreq[MAX_TREES][MAX_ALPHA_SIZE+1];

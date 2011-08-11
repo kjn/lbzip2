@@ -15,7 +15,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <arpa/inet.h>  /* ntohl() */
 #include "decode.h"
 
 
@@ -206,7 +205,7 @@ make_tree(YBibs_t *ibs,
     }                                           \
     else                                        \
     {                                           \
-      v |= (Long)ntohl(*(Int *)in) << (32-w);   \
+      v |= (Long)peekl(in) << (32-w);           \
       w += 32;                                  \
       in += 4;                                  \
       in_avail -= 4;                            \
@@ -322,7 +321,7 @@ YBibs_init()
 
 
 YBdec_t *
-YBdec_init()
+YBdec_init(void)
 {
   YBdec_t *dec;
 

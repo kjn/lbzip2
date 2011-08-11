@@ -80,23 +80,8 @@
 #include <setjmp.h>     /* setjmp() */
 #include <string.h>     /* memcmp() */
 #include <strings.h>    /* bzero() */
-#include <arpa/inet.h>  /* htons() */
 
 #include "encode.h"
-
-
-/* These macros load (peek) or store (poke) 16 or 32-bit values from/to
-   memory pointed by p.  The pointer p must be properly aligned. The casts
-   to void * are only to prevent compiler warnings about unaligned access.
-*/
-#define peeks(p) ntohs(*(const Short *)(const void *)(p))
-#define peekl(p) ntohl(*(const Int *)(const void *)(p))
-#define pokes(p,v) ((void)(*(Short *)(void *)(p) = htons(v)))
-#define pokel(p,v) ((void)(*(Int *)(void *)(p) = htonl(v)))
-
-
-#define min(x,y) ((x) < (y) ? (x) : (y))
-#define max(x,y) ((x) < (y) ? (y) : (x))
 
 
 #if 0

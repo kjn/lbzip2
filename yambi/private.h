@@ -1,7 +1,34 @@
+/*-
+  Copyright (C) 2011 Mikolaj Izdebski.  All rights reserved.
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include <arpa/inet.h> /* htonl() */
 #include <assert.h>    /* assert() */
 #include <inttypes.h>  /* uint32_t */
 
 #include "yambi.h"
+
+
+/* Type definitions first. */
+typedef uint8_t  Byte;
+typedef uint16_t Short;
+typedef uint32_t Int;
+typedef int32_t  SInt;
+typedef uint64_t Long;
+typedef int64_t  SLong;
 
 
 /* Memoty allocation stuff, provided by lbzip2. */
@@ -10,12 +37,19 @@ extern void (*freef)(void *ptr);
 #define xfree(x) ((*freef)(x))
 
 
-typedef uint8_t  Byte;
-typedef uint16_t Short;
-typedef uint32_t Int;
-typedef int32_t  SInt;
-typedef uint64_t Long;
-typedef int64_t  SLong;
+/* These macros load (peek) or store (poke) 16 or 32-bit values from/to
+   memory pointed by p.  The pointer p must be properly aligned. The casts
+   to void * are only to prevent compiler warnings about unaligned access.
+*/
+#define peeks(p) ntohs(*(const Short *)(const void *)(p))
+#define peekl(p) ntohl(*(const Int *)(const void *)(p))
+#define pokes(p,v) ((void)(*(Short *)(void *)(p) = htons(v)))
+#define pokel(p,v) ((void)(*(Int *)(void *)(p) = htonl(v)))
+
+
+/* Other generic macros. */
+#define min(x,y) ((x) < (y) ? (x) : (y))
+#define max(x,y) ((x) < (y) ? (y) : (x))
 
 
 /* Explicit static branch prediction to help compiler generating faster code.

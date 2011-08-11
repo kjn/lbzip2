@@ -17,6 +17,8 @@
 
 #include "decode.h"
 
+void log_fatal(const char *fmt, ...);
+
 
 /* Implementation of Sliding Lists algorithm for doing Inverse Move-To-Front
    (IMTF) transformation in O(n) space and amortised O(sqrt(n)) time.
@@ -209,7 +211,6 @@ YBdec_work(YBdec_t *state)
   /* FIXME: So far there is no support for ramdomized blocks !!! */
   if (state->rand)
   {
-    extern void log_fatal(const char *fmt, ...);
     log_fatal("lbzip2 has found a radomized block within the stream.\n"
               "This version of lbzip2 doesn't support randomized blocks.\n"
               "You can use lbzip2 version 0.23 to decompress the file.\n");

@@ -405,7 +405,7 @@ reord_dealloc(void *ptr, void *ignored)
 
 static void
 generic_write(int outfd, const char *osep, const char *ofmt,
-	      void *buf, size_t size)
+    void *buf, size_t size)
 {
   if (-1 != outfd) {
     char unsigned *cp;
@@ -415,10 +415,10 @@ generic_write(int outfd, const char *osep, const char *ofmt,
       ssize_t written;
 
       written = write(outfd, cp, size > (size_t)SSIZE_MAX
-		      ? (size_t)SSIZE_MAX : size);
+          ? (size_t)SSIZE_MAX : size);
       if (-1 == written) {
-	log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
-	    err2str(errno));
+        log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
+            err2str(errno));
       }
 
       size -= (size_t)written;
@@ -430,8 +430,8 @@ generic_write(int outfd, const char *osep, const char *ofmt,
 
 static void
 mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
-	  uint64_t *reord_needed, int outfd, const char *osep,
-	  const char *ofmt, YBobs_t *obs)
+    uint64_t *reord_needed, int outfd, const char *osep, const char *ofmt,
+    YBobs_t *obs)
 {
   assert(0 != *reord);
 
@@ -456,7 +456,7 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
     sub_i = 0;
     do {
       generic_write(outfd, osep, ofmt, reord_w2m_blk->subblock[sub_i].buf,
-		    reord_w2m_blk->subblock[sub_i].size);
+          reord_w2m_blk->subblock[sub_i].size);
 
       (*freef)(reord_w2m_blk->subblock[sub_i].buf);
       YBobs_join(obs, &reord_w2m_blk->subblock[sub_i].crc);

@@ -48,19 +48,18 @@ make_map_e(Byte *cmap, const Byte *inuse)
 /*---------------------------------------------------*/
 /* returns nmtf */
 static Int
-do_mtf(mtfv, block, mtffreq, cmap, nblock, EOB)
-  Short *mtfv;
-  Byte *block;
-  Int *mtffreq;
-  Byte *cmap;
-  Int nblock;
-  SInt EOB;
+do_mtf(
+  Short *mtfv,
+  Byte *block,
+  Int *mtffreq,
+  Byte *cmap,
+  SInt nblock,
+  SInt EOB)
 {
   Byte order[255];
   SInt i;
   SInt k;
   SInt t;
-  Int jj;
   Byte c;
   Byte u;
   Short *mtfv0 = mtfv;
@@ -123,7 +122,6 @@ size_t
 YBenc_work(YBenc_t *s, YBcrc_t *crc)
 {
   Int cost;
-  Int failed;
   Int pk;
   Int i;
   const Byte *sp;
@@ -194,8 +192,10 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
            sp - s->selector, c));
 
     if (c >= s->num_trees || sp - s->selector >= s->num_selectors)
+    {
       Trace((stderr, "c=%d, num_trees=%d, num_selectors=%d, pos=%d\n", c,
              s->num_trees, s->num_selectors, sp - s->selector));
+    }
     assert(c < s->num_trees);
     assert(sp - s->selector < s->num_selectors);
 
