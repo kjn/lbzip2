@@ -246,13 +246,13 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
     int exponential)
 {
   struct w2m_blk *w2m_blk;
-  char *ibuf;    /* pointer to a next, not yet consumed, input byte */
-  size_t ileft;  /* input bytes left (not yet consumed) */
-  size_t sub_i;  /* current subblock index */
+  char unsigned *ibuf;    /* pointer to the next input byte */
+  size_t ileft;           /* input bytes left (not yet consumed) */
+  size_t sub_i;           /* current subblock index */
 
   w2m_blk = xalloc(sizeof(struct w2m_blk));
 
-  ibuf = (char *)(s2w_blk + 1);
+  ibuf = (char unsigned *)(s2w_blk + 1);
   ileft = s2w_blk->loaded;
   assert(ileft > 0);
 
@@ -265,8 +265,9 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
     assert(sub_i <= 2);
 
-    /* Allocate a yambi encoder with given block size and default parameters.
-     */
+    /*
+      Allocate a yambi encoder with given block size and default parameters.
+    */
     enc = YBenc_init(bs100k * 100000, exponential ? 0 : YB_DEFAULT_SHALLOW,
         YB_DEFAULT_PREFIX);
 
@@ -279,12 +280,14 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
     /* Do the hard work. */
     size = YBenc_work(enc, &w2m_blk->subblock[sub_i].crc);
 
-    /* Now we know the exact compressed block size.
-       Allocate the output buffer and transmit the block into it. */
+    /*
+      Now we know the exact compressed block size. Allocate the output buffer
+      and transmit the block into it.
+    */
     buf = xalloc(size);
     YBenc_transmit(enc, buf);
 
-    /* The encoder is no longer needed.  Release memory. */
+    /* The encoder is no longer needed. Release memory. */
     YBenc_destroy(enc);
 
     w2m_blk->subblock[sub_i].buf = buf;
@@ -443,7 +446,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec ospec,
   struct lacos_rbtree_node *reord;
   uint64_t reord_needed;
   char unsigned buffer[YB_HEADER_SIZE > YB_TRAILER_SIZE ? YB_HEADER_SIZE
-      : YB_TRAILER_SIZE+100];
+      : YB_TRAILER_SIZE];
   YBobs_t *obs;
 
   /* Init obs and write out stream header. */

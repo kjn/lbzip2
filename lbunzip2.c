@@ -184,7 +184,7 @@ struct sw2w_q                /* Splitter and workers to workers queue. */
 
   We want to send as few as possible broadcasts. We can omit the broadcast if,
   before making any changes to the protected fields, neither of the necessary
-  conditions for blocking hold: !A && !B, because  then no worker can block.
+  conditions for blocking hold: !A && !B, because then no worker can block.
   Otherwise (A || B), there may be a worker blocking. In that case, we only
   need to send the broadcast if we produced new tasks (enabled the proceed
   predicate) for those possibly blocking. (If we didn't enable the proceed
@@ -1073,7 +1073,7 @@ work_get_second(struct s2w_blk **p_next,
 
 
 static void
-work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec ispec)
+work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec ispec)
 {
   for (;;) {
     struct s2w_blk *s2w_blk;
