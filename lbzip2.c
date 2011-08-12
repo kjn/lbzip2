@@ -149,7 +149,7 @@ m2s_q_uninit(struct m2s_q *m2s_q, unsigned num_free)
 
 static void
 split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec ispec,
-    const size_t sizeof_plain, const size_t sizeof_s2w_blk)
+    const size_t sizeof_plain)
 {
   uint64_t id;
   int eof;
@@ -166,7 +166,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec ispec,
     }
     --m2s_q->num_free;
     xunlock(&m2s_q->av);
-    s2w_blk = xalloc(sizeof_s2w_blk);
+    s2w_blk = xalloc(sizeof(struct s2w_blk) + sizeof_plain);
 
     /* Fill block. */
     vacant = sizeof_plain;
@@ -220,8 +220,7 @@ struct split_arg
   struct m2s_q *m2s_q;
   struct s2w_q *s2w_q;
   struct filespec ispec;
-  size_t sizeof_plain,
-      sizeof_s2w_blk;
+  size_t sizeof_plain;
 };
 
 
@@ -236,8 +235,7 @@ split_wrap(void *v_split_arg)
       split_arg->m2s_q,
       split_arg->s2w_q,
       split_arg->ispec,
-      split_arg->sizeof_plain,
-      split_arg->sizeof_s2w_blk
+      split_arg->sizeof_plain
   );
   return 0;
 }
@@ -533,33 +531,20 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   w2m_q_init(&w2m_q, num_worker);
   m2s_q_init(&m2s_q, num_slot);
 
-#define SIZES(struc, arr, arsz_unsigned, arg) \
-  do { \
-    unsigned tmp; \
-\
-    tmp = arsz_unsigned; \
-    if ((size_t)-1 < tmp) { \
-      log_fatal("%s: %s%s%s: size_t overflow in sizeof_" #arr "\n", pname, \
-          ispec.sep, ispec.fmt, ispec.sep); \
-    } \
-    arg ## _arg . sizeof_ ## arr = tmp; \
-\
-    if ((size_t)-1 - sizeof(struct struc) \
-        < arg ## _arg . sizeof_ ## arr /* - (size_t)1 */) { \
-      log_fatal("%s: %s%s%s: size_t overflow in sizeof_" #struc "\n", pname, \
-          ispec.sep, ispec.fmt, ispec.sep); \
-    } \
-    arg ## _arg . sizeof_ ## struc = sizeof(struct struc) \
-        + (arg ## _arg . sizeof_ ## arr /* - (size_t)1 */); \
-  } while (0)
+  if ((size_t)-1 < (unsigned)bs100k * 100000u) {
+    log_fatal("%s: %s%s%s: size_t overflow in sizeof_plain\n", pname,
+        ispec.sep, ispec.fmt, ispec.sep);
+  }
+  if ((size_t)-1 - sizeof(struct s2w_blk) < (unsigned)bs100k * 100000u) {
+    log_fatal("%s: %s%s%s: size_t overflow in sizeof_s2w_blk\n", pname,
+        ispec.sep, ispec.fmt, ispec.sep);
+  }
 
   split_arg.m2s_q = &m2s_q;
   split_arg.s2w_q = &s2w_q;
   split_arg.ispec = ispec;
-  SIZES(s2w_blk, plain, (unsigned)bs100k * 100u * 1000u, split);
+  split_arg.sizeof_plain = (unsigned)bs100k * 100000u;
   xcreate(&splitter, split_wrap, &split_arg);
-
-#undef SIZES
 
   work_arg.s2w_q = &s2w_q;
   work_arg.w2m_q = &w2m_q;
