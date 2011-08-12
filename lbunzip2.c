@@ -2,7 +2,6 @@
 
 #include <inttypes.h>     /* uint64_t */
 #include <assert.h>       /* assert() */
-#include <unistd.h>       /* read() */
 #include <errno.h>        /* errno */
 #include <string.h>       /* memcpy() */
 #include <signal.h>       /* SIGUSR2 */
@@ -410,8 +409,8 @@ m2s_q_uninit(struct m2s_q *m2s_q, unsigned num_free)
 
 
 static void
-split_chkstart(const char unsigned *comprp, size_t filled, const char *isep,
-    const char *ifmt)
+split_chkstart(const char unsigned *comprp, size_t filled,
+    struct filespec ispec)
 {
   if (filled >= sizeof intro && 0 == memcmp(comprp, intro, NUM_SHDR)) {
     comprp += NUM_SHDR;
@@ -424,14 +423,13 @@ split_chkstart(const char unsigned *comprp, size_t filled, const char *isep,
     }
   }
 
-  log_fatal("%s: %s%s%s doesn't start like a bzip2 stream\n", pname, isep,
-      ifmt, isep);
+  log_fatal("%s: %s%s%s doesn't start like a bzip2 stream\n", pname,
+      ispec.sep, ispec.fmt, ispec.sep);
 }
 
 
 static void
-split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, int infd, const char *isep,
-    const char *ifmt)
+split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec ispec)
 {
   struct s2w_blk *atch_scan;
   uint64_t id;
@@ -454,20 +452,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, int infd, const char *isep,
 
     /* Fill block. */
     vacant = sizeof s2w_blk->compr;
-    {
-      ssize_t rd;
-
-      do {
-        rd = read(infd, s2w_blk->compr + (sizeof s2w_blk->compr - vacant),
-            vacant > (size_t)SSIZE_MAX ? (size_t)SSIZE_MAX : vacant);
-      } while (0 < rd && 0u < (vacant -= (size_t)rd));
-
-      /* Read error. */
-      if (-1 == rd) {
-        log_fatal("%s: read(%s%s%s): %s\n", pname, isep, ifmt, isep,
-            err2str(errno));
-      }
-    }
+    xread(ispec, s2w_blk->compr, &vacant);
 
     if (0u == id) {
       /*
@@ -475,8 +460,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, int infd, const char *isep,
         the workers, by design, aren't offended by a missing bzip2 block header
         in a non-full first input block.
       */
-      split_chkstart(s2w_blk->compr, sizeof s2w_blk->compr - vacant, isep,
-          ifmt);
+      split_chkstart(s2w_blk->compr, sizeof s2w_blk->compr - vacant, ispec);
     }
 
     if (sizeof s2w_blk->compr == vacant) {
@@ -605,9 +589,7 @@ struct split_arg
 {
   struct m2s_q *m2s_q;
   struct sw2w_q *sw2w_q;
-  int infd;
-  const char *isep,
-      *ifmt;
+  struct filespec ispec;
 };
 
 
@@ -618,14 +600,13 @@ split_wrap(void *v_split_arg)
 
   split_arg = v_split_arg;
 
-  split(split_arg->m2s_q, split_arg->sw2w_q,
-      split_arg->infd, split_arg->isep, split_arg->ifmt);
+  split(split_arg->m2s_q, split_arg->sw2w_q, split_arg->ispec);
   return 0;
 }
 
 
 static void
-work_compl(struct w2w_blk *w2w_blk, const char *isep, const char *ifmt)
+work_compl(struct w2w_blk *w2w_blk, struct filespec ispec)
 {
   unsigned fb,
       ub,
@@ -635,8 +616,8 @@ work_compl(struct w2w_blk *w2w_blk, const char *isep, const char *ifmt)
   assert(w2w_blk->reconstructed <= sizeof w2w_blk->streamdata);
 
   if (w2w_blk->reconstructed < sizeof intro + NUM_CRC + sizeof eos) {
-    log_fatal("%s: %s%s%s: compressed block too short\n", pname, isep, ifmt,
-        isep);
+    log_fatal("%s: %s%s%s: compressed block too short\n", pname, ispec.sep,
+        ispec.fmt, ispec.sep);
   }
 
   (void)memcpy(w2w_blk->streamdata, intro, sizeof intro);
@@ -651,8 +632,8 @@ work_compl(struct w2w_blk *w2w_blk, const char *isep, const char *ifmt)
 
   if (sizeof w2w_blk->streamdata - w2w_blk->reconstructed
       < sizeof eos_crc + (size_t)(0u < ub)) {
-    log_fatal("%s: %s%s%s: compressed block too long\n", pname, isep, ifmt,
-        isep);
+    log_fatal("%s: %s%s%s: compressed block too long\n", pname, ispec.sep,
+        ispec.fmt, ispec.sep);
   }
 
   if (0u < ub) {
@@ -683,8 +664,8 @@ work_compl(struct w2w_blk *w2w_blk, const char *isep, const char *ifmt)
 
 
 static void
-work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
-    const char *ifmt)
+work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
+    struct filespec ispec)
 {
   int ybret;
   uint64_t decompr_blk_id;
@@ -703,15 +684,15 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
   ybret = YBibs_retrieve(ibs, dec, ibuf, &ileft);
   if (ybret == YB_UNDERFLOW)
     log_fatal("%s: %s%s%s: misrecognized a bit-sequence as a block"
-        " delimiter\n", pname, isep, ifmt, isep);
+        " delimiter\n", pname, ispec.sep, ispec.fmt, ispec.sep);
   if (ybret != YB_OK)
     log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
-        pname, isep, ifmt, isep, YBerr_detail(ybret));
+        pname, ispec.sep, ispec.fmt, ispec.sep, YBerr_detail(ybret));
 
   ybret = YBdec_work(dec);
   if (ybret != YB_OK)
     log_fatal("%s: %s%s%s: data error while decompressing block: %s\n",
-        pname, isep, ifmt, isep, YBerr_detail(ybret));
+        pname, ispec.sep, ispec.fmt, ispec.sep, YBerr_detail(ybret));
 
   do {
     struct w2m_blk *w2m_blk;
@@ -728,7 +709,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q, const char *isep,
     }
     else if (ybret != YB_UNDERFLOW)
       log_fatal("%s: %s%s%s: data error while emitting block: %s\n",
-          pname, isep, ifmt, isep, YBerr_detail(ybret));
+          pname, ispec.sep, ispec.fmt, ispec.sep, YBerr_detail(ybret));
 
     w2m_blk->id.w2w_blk_id = w2w_blk->id;
     w2m_blk->id.decompr_blk_id = decompr_blk_id++;
@@ -863,8 +844,8 @@ work_oflush(struct w2w_blk **p_w2w_blk, uint64_t s2w_blk_id,
 
 
 static struct s2w_blk *
-work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
-    const char *ifmt)
+work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
+    struct filespec ispec)
 {
   /* Hold "xlock_pred(&sw2w_q->proceed)" on entry. Will hold on return. */
 
@@ -906,8 +887,8 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
       sw2w_q->deco_head = deco->next;
       xunlock(&sw2w_q->proceed);
 
-      work_compl(deco, isep, ifmt);
-      work_decompr(deco, w2m_q, isep, ifmt);
+      work_compl(deco, ispec);
+      work_decompr(deco, w2m_q, ispec);
       (*freef)(deco);
 
       xlock_pred(&sw2w_q->proceed);
@@ -1046,8 +1027,7 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
 
 static struct s2w_blk *
 work_get_second(struct s2w_blk **p_next,
-    struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
-    const char *ifmt)
+    struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec ispec)
 {
   /* Hold "xlock_pred(&sw2w_q->proceed)" on entry. Will hold on return. */
   for (;;) {
@@ -1059,8 +1039,8 @@ work_get_second(struct s2w_blk **p_next,
       sw2w_q->deco_head = deco->next;
       xunlock(&sw2w_q->proceed);
 
-      work_compl(deco, isep, ifmt);
-      work_decompr(deco, w2m_q, isep, ifmt);
+      work_compl(deco, ispec);
+      work_decompr(deco, w2m_q, ispec);
       (*freef)(deco);
 
       xlock_pred(&sw2w_q->proceed);
@@ -1093,8 +1073,7 @@ work_get_second(struct s2w_blk **p_next,
 
 
 static void
-work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
-    const char *ifmt)
+work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec ispec)
 {
   for (;;) {
     struct s2w_blk *s2w_blk;
@@ -1117,7 +1096,7 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
     uint64_t search;
 
     xlock_pred(&sw2w_q->proceed);
-    s2w_blk = work_get_first(sw2w_q, w2m_q, isep, ifmt);
+    s2w_blk = work_get_first(sw2w_q, w2m_q, ispec);
     if (0 == s2w_blk) {
       xunlock(&sw2w_q->proceed);
       break;
@@ -1152,12 +1131,13 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
             if (sizeof s2w_blk->compr == s2w_blk->loaded) {
               assert(IST_IN_BZIP2 == istate || IST_OUT_BZIP2 == istate);
               log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                  " second input block\n", pname, isep, ifmt, isep);
+                  " second input block\n", pname, ispec.sep, ispec.fmt,
+                  ispec.sep);
             }
 
             if (IST_IN_BZIP2 == istate) {
               log_fatal("%s: %s%s%s: unterminated bzip2 block in short second"
-                  " input block\n", pname, isep, ifmt, isep);
+                  " input block\n", pname, ispec.sep, ispec.fmt, ispec.sep);
             }
 
             assert(IST_OUT_BZIP2 == istate);
@@ -1169,7 +1149,8 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
               switch (istate) {
                 case IST_IN_BZIP2:
                   log_fatal("%s: %s%s%s: unterminated bzip2 block in short"
-                      " first input block\n", pname, isep, ifmt, isep);
+                      " first input block\n", pname, ispec.sep, ispec.fmt,
+                      ispec.sep);
 
                 case IST_OUT_BZIP2:
                   /*
@@ -1187,7 +1168,8 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
               assert(sizeof s2w_blk->compr == s2w_blk->loaded);
               if (IST_NEVER == istate) {
                 log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                    " first input block\n", pname, isep, ifmt, isep);
+                    " first input block\n", pname, ispec.sep, ispec.fmt,
+                    ispec.sep);
               }
             }
           }
@@ -1202,8 +1184,7 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
           else {
             assert(!in_second);
             xlock_pred(&sw2w_q->proceed);
-            s2w_blk = work_get_second(&s2w_blk->next, sw2w_q, w2m_q, isep,
-                ifmt);
+            s2w_blk = work_get_second(&s2w_blk->next, sw2w_q, w2m_q, ispec);
           }
 
           assert(0u < release->refno);
@@ -1221,7 +1202,7 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
             assert(!in_second);
             if (IST_IN_BZIP2 == istate) {
               log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
-                  " input block\n", pname, isep, ifmt, isep);
+                  " input block\n", pname, ispec.sep, ispec.fmt, ispec.sep);
             }
 
             assert(IST_OUT_BZIP2 == istate);
@@ -1258,8 +1239,8 @@ work(struct  sw2w_q *sw2w_q, struct w2m_q *w2m_q, const char *isep,
         rbitbuf = rbitbuf << 1 | bit;
         if (0u == --w2w_blk->rbits_left) {
           if (sizeof w2w_blk->streamdata == w2w_blk->reconstructed) {
-            log_fatal("%s: %s%s%s: compressed block too long\n", pname, isep,
-                ifmt, isep);
+            log_fatal("%s: %s%s%s: compressed block too long\n", pname,
+                ispec.sep, ispec.fmt, ispec.sep);
           }
           w2w_blk->streamdata[w2w_blk->reconstructed++] = rbitbuf;
           w2w_blk->rbits_left = CHAR_BIT;
@@ -1325,8 +1306,7 @@ struct work_arg
 {
   struct sw2w_q *sw2w_q;
   struct w2m_q *w2m_q;
-  const char *isep,
-      *ifmt;
+  struct filespec ispec;
 };
 
 
@@ -1336,7 +1316,7 @@ work_wrap(void *v_work_arg)
   struct work_arg *work_arg;
 
   work_arg = v_work_arg;
-  work(work_arg->sw2w_q, work_arg->w2m_q, work_arg->isep, work_arg->ifmt);
+  work(work_arg->sw2w_q, work_arg->w2m_q, work_arg->ispec);
   return 0;
 }
 
@@ -1357,7 +1337,7 @@ reord_dealloc(void *ptr, void *ignored)
 
 static void
 mux_write(struct lacos_rbtree_node **reord, struct w2m_blk_nid *reord_needed,
-    int outfd, const char *osep, const char *ofmt)
+    struct filespec ospec)
 {
   assert(0 != *reord);
 
@@ -1378,24 +1358,7 @@ mux_write(struct lacos_rbtree_node **reord, struct w2m_blk_nid *reord_needed,
     }
 
     /* Write out "reord_w2m_blk". */
-    if (-1 != outfd) {
-      char unsigned *dp;
-
-      dp = reord_w2m_blk->decompr;
-      while (reord_w2m_blk->produced > 0u) {
-        ssize_t written;
-
-        written = write(outfd, dp, reord_w2m_blk->produced > (size_t)SSIZE_MAX
-            ? (size_t)SSIZE_MAX : reord_w2m_blk->produced);
-        if (-1 == written) {
-          log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
-              err2str(errno));
-        }
-
-        reord_w2m_blk->produced -= (size_t)written;
-        dp += written;
-      }
-    }
+    xwrite(ospec, reord_w2m_blk->decompr, reord_w2m_blk->produced);
 
     if (reord_w2m_blk->id.last_decompr) {
       if (reord_w2m_blk->id.w2w_blk_id.last_bzip2) {
@@ -1427,8 +1390,7 @@ mux_write(struct lacos_rbtree_node **reord, struct w2m_blk_nid *reord_needed,
 
 
 static void
-mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
-    const char *ofmt)
+mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec ospec)
 {
   struct lacos_rbtree_node *reord;
   struct w2m_blk_nid reord_needed;
@@ -1495,7 +1457,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
       } while (0 != w2m_blk);
 
       /* Write out initial continuous sequence of reordered sub-blocks. */
-      mux_write(&reord, &reord_needed, outfd, osep, ofmt);
+      mux_write(&reord, &reord_needed, ospec);
     }
 
     if (0u == working) {
@@ -1516,9 +1478,8 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
 
 
 static void
-lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
-    const char *isep, const char *ifmt, int outfd, const char *osep,
-    const char *ofmt)
+lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
+    struct filespec ispec, struct filespec ospec)
 {
   struct sw2w_q sw2w_q;
   struct w2m_q w2m_q;
@@ -1535,15 +1496,12 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
 
   split_arg.m2s_q = &m2s_q;
   split_arg.sw2w_q = &sw2w_q;
-  split_arg.infd = infd;
-  split_arg.isep = isep;
-  split_arg.ifmt = ifmt;
+  split_arg.ispec = ispec;
   xcreate(&splitter, split_wrap, &split_arg);
 
   work_arg.sw2w_q = &sw2w_q;
   work_arg.w2m_q = &w2m_q;
-  work_arg.isep = isep;
-  work_arg.ifmt = ifmt;
+  work_arg.ispec = ispec;
 
   assert(0u < num_worker);
   assert((size_t)-1 / sizeof *worker >= num_worker);
@@ -1552,7 +1510,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
     xcreate(&worker[i], work_wrap, &work_arg);
   }
 
-  mux(&w2m_q, &m2s_q, outfd, osep, ofmt);
+  mux(&w2m_q, &m2s_q, ospec);
 
   i = num_worker;
   do {
@@ -1572,7 +1530,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
         "%s: muxer stalled                                       : %*lu\n"
         "%s: splitter tried to consume from muxer                : %*lu\n"
         "%s: splitter stalled                                    : %*lu\n",
-        pname, isep, ifmt, isep,
+        pname, ispec.sep, ispec.fmt, ispec.sep,
         pname, FW, sw2w_q.proceed.ccount,
         pname, FW, sw2w_q.proceed.wcount,
         pname, FW, w2m_q.av_or_ex_or_rel.ccount,
@@ -1599,12 +1557,8 @@ lbunzip2_wrap(void *v_lbunzip2_arg)
       lbunzip2_arg->num_worker,
       lbunzip2_arg->num_slot,
       lbunzip2_arg->print_cctrs,
-      lbunzip2_arg->infd,
-      lbunzip2_arg->isep,
-      lbunzip2_arg->ifmt,
-      lbunzip2_arg->outfd,
-      lbunzip2_arg->osep,
-      lbunzip2_arg->ofmt
+      lbunzip2_arg->ispec,
+      lbunzip2_arg->ospec
   );
 
   xraise(SIGUSR2);

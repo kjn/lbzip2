@@ -2,7 +2,6 @@
 
 #include <inttypes.h>     /* uint64_t */
 #include <assert.h>       /* assert() */
-#include <unistd.h>       /* read() */
 #include <errno.h>        /* errno */
 #include <signal.h>       /* SIGUSR2 */
 
@@ -149,16 +148,15 @@ m2s_q_uninit(struct m2s_q *m2s_q, unsigned num_free)
 
 
 static void
-split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
-    const char *ifmt, const size_t sizeof_plain, const size_t sizeof_s2w_blk)
+split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec ispec,
+    const size_t sizeof_plain, const size_t sizeof_s2w_blk)
 {
   uint64_t id;
-  ssize_t rd;
+  int eof;
 
   id = 0u;
   do {
     struct s2w_blk *s2w_blk;
-    char unsigned *plain;
     size_t vacant;
 
     /* Grab a free slot. */
@@ -169,20 +167,11 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
     --m2s_q->num_free;
     xunlock(&m2s_q->av);
     s2w_blk = xalloc(sizeof_s2w_blk);
-    plain = (char unsigned *)(s2w_blk + 1);
 
     /* Fill block. */
     vacant = sizeof_plain;
-    do {
-      rd = read(infd, plain + (sizeof_plain - vacant),
-          vacant > (size_t)SSIZE_MAX ? (size_t)SSIZE_MAX : vacant);
-    } while (0 < rd && 0u < (vacant -= (size_t)rd));
-
-    /* Read error. */
-    if (-1 == rd) {
-      log_fatal("%s: read(%s%s%s): %s\n", pname, isep, ifmt, isep,
-          err2str(errno));
-    }
+    xread(ispec, (char unsigned *)(s2w_blk + 1), &vacant);
+    eof = (0 < vacant);
 
     if (sizeof_plain == vacant) {
       /* EOF on first read. */
@@ -198,7 +187,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
     }
 
     /* We either push a block, or set EOF, or both. */
-    assert(sizeof_plain > vacant || 0 == rd);
+    assert(sizeof_plain > vacant || eof);
 
     xlock(&s2w_q->av_or_eof);
     if (0 == s2w_q->head) {
@@ -214,7 +203,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
       }
       s2w_q->tail = s2w_blk;
     }
-    s2w_q->eof = (0 == rd);
+    s2w_q->eof = eof;
     xunlock(&s2w_q->av_or_eof);
 
     /*
@@ -222,7 +211,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, int infd, const char *isep,
       so it doesn't matter, because we'll leave immediately.
     */
     ++id;
-  } while (0 < rd);
+  } while (!eof);
 }
 
 
@@ -230,9 +219,7 @@ struct split_arg
 {
   struct m2s_q *m2s_q;
   struct s2w_q *s2w_q;
-  int infd;
-  const char *isep,
-      *ifmt;
+  struct filespec ispec;
   size_t sizeof_plain,
       sizeof_s2w_blk;
 };
@@ -248,9 +235,7 @@ split_wrap(void *v_split_arg)
   split(
       split_arg->m2s_q,
       split_arg->s2w_q,
-      split_arg->infd,
-      split_arg->isep,
-      split_arg->ifmt,
+      split_arg->ispec,
       split_arg->sizeof_plain,
       split_arg->sizeof_s2w_blk
   );
@@ -260,7 +245,7 @@ split_wrap(void *v_split_arg)
 
 static void
 work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
-    int exponential, const char *isep, const char *ifmt)
+    int exponential)
 {
   struct w2m_blk *w2m_blk;
   char *ibuf;    /* pointer to a next, not yet consumed, input byte */
@@ -284,8 +269,8 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
     /* Allocate a yambi encoder with given block size and default parameters.
      */
-    enc = YBenc_init(bs100k * 100000,
-        exponential ? 0 : YB_DEFAULT_SHALLOW, YB_DEFAULT_PREFIX);
+    enc = YBenc_init(bs100k * 100000, exponential ? 0 : YB_DEFAULT_SHALLOW,
+        YB_DEFAULT_PREFIX);
 
     /* Collect as much data as we can. */
     consumed = ileft;
@@ -324,8 +309,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
 
 static void
-work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential,
-    const char *isep, const char *ifmt)
+work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential)
 {
   for (;;) {
     struct s2w_blk *s2w_blk;
@@ -347,7 +331,7 @@ work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential,
     }
     xunlock(&s2w_q->av_or_eof);
 
-    work_compr(s2w_blk, w2m_q, bs100k, exponential, isep, ifmt);
+    work_compr(s2w_blk, w2m_q, bs100k, exponential);
     (*freef)(s2w_blk);
   }
 
@@ -366,8 +350,6 @@ struct work_arg
   struct w2m_q *w2m_q;
   int bs100k,
       exponential;
-  const char *isep,
-      *ifmt;
 };
 
 
@@ -381,9 +363,7 @@ work_wrap(void *v_work_arg)
       work_arg->s2w_q,
       work_arg->w2m_q,
       work_arg->bs100k,
-      work_arg->exponential,
-      work_arg->isep,
-      work_arg->ifmt
+      work_arg->exponential
   );
   return 0;
 }
@@ -404,34 +384,8 @@ reord_dealloc(void *ptr, void *ignored)
 
 
 static void
-generic_write(int outfd, const char *osep, const char *ofmt,
-    void *buf, size_t size)
-{
-  if (-1 != outfd) {
-    char unsigned *cp;
-
-    cp = buf;
-    while (size > 0u) {
-      ssize_t written;
-
-      written = write(outfd, cp, size > (size_t)SSIZE_MAX
-          ? (size_t)SSIZE_MAX : size);
-      if (-1 == written) {
-        log_fatal("%s: write(%s%s%s): %s\n", pname, osep, ofmt, osep,
-            err2str(errno));
-      }
-
-      size -= (size_t)written;
-      cp += written;
-    }
-  }
-}
-
-
-static void
 mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
-    uint64_t *reord_needed, int outfd, const char *osep, const char *ofmt,
-    YBobs_t *obs)
+    uint64_t *reord_needed, struct filespec ospec, YBobs_t *obs)
 {
   assert(0 != *reord);
 
@@ -455,7 +409,7 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
     /* Write out "reord_w2m_blk". */
     sub_i = 0;
     do {
-      generic_write(outfd, osep, ofmt, reord_w2m_blk->subblock[sub_i].buf,
+      xwrite(ospec, reord_w2m_blk->subblock[sub_i].buf,
           reord_w2m_blk->subblock[sub_i].size);
 
       (*freef)(reord_w2m_blk->subblock[sub_i].buf);
@@ -485,18 +439,18 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
 
 
 static void
-mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
-    const char *ofmt, int bs100k)
+mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec ospec,
+    int bs100k)
 {
   struct lacos_rbtree_node *reord;
   uint64_t reord_needed;
-  char header[YB_HEADER_SIZE];
-  char trailer[YB_TRAILER_SIZE];
+  char unsigned buffer[YB_HEADER_SIZE > YB_TRAILER_SIZE ? YB_HEADER_SIZE
+      : YB_TRAILER_SIZE+100];
   YBobs_t *obs;
 
-  /* Write stream header. */
-  obs = YBobs_init(100000 * bs100k, header);
-  generic_write(outfd, osep, ofmt, header, YB_HEADER_SIZE);
+  /* Init obs and write out stream header. */
+  obs = YBobs_init(100000 * bs100k, buffer);
+  xwrite(ospec, buffer, YB_HEADER_SIZE);
 
   reord = 0;
   reord_needed = 0u;
@@ -542,16 +496,16 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
     } while (0 != w2m_blk);
 
     /* Write out initial continuous sequence of reordered blocks. */
-    mux_write(m2s_q, &reord, &reord_needed, outfd, osep, ofmt, obs);
+    mux_write(m2s_q, &reord, &reord_needed, ospec, obs);
 
     xlock_pred(&w2m_q->av_or_exit);
     w2m_q->needed = reord_needed;
   }
   xunlock(&w2m_q->av_or_exit);
 
-  /* Write stream trailer. */
-  YBobs_finish(obs, trailer);
-  generic_write(outfd, osep, ofmt, trailer, YB_TRAILER_SIZE);
+  /* Write out stream trailer. */
+  YBobs_finish(obs, buffer);
+  xwrite(ospec, buffer, YB_TRAILER_SIZE);
 
   YBobs_destroy(obs);
 
@@ -560,9 +514,8 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, int outfd, const char *osep,
 
 
 static void
-lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
-    const char *isep, const char *ifmt, int outfd, const char *osep,
-       const char *ofmt, int bs100k, int exponential)
+lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
+    struct filespec ispec, struct filespec ospec, int bs100k, int exponential)
 {
   struct s2w_q s2w_q;
   struct w2m_q w2m_q;
@@ -587,14 +540,14 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
     tmp = arsz_unsigned; \
     if ((size_t)-1 < tmp) { \
       log_fatal("%s: %s%s%s: size_t overflow in sizeof_" #arr "\n", pname, \
-          isep, ifmt, isep); \
+          ispec.sep, ispec.fmt, ispec.sep); \
     } \
     arg ## _arg . sizeof_ ## arr = tmp; \
 \
     if ((size_t)-1 - sizeof(struct struc) \
         < arg ## _arg . sizeof_ ## arr /* - (size_t)1 */) { \
       log_fatal("%s: %s%s%s: size_t overflow in sizeof_" #struc "\n", pname, \
-          isep, ifmt, isep); \
+          ispec.sep, ispec.fmt, ispec.sep); \
     } \
     arg ## _arg . sizeof_ ## struc = sizeof(struct struc) \
         + (arg ## _arg . sizeof_ ## arr /* - (size_t)1 */); \
@@ -602,9 +555,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
 
   split_arg.m2s_q = &m2s_q;
   split_arg.s2w_q = &s2w_q;
-  split_arg.infd = infd;
-  split_arg.isep = isep;
-  split_arg.ifmt = ifmt;
+  split_arg.ispec = ispec;
   SIZES(s2w_blk, plain, (unsigned)bs100k * 100u * 1000u, split);
   xcreate(&splitter, split_wrap, &split_arg);
 
@@ -614,8 +565,6 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
   work_arg.w2m_q = &w2m_q;
   work_arg.bs100k = bs100k;
   work_arg.exponential = exponential;
-  work_arg.isep = isep;
-  work_arg.ifmt = ifmt;
 
   assert(0u < num_worker);
   assert((size_t)-1 / sizeof *worker >= num_worker);
@@ -624,7 +573,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
     xcreate(&worker[i], work_wrap, &work_arg);
   }
 
-  mux(&w2m_q, &m2s_q, outfd, osep, ofmt, bs100k);
+  mux(&w2m_q, &m2s_q, ospec, bs100k);
 
   i = num_worker;
   do {
@@ -656,7 +605,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs, int infd,
         "%s: muxer stalled                            : %*lu\n"
         "%s: splitter tried to consume from muxer     : %*lu\n"
         "%s: splitter stalled                         : %*lu\n",
-        pname, isep, ifmt, isep,
+        pname, ispec.sep, ispec.fmt, ispec.sep,
         pname, FW, s2w_q.av_or_eof.ccount,
         pname, FW, s2w_q.av_or_eof.wcount,
         pname, FW, w2m_q.av_or_exit.ccount,
@@ -683,12 +632,8 @@ lbzip2_wrap(void *v_lbzip2_arg)
       lbzip2_arg->num_worker,
       lbzip2_arg->num_slot,
       lbzip2_arg->print_cctrs,
-      lbzip2_arg->infd,
-      lbzip2_arg->isep,
-      lbzip2_arg->ifmt,
-      lbzip2_arg->outfd,
-      lbzip2_arg->osep,
-      lbzip2_arg->ofmt,
+      lbzip2_arg->ispec,
+      lbzip2_arg->ospec,
       lbzip2_arg->bs100k,
       lbzip2_arg->exponential
   );

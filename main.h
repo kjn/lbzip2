@@ -129,4 +129,31 @@ xjoin(pthread_t thread);
 void
 xraise(int sig);
 
+
+/*
+  (V) File I/O utilities. If they fail, they call log_fatal().
+*/
+
+/*
+  The file specifier.
+
+  The pointers "sep" and "fmt" point to character arrays that either don't
+  need to be released, or need to be released through different aliases.
+  These are prepared solely for logging. This is why the pointed to chars
+  are qualified as const.
+*/
+struct filespec
+{
+  int fd;           /* the file descriptor; may be -1 if discarding output */
+  const char *sep,  /* name separator; either "" or "\"" */
+      *fmt;         /* either file name or a special name, like stdin */
+};
+
+void
+xread(struct filespec ispec, char unsigned *buffer, size_t *vacant);
+
+void
+xwrite(struct filespec ospec, const char unsigned *buffer, size_t size);
+
+
 #endif

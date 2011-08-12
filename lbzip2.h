@@ -7,13 +7,9 @@ struct lbzip2_arg
 {
   unsigned num_worker,
       num_slot;
-  int print_cctrs,
-      infd;
-  const char *isep,
-      *ifmt;
-  int outfd;
-  const char *osep,
-      *ofmt;
+  int print_cctrs;
+  struct filespec ispec,
+      ospec;
   int bs100k,
       exponential;
 };

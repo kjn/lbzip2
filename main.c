@@ -474,6 +474,7 @@ xlock(struct cond *cond)
 
   ret = pthread_mutex_lock(&cond->lock);
   if (0 != ret) {
+    abort();
     log_fatal("%s: pthread_mutex_lock(): %s\n", pname, err2str(ret));
   }
 }
@@ -566,6 +567,60 @@ xraise(int sig)
 {
   if (-1 == kill(pid, sig)) {
     log_fatal("%s: kill(): %s\n", pname, err2str(errno));
+  }
+}
+
+
+/* (V) File I/O utilities. */
+
+void
+xread(struct filespec ispec, char unsigned *buffer, size_t *vacant)
+{
+  assert(0 < *vacant);
+
+  do {
+    ssize_t rd;
+
+    rd = read(ispec.fd, buffer, *vacant > (size_t)SSIZE_MAX ?
+        (size_t)SSIZE_MAX : *vacant);
+
+    /* End of file. */
+    if (0 == rd)
+      break;
+
+    /* Read error. */
+    if (-1 == rd) {
+      log_fatal("%s: read(%s%s%s): %s\n", pname, ispec.sep, ispec.fmt,
+          ispec.sep, err2str(errno));
+    }
+
+    *vacant -= (size_t)rd;
+    buffer += (size_t)rd;
+  } while (0 < *vacant);
+}
+
+
+void
+xwrite(struct filespec ospec, const char unsigned *buffer, size_t size)
+{
+  assert(0 < size);
+
+  if (-1 != ospec.fd) {
+    do {
+      ssize_t wr;
+
+      wr = write(ospec.fd, buffer, size > (size_t)SSIZE_MAX ?
+          (size_t)SSIZE_MAX : size);
+
+      /* Write error. */
+      if (-1 == wr) {
+        log_fatal("%s: write(%s%s%s): %s\n", pname, ospec.sep, ospec.fmt,
+            ospec.sep, err2str(errno));
+      }
+
+      size -= (size_t)wr;
+      buffer += (size_t)wr;
+    } while (0 < size);
   }
 }
 
@@ -1210,22 +1265,23 @@ log_warning(const char *fmt, ...)
   If input is unavailable (skipping), return -1.
 
   Otherwise:
-    - return the file descriptor to read from,
+    - return 0,
+    - store the file descriptor to read from (might be -1 if discarding),
     - if input is coming from a successfully opened FILE operand, fill in
       "*sbuf" via fstat() -- but "*sbuf" may be modified without this, too,
-    - set up "*isep" and "*ifmt" for logging; the character arrays pointed to
-      by them won't need to be released (or at least not through these
-      aliases).
+    - set up "ispec->sep" and "ispec->fmt" for logging; the character arrays
+      pointed to by them won't need to be released (or at least not through
+      these aliases).
 */
 static int
 input_init(const struct arg *operand, enum outmode outmode, int decompress,
-    int force, int keep, struct stat *sbuf, const char **isep,
-    const char **ifmt)
+    int force, int keep, struct stat *sbuf, struct filespec *ispec)
 {
   if (0 == operand) {
-    *isep = "";
-    *ifmt = "stdin";
-    return STDIN_FILENO;
+    ispec->fd  = STDIN_FILENO;
+    ispec->sep = "";
+    ispec->fmt = "stdin";
+    return 0;
   }
 
   if (!force) {
@@ -1262,9 +1318,10 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
     }
     else {
       if (-1 != fstat(infd, sbuf)) {
-        *isep = "\"";
-        *ifmt = operand->val;
-        return infd;
+        ispec->fd  = infd;
+        ispec->sep = "\"";
+        ispec->fmt = operand->val;
+        return 0;
       }
 
       log_warning("%s: skipping \"%s\": fstat(): %s\n", pname, operand->val,
@@ -1293,11 +1350,11 @@ input_oprnd_rm(const struct arg *operand)
 
 
 static void
-input_uninit(int infd, const char *isep, const char *ifmt)
+input_uninit(struct filespec ispec)
 {
-  if (-1 == close(infd)) {
-    log_fatal("%s: close(%s%s%s): %s\n", pname, isep, ifmt, isep,
-        err2str(errno));
+  if (-1 == close(ispec.fd)) {
+    log_fatal("%s: close(%s%s%s): %s\n", pname, ispec.sep, ispec.fmt,
+        ispec.sep, err2str(errno));
   }
 }
 
@@ -1310,26 +1367,26 @@ input_uninit(int infd, const char *isep, const char *ifmt)
     - store the file descriptor to write to (might be -1 if discarding),
     - if we write to a regular file, store the dynamically allocated output
       pathname,
-    - set up "*osep" and "*ofmt" for logging; the character arrays pointed to
-      by them won't need to be released (or at least not through these
-      aliases).
+    - set up "ospec->sep" and "ospec->fmt" for logging; the character arrays
+      pointed to by them won't need to be released (or at least not through
+      these aliases).
 */
 static int
 output_init(const struct arg *operand, enum outmode outmode, int decompress,
-    int force, const struct stat *sbuf, int *outfd, char **output_pathname,
-    const char **osep, const char **ofmt)
+    int force, const struct stat *sbuf, struct filespec *ospec,
+    char **output_pathname)
 {
   switch (outmode) {
     case OM_STDOUT:
-      *outfd = STDOUT_FILENO;
-      *osep = "";
-      *ofmt = "stdout";
+      ospec->fd  = STDOUT_FILENO;
+      ospec->sep = "";
+      ospec->fmt = "stdout";
       return 0;
 
     case OM_DISCARD:
-      *outfd = -1;
-      *osep = "";
-      *ofmt = "the bit bucket";
+      ospec->fd  = -1;
+      ospec->sep = "";
+      ospec->fmt = "the bit bucket";
       return 0;
 
     case OM_REGF:
@@ -1362,18 +1419,18 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
           log_info("%s: unlink(\"%s\"): %s\n", pname, tmp, err2str(errno));
         }
 
-        *outfd = open(tmp, O_WRONLY | O_CREAT | O_EXCL,
+        ospec->fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL,
             sbuf->st_mode & (S_IRUSR | S_IWUSR));
 
-        if (-1 == *outfd) {
+        if (-1 == ospec->fd) {
           log_warning("%s: skipping \"%s\": open(\"%s\"): %s\n", pname,
               operand->val, tmp, err2str(errno));
           (*freef)(tmp);
         }
         else {
           *output_pathname = tmp;
-          *osep = "\"";
-          *ofmt = tmp;
+          ospec->sep = "\"";
+          ospec->fmt = tmp;
           return 0;
         }
       }
@@ -1437,9 +1494,8 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
 
 
 static void
-process(const struct opts *opts, unsigned num_slot, int infd, const char *isep,
-    const char *ifmt, int outfd, const char *osep, const char *ofmt, const
-    sigset_t *unblocked)
+process(const struct opts *opts, unsigned num_slot, struct filespec ispec,
+    struct filespec ospec, const sigset_t *unblocked)
 {
   /*
     We could wait for signals with either sigwait() or sigsuspend(). SUSv2
@@ -1460,39 +1516,31 @@ process(const struct opts *opts, unsigned num_slot, int infd, const char *isep,
 
   union
   {
-    struct lbunzip2_arg        lbunzip2;
-    struct lbzip2_arg          lbzip2;
+    struct lbunzip2_arg lbunzip2;
+    struct lbzip2_arg   lbzip2;
   } muxer_arg;
   pthread_t muxer;
 
   if (opts->verbose) {
     log_info("%s: %s %s%s%s to %s%s%s\n", pname, opts->decompress
-        ? "decompressing" : "compressing", isep, ifmt, isep, osep, ofmt, osep
-    );
+        ? "decompressing" : "compressing", ispec.sep, ispec.fmt, ispec.sep,
+        ospec.sep, ospec.fmt, ospec.sep);
   }
 
   if (opts->decompress) {
     muxer_arg.lbunzip2.num_worker = opts->num_worker;
     muxer_arg.lbunzip2.num_slot = num_slot;
     muxer_arg.lbunzip2.print_cctrs = opts->print_cctrs;
-    muxer_arg.lbunzip2.infd = infd;
-    muxer_arg.lbunzip2.isep = isep;
-    muxer_arg.lbunzip2.ifmt = ifmt;
-    muxer_arg.lbunzip2.outfd = outfd;
-    muxer_arg.lbunzip2.osep = osep;
-    muxer_arg.lbunzip2.ofmt = ofmt;
+    muxer_arg.lbunzip2.ispec = ispec;
+    muxer_arg.lbunzip2.ospec = ospec;
     xcreate(&muxer, lbunzip2_wrap, &muxer_arg.lbunzip2);
   }
   else {
     muxer_arg.lbzip2.num_worker = opts->num_worker;
     muxer_arg.lbzip2.num_slot = num_slot;
     muxer_arg.lbzip2.print_cctrs = opts->print_cctrs;
-    muxer_arg.lbzip2.infd = infd;
-    muxer_arg.lbzip2.isep = isep;
-    muxer_arg.lbzip2.ifmt = ifmt;
-    muxer_arg.lbzip2.outfd = outfd;
-    muxer_arg.lbzip2.osep = osep;
-    muxer_arg.lbzip2.ofmt = ofmt;
+    muxer_arg.lbzip2.ispec = ispec;
+    muxer_arg.lbzip2.ospec = ospec;
     muxer_arg.lbzip2.bs100k = opts->bs100k;
     muxer_arg.lbzip2.exponential = opts->exponential;
     xcreate(&muxer, lbzip2_wrap, &muxer_arg.lbzip2);
@@ -1642,36 +1690,25 @@ main(int argc, char **argv)
   num_slot = opts.num_worker * blf;
 
   do {
-    /*
-      Process operand.
-
-      The pointers "isep", "ifmt", and "osep", "ofmt" all point to character
-      arrays that either don't need to be released, or need to be released
-      through different aliases. These are prepared solely for logging. This is
-      why the pointed to chars are qualified as const.
-    */
+    /* Process operand. */
     {
-      int infd;
+      int ret;
       struct stat instat;
-      const char *isep,
-          *ifmt;
+      struct filespec ispec;
 
-      infd = input_init(operands, opts.outmode, opts.decompress, opts.force,
-          opts.keep, &instat, &isep, &ifmt);
-      if (-1 != infd) {
+      ret = input_init(operands, opts.outmode, opts.decompress, opts.force,
+          opts.keep, &instat, &ispec);
+      if (-1 != ret) {
         sigset_t unblocked;
-        int outfd;
-        const char *osep,
-            *ofmt;
+        struct filespec ospec;
 
         sigs_mod(1, &unblocked);
         if (-1 != output_init(operands, opts.outmode, opts.decompress,
-            opts.force, &instat, &outfd, &opathn, &osep, &ofmt)) {
-          process(&opts, num_slot, infd, isep, ifmt, outfd, osep, ofmt,
-              &unblocked);
+            opts.force, &instat, &ospec, &opathn)) {
+          process(&opts, num_slot, ispec, ospec, &unblocked);
 
           if (OM_REGF == opts.outmode) {
-            output_regf_uninit(outfd, &instat, &opathn);
+            output_regf_uninit(ospec.fd, &instat, &opathn);
             if (!opts.keep) {
               input_oprnd_rm(operands);
             }
@@ -1679,7 +1716,7 @@ main(int argc, char **argv)
         } /* output available or discarding */
         sigs_mod(0, &unblocked);
 
-        input_uninit(infd, isep, ifmt);
+        input_uninit(ispec);
       } /* input available */
     }
 
