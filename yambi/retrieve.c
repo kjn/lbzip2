@@ -47,20 +47,27 @@
   aren't rejected directly at creation (that's the moment when both bad cases
   are detected).  Instead, invalid trees cause decode error only when they are
   actually used to decode a group.  This is noncomforming behavior -- the
-  original BZip2, which serves as a reference implementation, accepts
+  original bzip2, which serves as a reference implementation, accepts
   malformed trees as long as nonexistent codes don't appear in compressed
-  stream.  Neither BZip2 nor any alternative implementation I know produces
+  stream.  Neither bzip2 nor any alternative implementation I know produces
   such trees, so this behaviour seems sane.
 */
 
 
-/* Build a set of decoding tables.  Inspired by "On the implementation of
-   minimum-redundancy prefix codes" by Alistair Moffat and Andrew Turpin. */
+/* Given a list of code lengths, make a set of tables to decode that set
+   of codes.  Return zero on success (the tables are built only in this
+   case), 7 if the given code set is incomplete, 6 if the input is invalid
+   (an oversubscribed set of lengths).
+
+   The algorithm implemented here was inspired by "On the implementation of
+   minimum-redundancy prefix codes" by Alistair Moffat and Andrew Turpin,
+   but the code below doesn't diectly follow the description in the paper.
+*/
 static int
-make_tree(YBibs_t *ibs,
-          int t,
-          Byte L[],
-          Int n)
+make_tree(YBibs_t *ibs,   /* the IBS where to store created tables */
+          Int t,          /* tree index */
+          const Byte *L,  /* code lengths */
+          Int n)          /* alphabet size */
 {
   Int   *C;  /* code length count; C[0] is a sentinel (always zero) */
   Long  *B;  /* left-justified base */
@@ -69,11 +76,11 @@ make_tree(YBibs_t *ibs,
 
   int    k;  /* current code length */
   Int    s;  /* current symbol */
-  Long sofar, next;
+  Long sofar;
+  Long next;
   Int cum;
   Int code;
   Long inc;
-  Short x;
 
   Long v;
 
@@ -89,6 +96,7 @@ make_tree(YBibs_t *ibs,
     k = L[s];
     C[k]++;
   }
+  /* Make sure there are no zero-length codes. */
   assert(C[0] == 0);
 
   /* Check if Kraft's inequality is satisfied. */
@@ -110,10 +118,13 @@ make_tree(YBibs_t *ibs,
     B[k] = sofar;
     sofar = next;
   }
+  /* Ensure that "sofar" has overflowed to zero. */
   assert(sofar == 0);
 
   /* The last few entries of lj-base may have overflowed to zero,
-     so replace all trailing zeros with the greatest possible 64-bit value. */
+     so replace all trailing zeros with the greatest possible 64-bit value
+     (which is greater than the greatest possible left-justified base).
+  */
   assert(k == MAX_CODE_LENGTH+1);
   k = MAX_CODE_LENGTH;
   while (C[k] == 0)
@@ -151,7 +162,7 @@ make_tree(YBibs_t *ibs,
   {
     for (s = C[k-1]; s < C[k]; s++)
     {
-      x = (P[s] << 5) | k;
+      Short x = (P[s] << 5) | k;
       v = code;
       code += inc;
       while (v < code)
@@ -178,6 +189,7 @@ make_tree(YBibs_t *ibs,
   {
     C[k] = C[k-1];
   }
+  assert(C[0] == 0);
 
   /* Valid tables were created successfully. */
   return 0;
@@ -710,11 +722,11 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
       if (unlikely(t >= 6))
       {
         if (t == 6) {
-          Trace(("oversubscribed Huffman tree\n"));
+          Trace(("oversubscribed prefix code\n"));
           return YB_ERR_PREFIX;
         }
         else {
-          Trace(("incomplete Huffman tree\n"));
+          Trace(("incomplete prefix code\n"));
           return YB_ERR_INCOMPLT;
         }
       }

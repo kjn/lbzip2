@@ -50,10 +50,12 @@ struct YBenc_s
   Byte *selectorMTF;
   Int num_selectors;
   Int num_trees;
-  Int count[6][32];
-  Byte length[6][259];
-  Int lookup[6][259];
-  Int rfreq[6][259];
+  Int count[MAX_TREES][32];
+  /* There is a sentinel symbol added at the end of each alphabet,
+     hence the +1s below. */
+  Byte length[MAX_TREES][MAX_ALPHA_SIZE+1];
+  Int lookup[MAX_TREES][MAX_ALPHA_SIZE+1];
+  Int rfreq[MAX_TREES][MAX_ALPHA_SIZE+1];
 };
 
 

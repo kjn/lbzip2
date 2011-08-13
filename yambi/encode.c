@@ -124,8 +124,8 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   Int cost;
   Int pk;
   Int i;
-  const Byte *sp;
-  Byte *smp;
+  const Byte *sp;  /* selector pointer */
+  Byte *smp;       /* selector MTFV pointer */
   Byte c;  /* value before MTF */
   Byte j;  /* value after MTF */
   Int p;   /* MTF state */
@@ -245,6 +245,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   }
   cost += 16;  /* Big bucket costs 16 bits on its own. */
 
+  /* Convert cost from bits to bytes. */
   assert(cost % 8 == 0);
   cost >>= 3;
 

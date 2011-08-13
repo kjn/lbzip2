@@ -31,6 +31,8 @@ The Art of Computer Programming, volume 3: Sorting and Searching
 
 */
 
+#include <strings.h>  /* bzero() */
+
 #include "encode.h"
 
 
@@ -592,7 +594,6 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
   Int alphaSize;
   Int nGroups;
   Int iter, i;
-  Int rfreq[MAX_TREES][MAX_ALPHA_SIZE+1];
   Int cost;
 
   alphaSize = mtfv[nmtf-1]+1;  /* the last mtfv is EOB */
@@ -627,7 +628,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
     Short *gs;
     Int v, t;
     Byte *sp;
-    int tfreq[MAX_TREES];
+    /* int tfreq[MAX_TREES]; */
 
     /* Pack code lengths of all trees into 64-bit integers in order to take
        advantage of 64-bit vector arithmetics.  Each group holds at most
@@ -642,13 +643,8 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
                      ((Long)s->length[5][v] << 50));
     len_pack[alphaSize] = 0;
 
-    for (t = 0; t < nGroups; t++)
-      tfreq[t] = 0;
-
-    /* TODO: try using memset */
-    for (t = 0; t < nGroups; t++)
-      for (v = 0; v <= alphaSize; v++)
-        rfreq[t][v] = 0;
+    /* bzero(tfreq, nGroups * sizeof(*tfreq); */
+    bzero(s->rfreq, nGroups * (MAX_ALPHA_SIZE+1) * sizeof(**s->rfreq));
 
     sp = s->selector;
 
@@ -659,8 +655,8 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
          and remember the choice in the selector array. */
       t = find_best_tree(gs, nGroups, len_pack);
       assert(t < nGroups);
-      increment_freqs(gs, rfreq[t]);
-      tfreq[t]++;
+      increment_freqs(gs, s->rfreq[t]);
+      /* tfreq[t]++; */
       Trace((stderr, "prefix: adding selector number %5d of value %d.\n",
              sp - s->selector, t));
       *sp++ = t;
@@ -671,6 +667,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
            "(end marker).\n", sp - s->selector, MAX_TREES));
     *sp = MAX_TREES;
 
+    /* TODO: bring this code back to life, may improove compression level */
     /* Remove unused trees. */
     /* WARNING: removing a tree will most likely invalidate selectors!!
        If this code is to be brought back to life, all selectors
@@ -686,7 +683,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
           {
             s->count[t][v] = s->count[nGroups][v];
             s->length[t][v] = s->length[nGroups][v];
-            rfreq[t][v] = rfreq[nGroups][v];
+            s->rfreq[t][v] = s->rfreq[nGroups][v];
           }
       }
 #endif
@@ -695,7 +692,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
       Recompute the tables based on the accumulated frequencies.
       --*/
     for (t = 0; t < nGroups; t++)
-      make_code_lengths(s->count[t], s->length[t], rfreq[t], alphaSize);
+      make_code_lengths(s->count[t], s->length[t], s->rfreq[t], alphaSize);
   }
 
   {
@@ -721,7 +718,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
       SInt p, c, d;
 
       cost += 6;
-      cost += rfreq[t][0] * len[0];
+      cost += s->rfreq[t][0] * len[0];
       p = len[0];
       for (v = 1; v < alphaSize; v++)
       {
@@ -732,7 +729,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
           d = -d;
         cost += 1+2*d;
         p = c;
-        cost += rfreq[t][v] * len[v];
+        cost += s->rfreq[t][v] * len[v];
       }
     }
   }

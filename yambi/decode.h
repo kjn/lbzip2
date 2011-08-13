@@ -18,6 +18,24 @@
 #include "private.h"
 
 
+/* Prefix code decoding is performed using a multi-level table lookup.
+   The fastest way to decode is to simply build a lookup table whose size
+   is determined by the longest code.  However, the time it takes to build
+   this table can also be a factor if the data being decoded is not very
+   long.  The most common codes are necessarily the shortest codes, so those
+   codes dominate the decoding time, and hence the speed.  The idea is you
+   can have a shorter table that decodes the shorter, more probable codes,
+   and then point to subsidiary tables for the longer codes.  The time it
+   costs to decode the longer codes is then traded against the time it takes
+   to make longer tables.
+
+   This result of this trade are in the constant HUFF_START_WIDTH below.
+   HUFF_START_WIDTH is the number of bits the first level table can decode
+   in one step.  Subsequent tables always decode one bit at time. The current
+   value of HUFF_START_WIDTH was determined with a series of benchmarks.
+   The optimum value may differ though from machine to machine, and possibly
+   even between compilers.  Your mileage may vary.
+*/
 #define HUFF_START_WIDTH 10
 
 /* IMTF_ROW_WIDTH and IMTF_NUM_ROWS must be positive

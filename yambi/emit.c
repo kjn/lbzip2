@@ -20,7 +20,7 @@
 
 #define Trace(x)
 
-#define M1 0xFFFFFFFF
+#define M1 0xFFFFFFFFu
 
 
 /* Returns bytes still remaining in output buffer (zero if all bytes were
