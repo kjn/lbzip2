@@ -474,7 +474,6 @@ xlock(struct cond *cond)
 
   ret = pthread_mutex_lock(&cond->lock);
   if (0 != ret) {
-    abort();
     log_fatal("%s: pthread_mutex_lock(): %s\n", pname, err2str(ret));
   }
 }

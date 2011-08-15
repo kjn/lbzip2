@@ -17,7 +17,7 @@
 
 #include "decode.h"
 
-#if 1
+#if 0
 # include <stdio.h>
 # define Trace(x) fprintf x
 #else

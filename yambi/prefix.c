@@ -140,7 +140,7 @@ build_tree(
     else
       w2 = P[s--];
 
-    w = (w1 + w2) & 0xFFFFFFFF00FF0000;
+    w = (w1 + w2) & ~(Long)0xFF00FFFF;
     w1 &= 0xFF000000; w2 &= 0xFF000000;
     if (w2 > w1) w1 = w2;
     w2 = P[t] & 0xFFFF;
@@ -662,7 +662,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
       *sp++ = t;
     }
 
-    assert(sp - s->selector == s->num_selectors);
+    assert((size_t)(sp - s->selector) == s->num_selectors);
     Trace((stderr, "prefix: adding selector number %5d of value %d "
            "(end marker).\n", sp - s->selector, MAX_TREES));
     *sp = MAX_TREES;

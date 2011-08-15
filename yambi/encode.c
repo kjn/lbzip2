@@ -191,13 +191,13 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
     Trace((stderr, "Selector number %5d has value of %d.\n",
            sp - s->selector, c));
 
-    if (c >= s->num_trees || sp - s->selector >= s->num_selectors)
+    if (c >= s->num_trees || (size_t)(sp - s->selector) >= s->num_selectors)
     {
       Trace((stderr, "c=%d, num_trees=%d, num_selectors=%d, pos=%d\n", c,
              s->num_trees, s->num_selectors, sp - s->selector));
     }
     assert(c < s->num_trees);
-    assert(sp - s->selector < s->num_selectors);
+    assert((size_t)(sp - s->selector) < s->num_selectors);
 
     v = p ^ (0x111111 * c);
     z = (v + 0xEEEEEF) & 0x888888;
