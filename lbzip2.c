@@ -2,7 +2,6 @@
 
 #include <inttypes.h>     /* uint64_t */
 #include <assert.h>       /* assert() */
-#include <errno.h>        /* errno */
 #include <signal.h>       /* SIGUSR2 */
 
 #include "yambi/yambi.h"  /* YBenc_t */

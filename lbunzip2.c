@@ -2,7 +2,6 @@
 
 #include <inttypes.h>     /* uint64_t */
 #include <assert.h>       /* assert() */
-#include <errno.h>        /* errno */
 #include <string.h>       /* memcpy() */
 #include <signal.h>       /* SIGUSR2 */
 
