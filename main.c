@@ -573,14 +573,14 @@ xraise(int sig)
 /* (V) File I/O utilities. */
 
 void
-xread(struct filespec ispec, char unsigned *buffer, size_t *vacant)
+xread(struct filespec *ispec, char unsigned *buffer, size_t *vacant)
 {
   assert(0 < *vacant);
 
   do {
     ssize_t rd;
 
-    rd = read(ispec.fd, buffer, *vacant > (size_t)SSIZE_MAX ?
+    rd = read(ispec->fd, buffer, *vacant > (size_t)SSIZE_MAX ?
         (size_t)SSIZE_MAX : *vacant);
 
     /* End of file. */
@@ -589,32 +589,34 @@ xread(struct filespec ispec, char unsigned *buffer, size_t *vacant)
 
     /* Read error. */
     if (-1 == rd) {
-      log_fatal("%s: read(%s%s%s): %s\n", pname, ispec.sep, ispec.fmt,
-          ispec.sep, err2str(errno));
+      log_fatal("%s: read(%s%s%s): %s\n", pname, ispec->sep, ispec->fmt,
+          ispec->sep, err2str(errno));
     }
 
     *vacant -= (size_t)rd;
     buffer += (size_t)rd;
+    ispec->total += (size_t)rd;
   } while (0 < *vacant);
 }
 
 
 void
-xwrite(struct filespec ospec, const char unsigned *buffer, size_t size)
+xwrite(struct filespec *ospec, const char unsigned *buffer, size_t size)
 {
   assert(0 < size);
+  ospec->total += size;
 
-  if (-1 != ospec.fd) {
+  if (-1 != ospec->fd) {
     do {
       ssize_t wr;
 
-      wr = write(ospec.fd, buffer, size > (size_t)SSIZE_MAX ?
+      wr = write(ospec->fd, buffer, size > (size_t)SSIZE_MAX ?
           (size_t)SSIZE_MAX : size);
 
       /* Write error. */
       if (-1 == wr) {
-        log_fatal("%s: write(%s%s%s): %s\n", pname, ospec.sep, ospec.fmt,
-            ospec.sep, err2str(errno));
+        log_fatal("%s: write(%s%s%s): %s\n", pname, ospec->sep, ospec->fmt,
+            ospec->sep, err2str(errno));
       }
 
       size -= (size_t)wr;
@@ -1276,6 +1278,8 @@ static int
 input_init(const struct arg *operand, enum outmode outmode, int decompress,
     int force, int keep, struct stat *sbuf, struct filespec *ispec)
 {
+  ispec->total = 0u;
+
   if (0 == operand) {
     ispec->fd  = STDIN_FILENO;
     ispec->sep = "";
@@ -1349,11 +1353,11 @@ input_oprnd_rm(const struct arg *operand)
 
 
 static void
-input_uninit(struct filespec ispec)
+input_uninit(struct filespec *ispec)
 {
-  if (-1 == close(ispec.fd)) {
-    log_fatal("%s: close(%s%s%s): %s\n", pname, ispec.sep, ispec.fmt,
-        ispec.sep, err2str(errno));
+  if (-1 == close(ispec->fd)) {
+    log_fatal("%s: close(%s%s%s): %s\n", pname, ispec->sep, ispec->fmt,
+        ispec->sep, err2str(errno));
   }
 }
 
@@ -1375,6 +1379,8 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
     int force, const struct stat *sbuf, struct filespec *ospec,
     char **output_pathname)
 {
+  ospec->total = 0u;
+
   switch (outmode) {
     case OM_STDOUT:
       ospec->fd  = STDOUT_FILENO;
@@ -1493,8 +1499,8 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
 
 
 static void
-process(const struct opts *opts, unsigned num_slot, struct filespec ispec,
-    struct filespec ospec, const sigset_t *unblocked)
+process(const struct opts *opts, unsigned num_slot, struct filespec *ispec,
+    struct filespec *ospec, const sigset_t *unblocked)
 {
   /*
     We could wait for signals with either sigwait() or sigsuspend(). SUSv2
@@ -1522,8 +1528,8 @@ process(const struct opts *opts, unsigned num_slot, struct filespec ispec,
 
   if (opts->verbose) {
     log_info("%s: %s %s%s%s to %s%s%s\n", pname, opts->decompress
-        ? "decompressing" : "compressing", ispec.sep, ispec.fmt, ispec.sep,
-        ospec.sep, ospec.fmt, ospec.sep);
+        ? "decompressing" : "compressing", ispec->sep, ispec->fmt, ispec->sep,
+        ospec->sep, ospec->fmt, ospec->sep);
   }
 
   if (opts->decompress) {
@@ -1704,7 +1710,7 @@ main(int argc, char **argv)
         sigs_mod(1, &unblocked);
         if (-1 != output_init(operands, opts.outmode, opts.decompress,
             opts.force, &instat, &ospec, &opathn)) {
-          process(&opts, num_slot, ispec, ospec, &unblocked);
+          process(&opts, num_slot, &ispec, &ospec, &unblocked);
 
           if (OM_REGF == opts.outmode) {
             output_regf_uninit(ospec.fd, &instat, &opathn);
@@ -1712,10 +1718,38 @@ main(int argc, char **argv)
               input_oprnd_rm(operands);
             }
           }
+
+          /*
+            Display data compression ratio and space savings, but only
+            if the user desires so.
+          */
+          if (opts.verbose && 0u < ispec.total && 0u < ospec.total) {
+            uint64_t plain_size,
+                compr_size;
+            double
+                ratio,
+                savings,
+                ratio_magnitude;
+
+            /*
+              Do the math. Note that converting from uint64_t to double
+              *may* result in precission loss, but that shouldn't matter.
+            */
+            plain_size = !opts.decompress ? ispec.total : ospec.total;
+            compr_size = ispec.total ^ ospec.total ^ plain_size;
+            ratio = (double)compr_size / plain_size;
+            savings = 1 - ratio;
+            ratio_magnitude = ratio < 1 ? 1 / ratio : ratio;
+
+            log_info("%s: %s%s%s: compression ratio is %s%.3f%s, "
+                "space savings is %.2f%%\n", pname, ispec.sep, ispec.fmt,
+                ispec.sep, ratio < 1 ? "1:" : "", ratio_magnitude,
+                ratio < 1 ? "" : ":1", 100 * savings);
+          }
         } /* output available or discarding */
         sigs_mod(0, &unblocked);
 
-        input_uninit(ispec);
+        input_uninit(&ispec);
       } /* input available */
     }
 

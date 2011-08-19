@@ -1,6 +1,5 @@
 /* lbzip2.c,v 1.26 2009/12/20 19:24:06 lacos Exp */
 
-#include <inttypes.h>     /* uint64_t */
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
 
@@ -147,7 +146,7 @@ m2s_q_uninit(struct m2s_q *m2s_q, unsigned num_free)
 
 
 static void
-split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec ispec,
+split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec *ispec,
     const size_t sizeof_plain)
 {
   uint64_t id;
@@ -218,7 +217,7 @@ struct split_arg
 {
   struct m2s_q *m2s_q;
   struct s2w_q *s2w_q;
-  struct filespec ispec;
+  struct filespec *ispec;
   size_t sizeof_plain;
 };
 
@@ -385,7 +384,7 @@ reord_dealloc(void *ptr, void *ignored)
 
 static void
 mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
-    uint64_t *reord_needed, struct filespec ospec, YBobs_t *obs)
+    uint64_t *reord_needed, struct filespec *ospec, YBobs_t *obs)
 {
   assert(0 != *reord);
 
@@ -439,7 +438,7 @@ mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
 
 
 static void
-mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec ospec,
+mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec,
     int bs100k)
 {
   struct lacos_rbtree_node *reord;
@@ -515,7 +514,8 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec ospec,
 
 static void
 lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
-    struct filespec ispec, struct filespec ospec, int bs100k, int exponential)
+    struct filespec *ispec, struct filespec *ospec, int bs100k,
+    int exponential)
 {
   struct s2w_q s2w_q;
   struct w2m_q w2m_q;
@@ -535,11 +535,11 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
 
   if ((size_t)-1 < (unsigned)bs100k * 100000u) {
     log_fatal("%s: %s%s%s: size_t overflow in sizeof_plain\n", pname,
-        ispec.sep, ispec.fmt, ispec.sep);
+        ispec->sep, ispec->fmt, ispec->sep);
   }
   if ((size_t)-1 - sizeof(struct s2w_blk) < (unsigned)bs100k * 100000u) {
     log_fatal("%s: %s%s%s: size_t overflow in sizeof_s2w_blk\n", pname,
-        ispec.sep, ispec.fmt, ispec.sep);
+        ispec->sep, ispec->fmt, ispec->sep);
   }
 
   split_arg.m2s_q = &m2s_q;
@@ -592,7 +592,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
         "%s: muxer stalled                            : %*lu\n"
         "%s: splitter tried to consume from muxer     : %*lu\n"
         "%s: splitter stalled                         : %*lu\n",
-        pname, ispec.sep, ispec.fmt, ispec.sep,
+        pname, ispec->sep, ispec->fmt, ispec->sep,
         pname, FW, s2w_q.av_or_eof.ccount,
         pname, FW, s2w_q.av_or_eof.wcount,
         pname, FW, w2m_q.av_or_exit.ccount,

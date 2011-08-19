@@ -8,8 +8,8 @@ struct lbunzip2_arg
   unsigned num_worker,
       num_slot;
   int print_cctrs;
-  struct filespec ispec,
-      ospec;
+  struct filespec *ispec,
+      *ospec;
 };
 
 void *

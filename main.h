@@ -3,9 +3,10 @@
 #ifndef MAIN_H
 #  define MAIN_H
 
-#  include <limits.h>  /* CHAR_BIT */
-#  include <stddef.h>  /* size_t */
-#  include <pthread.h> /* pthread_mutex_t */
+#  include <limits.h>   /* CHAR_BIT */
+#  include <stddef.h>   /* size_t */
+#  include <pthread.h>  /* pthread_mutex_t */
+#  include <inttypes.h> /* uint64_t */
 
 #  if 8 != CHAR_BIT
 #    error "Environments where 8 != CHAR_BIT are not supported."
@@ -147,13 +148,14 @@ struct filespec
   int fd;           /* the file descriptor; may be -1 if discarding output */
   const char *sep,  /* name separator; either "" or "\"" */
       *fmt;         /* either file name or a special name, like stdin */
+  uint64_t total;   /* total number of bytes transfered from/to this file */
 };
 
 void
-xread(struct filespec ispec, char unsigned *buffer, size_t *vacant);
+xread(struct filespec *ispec, char unsigned *buffer, size_t *vacant);
 
 void
-xwrite(struct filespec ospec, const char unsigned *buffer, size_t size);
+xwrite(struct filespec *ospec, const char unsigned *buffer, size_t size);
 
 
 #endif

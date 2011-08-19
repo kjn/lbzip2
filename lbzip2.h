@@ -8,8 +8,8 @@ struct lbzip2_arg
   unsigned num_worker,
       num_slot;
   int print_cctrs;
-  struct filespec ispec,
-      ospec;
+  struct filespec *ispec,
+      *ospec;
   int bs100k,
       exponential;
 };
