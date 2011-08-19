@@ -11,6 +11,7 @@ struct lbzip2_arg
   struct filespec *ispec,
       *ospec;
   int bs100k,
+      verbose,
       exponential;
 };
 

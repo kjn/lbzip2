@@ -2,6 +2,8 @@
 
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
+#include <sys/time.h>     /* gettimeofday() */
+#include <unistd.h>       /* isatty() */
 
 #include "yambi/yambi.h"  /* YBenc_t */
 
@@ -66,6 +68,7 @@ s2w_q_uninit(struct s2w_q *s2w_q)
 struct w2m_blk            /* Workers to muxer. */
 {
   uint64_t id;            /* Block index as read from infd. */
+  size_t uncompr_size;    /* Plain (uncompressed) data size. */
   struct w2m_blk *next;   /* Next block in list (unordered). */
   size_t n_subblocks;
   struct {
@@ -295,6 +298,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
   w2m_blk->n_subblocks = sub_i;
   w2m_blk->id = s2w_blk->id;
+  w2m_blk->uncompr_size = s2w_blk->loaded;
 
   /* Push block to muxer. */
   xlock(&w2m_q->av_or_exit);
@@ -382,70 +386,48 @@ reord_dealloc(void *ptr, void *ignored)
 }
 
 
-static void
-mux_write(struct m2s_q *m2s_q, struct lacos_rbtree_node **reord,
-    uint64_t *reord_needed, struct filespec *ospec, YBobs_t *obs)
+/* If tv1 < tv2, return tv2 - tv1. Otherwise return 0. */
+static double
+timeval_diff(struct timeval tv1, struct timeval tv2)
 {
-  assert(0 != *reord);
-
-  /*
-    Go on until the tree becomes empty or the next block is found to be
-    missing.
-  */
-  do {
-    struct lacos_rbtree_node *reord_head;
-    struct w2m_blk *reord_w2m_blk;
-    size_t sub_i;
-
-    reord_head = lacos_rbtree_min(*reord);
-    assert(0 != reord_head);
-
-    reord_w2m_blk = *(void **)reord_head;
-    if (reord_w2m_blk->id != *reord_needed) {
-      break;
-    }
-
-    /* Write out "reord_w2m_blk". */
-    sub_i = 0;
-    do {
-      xwrite(ospec, reord_w2m_blk->subblock[sub_i].buf,
-          reord_w2m_blk->subblock[sub_i].size);
-
-      (*freef)(reord_w2m_blk->subblock[sub_i].buf);
-      YBobs_join(obs, &reord_w2m_blk->subblock[sub_i].crc);
-    } while (++sub_i < reord_w2m_blk->n_subblocks);
-
-    ++*reord_needed;
-
-    xlock(&m2s_q->av);
-    if (0u == m2s_q->num_free++) {
-      xsignal(&m2s_q->av);
-    }
-    xunlock(&m2s_q->av);
-
-    lacos_rbtree_delete(
-        reord,         /* new_root */
-        reord_head,    /* old_node */
-        0,             /* old_data */
-        reord_dealloc, /* dealloc() */
-        0              /* alloc_ctl */
-    );
-
-    /* Release "reord_w2m_blk". */
-    (*freef)(reord_w2m_blk);
-  } while (0 != *reord);
+  return (tv1.tv_sec <= tv2.tv_sec) ? tv2.tv_sec - tv1.tv_sec +
+      0.000001 * ((double)tv2.tv_usec - (double)tv1.tv_usec) : 0;
 }
 
 
 static void
-mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec,
-    int bs100k)
+mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
+    struct filespec *ospec, int bs100k, int verbose)
 {
   struct lacos_rbtree_node *reord;
   uint64_t reord_needed;
   char unsigned buffer[YB_HEADER_SIZE > YB_TRAILER_SIZE ? YB_HEADER_SIZE
       : YB_TRAILER_SIZE];
   YBobs_t *obs;
+  off_t uncompr_total;
+  struct timeval start_time,
+      last_time;
+  int progress;
+
+  /*
+    Progress info is displayed only if all the following conditions are met:
+     1) the user has specified -v or --verbose option
+     2) stderr is connected to a terminal device
+     3) the input file is a regular file
+     4) the input file is nonempty
+
+    Although SUSv2-compliant gettimeofday() should always return 0,
+    many systems document possibility of returning -1 on failure.
+    The list of systems that may return nonzero values includes:
+    GNU, Linux, NetBSD, FreeBSD, SysV, OSX, SunOS, z/OS, AIX, HP-UX.
+    If we get a non-zero value, we simply don't display the progress info.
+  */
+  if ((progress = verbose && (0 < ispec->size) && isatty(STDERR_FILENO) &&
+      0 == gettimeofday(&start_time, 0))) {
+    last_time = start_time;
+    log_info("%s: %s%s%s: progress: %.2f%%\r", pname, ispec->sep,
+        ispec->fmt, ispec->sep, 0.0);
+  }
 
   /* Init obs and write out stream header. */
   obs = YBobs_init(100000 * bs100k, buffer);
@@ -453,6 +435,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec,
 
   reord = 0;
   reord_needed = 0u;
+  uncompr_total = 0;
 
   xlock_pred(&w2m_q->av_or_exit);
   for (;;) {
@@ -494,9 +477,76 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec,
       w2m_blk = next;
     } while (0 != w2m_blk);
 
-    /* Write out initial continuous sequence of reordered blocks. */
-    mux_write(m2s_q, &reord, &reord_needed, ospec, obs);
+    /*
+      Write out initial continuous sequence of reordered blocks. Go on until
+      the tree becomes empty or the next block is found to be missing.
+    */
+    do {
+      struct lacos_rbtree_node *reord_head;
+      struct w2m_blk *reord_w2m_blk;
+      size_t sub_i;
 
+      reord_head = lacos_rbtree_min(reord);
+      assert(0 != reord_head);
+
+      reord_w2m_blk = *(void **)reord_head;
+      if (reord_w2m_blk->id != reord_needed) {
+        break;
+      }
+
+      /* Write out "reord_w2m_blk". */
+      sub_i = 0;
+      do {
+        xwrite(ospec, reord_w2m_blk->subblock[sub_i].buf,
+            reord_w2m_blk->subblock[sub_i].size);
+
+        (*freef)(reord_w2m_blk->subblock[sub_i].buf);
+        YBobs_join(obs, &reord_w2m_blk->subblock[sub_i].crc);
+      } while (++sub_i < reord_w2m_blk->n_subblocks);
+
+      ++reord_needed;
+
+      xlock(&m2s_q->av);
+      if (0u == m2s_q->num_free++) {
+        xsignal(&m2s_q->av);
+      }
+      xunlock(&m2s_q->av);
+
+      uncompr_total += reord_w2m_blk->uncompr_size;
+      if (progress) {
+        struct timeval time_now;
+
+        if (0 == gettimeofday(&time_now, 0) &&
+            timeval_diff(last_time, time_now) >= 0.1) {
+          double completed,
+              elapsed;
+
+          last_time = time_now;
+          elapsed = timeval_diff(start_time, time_now);
+          completed = (double)uncompr_total / ispec->size;
+
+          if (elapsed < 5)
+            log_info("%s: %s%s%s: progress: %.2f%%\r", pname, ispec->sep,
+                ispec->fmt, ispec->sep, 100 * completed);
+          else
+            log_info("%s: %s%s%s: progress: %.2f%%, ETA: %.0f s    \r",
+                pname, ispec->sep, ispec->fmt, ispec->sep, 100 * completed,
+                elapsed * (1 / completed - 1));
+        }
+      }
+
+      lacos_rbtree_delete(
+          &reord,        /* new_root */
+          reord_head,    /* old_node */
+          0,             /* old_data */
+          reord_dealloc, /* dealloc() */
+          0              /* alloc_ctl */
+      );
+
+      /* Release "reord_w2m_blk". */
+      (*freef)(reord_w2m_blk);
+    } while (0 != reord);
+  
     xlock_pred(&w2m_q->av_or_exit);
     w2m_q->needed = reord_needed;
   }
@@ -514,7 +564,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec,
 
 static void
 lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
-    struct filespec *ispec, struct filespec *ospec, int bs100k,
+    struct filespec *ispec, struct filespec *ospec, int bs100k, int verbose,
     int exponential)
 {
   struct s2w_q s2w_q;
@@ -528,6 +578,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
 
   assert(1 <= bs100k && bs100k <= 9);
   assert(exponential == !!exponential);
+  assert(verbose == !!verbose);
 
   s2w_q_init(&s2w_q);
   w2m_q_init(&w2m_q, num_worker);
@@ -560,7 +611,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
     xcreate(&worker[i], work_wrap, &work_arg);
   }
 
-  mux(&w2m_q, &m2s_q, ospec, bs100k);
+  mux(&w2m_q, &m2s_q, ispec, ospec, bs100k, verbose);
 
   i = num_worker;
   do {
@@ -622,6 +673,7 @@ lbzip2_wrap(void *v_lbzip2_arg)
       lbzip2_arg->ispec,
       lbzip2_arg->ospec,
       lbzip2_arg->bs100k,
+      lbzip2_arg->verbose,
       lbzip2_arg->exponential
   );
 

@@ -1,7 +1,6 @@
 /* main.c,v 1.75 2010/03/03 01:12:45 lacos Exp */
 
 #include <unistd.h>          /* unlink() */
-#include <sys/types.h>       /* kill() */
 #include <signal.h>          /* kill() */
 #include <stdlib.h>          /* strtol() */
 #include <stdarg.h>          /* va_list */
@@ -1284,6 +1283,7 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
     ispec->fd  = STDIN_FILENO;
     ispec->sep = "";
     ispec->fmt = "stdin";
+    ispec->size = 0;
     return 0;
   }
 
@@ -1324,6 +1324,7 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
         ispec->fd  = infd;
         ispec->sep = "\"";
         ispec->fmt = operand->val;
+        ispec->size = sbuf->st_size;
         return 0;
       }
 
@@ -1547,6 +1548,7 @@ process(const struct opts *opts, unsigned num_slot, struct filespec *ispec,
     muxer_arg.lbzip2.ispec = ispec;
     muxer_arg.lbzip2.ospec = ospec;
     muxer_arg.lbzip2.bs100k = opts->bs100k;
+    muxer_arg.lbzip2.verbose = opts->verbose;
     muxer_arg.lbzip2.exponential = opts->exponential;
     xcreate(&muxer, lbzip2_wrap, &muxer_arg.lbzip2);
   }

@@ -3,10 +3,11 @@
 #ifndef MAIN_H
 #  define MAIN_H
 
-#  include <limits.h>   /* CHAR_BIT */
-#  include <stddef.h>   /* size_t */
-#  include <pthread.h>  /* pthread_mutex_t */
-#  include <inttypes.h> /* uint64_t */
+#  include <limits.h>    /* CHAR_BIT */
+#  include <stddef.h>    /* size_t */
+#  include <pthread.h>   /* pthread_mutex_t */
+#  include <inttypes.h>  /* uint64_t */
+#  include <sys/types.h> /* off_t */
 
 #  if 8 != CHAR_BIT
 #    error "Environments where 8 != CHAR_BIT are not supported."
@@ -149,6 +150,7 @@ struct filespec
   const char *sep,  /* name separator; either "" or "\"" */
       *fmt;         /* either file name or a special name, like stdin */
   uint64_t total;   /* total number of bytes transfered from/to this file */
+  off_t size;       /* file size or 0 if unknown */
 };
 
 void
