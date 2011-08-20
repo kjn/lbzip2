@@ -10,7 +10,8 @@
 #include <assert.h>          /* assert() */
 #include <sys/stat.h>        /* lstat() */
 #include <fcntl.h>           /* open() */
-#include <utime.h>           /* utime() */
+
+#include "utimens.h"         /* fdutimens() */
 
 #include "main.h"            /* pname */
 #include "lbunzip2.h"        /* lbunzip2_wrap() */
@@ -1473,17 +1474,15 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
     }
   }
 
-  /*
-    utime() introduces a race. It would be nice to call futimens() instead, but
-    that appeared in SUSv4 first. 28-NOV-2009 lacos
-  */
   {
-    struct utimbuf utb;
+    struct timespec ts[2];
 
-    utb.actime = sbuf->st_atime;
-    utb.modtime = sbuf->st_mtime;
+    ts[0].tv_sec = sbuf->st_atime;
+    ts[0].tv_nsec = 0;
+    ts[1].tv_sec = sbuf->st_mtime;
+    ts[1].tv_nsec = 0;
 
-    if (-1 == utime(*output_pathname, &utb)) {
+    if (-1 == fdutimens(outfd, *output_pathname, ts)) {
       log_warning("%s: utime(\"%s\"): %s\n", pname, *output_pathname,
           err2str(errno));
     }
