@@ -1,5 +1,7 @@
 /* lbunzip2.c,v 1.40 2009/12/10 23:51:09 lacos Exp */
 
+#include <config.h>
+
 #include <assert.h>       /* assert() */
 #include <string.h>       /* memcpy() */
 #include <signal.h>       /* SIGUSR2 */

@@ -1,5 +1,7 @@
 /* lacos_rbtree.c,v 1.1.1.1 2008/09/01 17:45:52 lacos Exp */
 
+#include <config.h>
+
 #include "lacos_rbtree.h" /* struct lacos_rbtree_node */
 
 

@@ -1,3 +1,5 @@
+#include <config.h>
+
 #include "private.h"
 
 Int YB_crc_table[256] = {

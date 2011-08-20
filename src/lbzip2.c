@@ -1,5 +1,7 @@
 /* lbzip2.c,v 1.26 2009/12/20 19:24:06 lacos Exp */
 
+#include <config.h>
+
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
 #include <sys/time.h>     /* gettimeofday() */

@@ -77,6 +77,8 @@
    Finally sort them according to the 1st character.
 */
 
+#include <config.h>
+
 #include <setjmp.h>     /* setjmp() */
 #include <string.h>     /* memcmp() */
 #include <strings.h>    /* bzero() */
