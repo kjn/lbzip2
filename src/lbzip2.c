@@ -5,7 +5,7 @@
 #include <sys/time.h>     /* gettimeofday() */
 #include <unistd.h>       /* isatty() */
 
-#include "yambi/yambi.h"  /* YBenc_t */
+#include "yambi.h"        /* YBenc_t */
 
 #include "main.h"         /* pname */
 #include "lbzip2.h"       /* lbzip2() */

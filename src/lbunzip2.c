@@ -4,7 +4,7 @@
 #include <string.h>       /* memcpy() */
 #include <signal.h>       /* SIGUSR2 */
 
-#include "yambi/yambi.h"  /* YBdec_t */
+#include "yambi.h"        /* YBdec_t */
 
 #include "main.h"         /* pname */
 #include "lbunzip2.h"     /* lbunzip2() */
