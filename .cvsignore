@@ -1,1 +1,0 @@
-lbzip2 main.o lbzip2.o lbunzip2.o lbunzip2_single.o lacos_rbtree.o tags
