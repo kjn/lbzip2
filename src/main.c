@@ -1485,7 +1485,7 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
     ts[1].tv_nsec = 0;
 
     if (-1 == fdutimens(outfd, *output_pathname, ts)) {
-      log_warning("%s: utime(\"%s\"): %s\n", pname, *output_pathname,
+      log_warning("%s: fdutimens(\"%s\"): %s\n", pname, *output_pathname,
           err2str(errno));
     }
   }
@@ -1729,8 +1729,7 @@ main(int argc, char **argv)
           if (opts.verbose && 0u < ispec.total && 0u < ospec.total) {
             uint64_t plain_size,
                 compr_size;
-            double
-                ratio,
+            double ratio,
                 savings,
                 ratio_magnitude;
 

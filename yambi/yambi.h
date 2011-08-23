@@ -15,13 +15,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* The YB_VERSION macro serves as both include guardian and the library
-   version number.  The low 8 bits form the minor version number and
-   everything above that forms the major verson (for example YB_VERSION
-   of 0x412 would mean version 4.18 of the library).
-*/
-#ifndef YB_VERSION
-#define YB_VERSION 1
+#ifndef YB_YAMBI_H
+#define YB_YAMBI_H
 
 #include <stddef.h>  /* size_t */
 
@@ -150,8 +145,7 @@ YBenc_t *YBenc_init(unsigned long max_block_size,
                     unsigned shallow_factor,
                     unsigned prefix_factor);
 
-/* -1 on underflow, >= 0 on successfull collect
-   (retval is number of bytes remaining in buffer) */
+/* Returns YB_OK on successfull collect, YB_OVERFLOW on overflow. */
 int YBenc_collect(YBenc_t *e, const void *buf, size_t *buf_sz);
 
 /* return compressed size */
@@ -178,7 +172,7 @@ void YBenc_destroy(YBenc_t *enc);
 void YBobs_destroy(YBobs_t *obs);
 
 
-#endif /* YB_VERSION */
+#endif /* YB_YAMBI_H */
 
 
 /* Local Variables: */
