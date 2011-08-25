@@ -147,16 +147,9 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   /* Sort block. */
   YBpriv_block_sort(s);
 
-  {
-    Int ninuse = make_map_e(cmap, s->cmap);
-    assert(ninuse >= 1);
-    assert(ninuse <= 256);
-    EOB = ninuse+1;
-
-    /*for (i = 0; i < s->nblock; i++) {
-      s->block[i] = cmap[s->block[i]];
-      }*/
-  }
+  EOB = make_map_e(cmap, s->cmap) + 1;
+  assert(EOB >= 2);
+  assert(EOB < 258);
 
   s->nmtf = do_mtf(s->mtfv, s->block, s->lookup[0], cmap, s->nblock, EOB);
 
@@ -205,7 +198,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
     l = z ^ (z-1);
     h = ~l;
     p = (p | l) & ((p << 4) | h | c);
-#ifdef __GNUC__
+#if GNUC_VERSION >= 30406
     j = (__builtin_ctz(h) >> 2) - 1;
 #else
     h &= -h;

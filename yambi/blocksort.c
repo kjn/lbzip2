@@ -1091,15 +1091,21 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
 
     nNotDone = 0;
     r = 0;
-    while (1) {
-
+    while (1)
+    {
       /*-- find the next non-singleton bucket --*/
       k = r + 1;
       while (ISSET_BH(k) && UNALIGNED_BH(k)) k++;
-      if (ISSET_BH(k)) {
+      if (ISSET_BH(k))
+      {
         while (WORD_BH(k) == ~(Long)0) k += 64;
-#ifdef __GNUC__
-        k += __builtin_ctzl(~WORD_BH(k));
+#if GNUC_VERSION >= 30406
+        /* We use ctzll() instead of ctzl() for compatibility with 32-bit
+           systems -- "long long int" is guarranteed to be at least 64-bit
+           wide.  We abuse the fact that GNU C has ctzll() even in C89 mode,
+           when the "long long int" type is disabled.
+        */
+        k += __builtin_ctzll(~WORD_BH(k));
 #else
         while (ISSET_BH(k)) k++;
 #endif
@@ -1107,10 +1113,11 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
       l = k - 1;
       if (l >= nblock) break;
       while (!ISSET_BH(k) && UNALIGNED_BH(k)) k++;
-      if (!ISSET_BH(k)) {
+      if (!ISSET_BH(k))
+      {
         while (WORD_BH(k) == 0) k += 64;
-#ifdef __GNUC__
-        k += __builtin_ctzl(WORD_BH(k));
+#if GNUC_VERSION >= 30406
+        k += __builtin_ctzll(WORD_BH(k));
 #else
         while (!ISSET_BH(k)) k++;
 #endif

@@ -1,3 +1,5 @@
+dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
+
 AC_PREREQ([2.68])
 AC_INIT([lbzip2], [1.0])
 

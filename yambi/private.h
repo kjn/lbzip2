@@ -52,9 +52,15 @@ extern void (*freef)(void *ptr);
 #define max(x,y) ((x) < (y) ? (y) : (x))
 
 
+/* Check GCC version.  This not only works for GNU C, but also Clang
+   and possibly others.  If a particular compiler defines __GNUC__
+   but it's not GCC compatible then it's that compilers problem. */
+#define GNUC_VERSION (10000 * (__GNUC__ + 0) + 100 * (__GNUC_MINOR__ + 0) + \
+                      (__GNUC_PATCHLEVEL__ + 0))
+
 /* Explicit static branch prediction to help compiler generating faster code.
-   This not only works for GNU C, but also Clang and possibly others. */
-#ifdef __GNUC__
+*/
+#if GNUC_VERSION >= 30004
 # define likely(x)   __builtin_expect((x), 1)
 # define unlikely(x) __builtin_expect((x), 0)
 #else
