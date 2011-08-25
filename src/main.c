@@ -653,13 +653,11 @@ struct opts
       print_cctrs;      /* Print condition variable counters, -S. */
 };
 
-static const char version[] = "0.23";
-
 /* Backlog factor for all workers together. */
 static const unsigned blf = 4u;
 
 /* Names of other recognized environment variables. */
-static const char * const ev_name[] = { "LBZIP2", "BZIP2", "BZIP" };
+static const char * const ev_name[] = { "BZIMP2", "LBZIP2", "BZIP2", "BZIP" };
 
 /* Separator characters in environment variable values. No escaping. */
 static const char envsep[] = " \t";
@@ -687,12 +685,6 @@ static void
 usage(unsigned mx_worker)
 {
   log_info(
-    "lbzip2: Parallel bzip2 utility.\n"
-    "Copyright (C) 2008, 2009, 2010 Laszlo Ersek.\n"
-    "Copyright (C) 2011 Mikolaj Izdebski.\n"
-    "Released under the GNU GPLv3+.\n"
-    "Version %s.\n"
-    "\n"
     "Usage:\n"
     "1. PROG [-n WTHRS] [-k|-c|-t] [-d|-z] [-1 .. -9] [-f] [-v] [-S] {FILE}\n"
     "2. PROG -h\n"
@@ -703,10 +695,10 @@ usage(unsigned mx_worker)
     "  <otherwise>        : Compress. Forceable with \"-z\".\n"
     "\n"
     "Environment variables:\n"
-    "  LBZIP2, BZIP2,\n", version);
+    "  BZIMP2, LBZIP2,\n");
 
   log_info(
-    "  BZIP               : Insert arguments betwen PROG and the rest of the\n"
+    "  BZIP2, BZIP        : Insert arguments betwen PROG and the rest of the\n"
     "                       command line. Tokens are separated by spaces and\n"
     "                       tabs; no escaping.\n"
     "  LBZIP2_TRACE_ALLOC : If set to a non-empty value, print a memory\n"
@@ -719,10 +711,10 @@ usage(unsigned mx_worker)
 
   log_info(
 #ifdef _SC_NPROCESSORS_ONLN
-    "                       If this option is not specified, lbzip2 queries\n"
+    "                       If this option is not specified, bzimp2 queries\n"
     "                       the system for the number of online processors.\n"
 #else
-    "                       If this option is not specified, lbzip2 exits\n"
+    "                       If this option is not specified, bzimp2 exits\n"
     "                       with an error.\n"
 #endif
     "  -k, --keep         : Don't remove FILE operands. Open regular input\n"
@@ -750,25 +742,57 @@ usage(unsigned mx_worker)
     "  -s, --small,\n"
     "  -q, --quiet,\n"
     "  --repetitive-fast,\n"
-    "  --repetitive-best  : Accepted for compatibility, otherwise ignored.\n"
-    "  -h, --help,\n"
-    "  -L, --license,\n");
+    "  --repetitive-best  : Accepted for compatibility, otherwise ignored.\n");
 
   log_info(
-    "  -V, --version      : Print this help and exit successfully.\n"
+    "  -h, --help         : Print this help and exit successfully.\n"
+    "  -L, --license,\n"
+    "  -V, --version      : Print version information and exit successfully.\n"
     "\n"
     "Operands:\n"
     "  FILE               : Specify files to compress or decompress. If no\n"
-    "                       FILE is given, work as a filter. FILEs with\n"
+    "                       FILE is given, work as a filter. FILEs with\n");
+
+  log_info(
     "                       \".bz2\", \".tbz\", \".tbz2\" and \".tz2\" name\n"
     "                       suffixes will be skipped when compressing. When\n"
     "                       decompressing, \".bz2\" suffixes will be removed\n"
-    "                       in output filenames; \".tbz\", \".tbz2\" and\n");
-
-  log_info(
+    "                       in output filenames; \".tbz\", \".tbz2\" and\n"
     "                       \".tz2\" suffixes will be replaced by \".tar\";\n"
     "                       other filenames will be suffixed with \".out\".\n"
   );
+
+  _exit(EX_OK);
+}
+
+
+static void
+version(void)
+{
+#if defined(__GNUC__) && defined(__TIMESTAMP__) && defined(__VERSION__)
+  log_info("%s version %s\nCompiled on %s with GCC %s.\n\n",
+           PACKAGE_NAME, PACKAGE_VERSION, __TIMESTAMP__, __VERSION__);
+#else
+  log_info("%s version %s\n\n", PACKAGE_NAME, PACKAGE_VERSION);
+#endif
+
+  log_info(
+    "Copyright (C) 2011  Mikolaj Izdebski\n"
+    "Copyright (C) 2008, 2009, 2010  Laszlo Ersek\n"
+    "\n"
+    "This program is free software: you can redistribute it and/or modify\n"
+    "it under the terms of the GNU General Public License as published by\n"
+    "the Free Software Foundation, either version 3 of the License, or\n"
+    "(at your option) any later version.\n"
+    "\n");
+ log_info(
+    "This program is distributed in the hope that it will be useful,\n"
+    "but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+    "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+    "GNU General Public License for more details.\n"
+    "\n"
+    "You should have received a copy of the GNU General Public License\n"
+    "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n");
 
   _exit(EX_OK);
 }
@@ -901,7 +925,8 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
     {
       AS_CONTINUE,  /* Continue argument processing. */
       AS_STOP,      /* Processing finished because of "--". */
-      AS_USAGE      /* Processing finished because user asked for help. */
+      AS_USAGE,     /* Processing finished because user asked for help. */
+      AS_VERSION    /* Processing finished because user asked for version. */
     } args_state;
     struct arg *arg,
         *next;
@@ -956,10 +981,12 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
           else if (0 == strcmp("verbose", argscan)) {
             opts->verbose = 1;
           }
-          else if (0 == strcmp("help", argscan)
-              || 0 == strcmp("license", argscan)
-              || 0 == strcmp("version", argscan)) {
+          else if (0 == strcmp("help", argscan)) {
             args_state = AS_USAGE;
+          }
+          else if (0 == strcmp("license", argscan)
+              || 0 == strcmp("version", argscan)) {
+            args_state = AS_VERSION;
           }
           else if (0 != strcmp("small", argscan)
               && 0 != strcmp("quiet", argscan)
@@ -1001,8 +1028,13 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
               case 's': case 'q':
                 break;
 
-              case 'h': case 'L': case 'V':
+              case 'h':
                 args_state = AS_USAGE;
+                cont = 0;
+                break;
+
+              case 'L': case 'V':
+                args_state = AS_VERSION;
                 cont = 0;
                 break;
 
@@ -1044,12 +1076,15 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
       } /* argument holds options */
     } /* arguments loop */
 
-    if (AS_USAGE == args_state) {
+    if (AS_USAGE == args_state || AS_VERSION == args_state) {
       for (arg = *operands; 0 != arg; arg = next) {
         next = arg->next;
         (*freef)(arg);
       }
-      usage(mx_worker);
+      if (AS_USAGE == args_state)
+        usage(mx_worker);
+      else
+        version();
     }
   } /* process arguments */
 

@@ -1,2 +1,2 @@
-SUBDIRS = yambi lib src doc
+SUBDIRS = yambi lib src
 ACLOCAL_AMFLAGS = -Im4

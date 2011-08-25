@@ -1,7 +1,7 @@
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
 AC_PREREQ([2.68])
-AC_INIT([lbzip2], [1.0])
+AC_INIT([bzimp2], [current])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -48,6 +48,5 @@ AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
 
 gl_INIT
 
-AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile
-    doc/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile])
 AC_OUTPUT
