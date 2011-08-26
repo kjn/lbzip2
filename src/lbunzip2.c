@@ -1158,6 +1158,7 @@ work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
                   */
                   break;
 
+                default:
                 case IST_NEVER:
                   /* Short first input block without a bzip2 block header. */
                   break;

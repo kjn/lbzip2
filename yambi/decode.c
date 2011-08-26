@@ -17,6 +17,8 @@
 
 #include <config.h>
 
+#include <stdlib.h>  /* abort() */
+
 #include "decode.h"
 
 #if 0
@@ -98,6 +100,8 @@ mtf_one(YBdec_t *state, Byte c)
     */
 #if IMTF_ROW_WIDTH == 16
     switch (nn) {
+    default:
+      abort();
 #define R(n) case n: pp[n] = pp[n-1]
       R(15); R(14); R(13); R(12); R(11); R(10); R( 9);
       R( 8); R( 7); R( 6); R( 5); R( 4); R( 3); R( 2); R( 1);

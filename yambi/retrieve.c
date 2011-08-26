@@ -17,6 +17,8 @@
 
 #include <config.h>
 
+#include <stdlib.h>  /* abort() */
+
 #include "decode.h"
 
 
@@ -293,14 +295,13 @@ make_tree(YBibs_t *ibs,   /* the IBS where to store created tables */
 #define S_SELECTOR_MTF   20
 #define S_DELTA_BASE     21
 #define S_DELTA_TAG      22
-#define S_DELTA_INC      23
 #define S_PREFIX         24
 #define S_CRC2           25
 
 
 
 YBibs_t *
-YBibs_init()
+YBibs_init(void)
 {
   YBibs_t *ibs;
 
@@ -800,6 +801,9 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
     Trace(("no EOB in the last group\n"));
     return YB_ERR_UNTERM;
+
+  default:
+    abort();
   }
 
 #define SAVE(var) ibs->save_##var = var

@@ -438,7 +438,6 @@ med5(
 
 #define BZ_N_RADIX 2
 #define BZ_N_QSORT 16
-#define BZ_N_SHELL 18
 #define BZ_N_OVERSHOOT 800
 
 #define QSORT_SMALL_THRESH 10
@@ -700,6 +699,7 @@ update_quadrants(
 }
 
 
+/* XXX bigDone is redundant - qqBigSize[i]==0 implies bigDine[i] */
 /* Algorithm Q. */
 static Int
 copy_cache(
@@ -715,7 +715,7 @@ copy_cache(
   Byte bigOrder[256];
   Byte smallOrder[255];
   Int idx = 900000;
-  Int qqBigSize[256];
+  Int qqBigSize[256];  /* XXX rename this */
   Int num_big = 0;
 
   /* Calculate the running order, from smallest to largest big bucket.
@@ -751,8 +751,12 @@ copy_cache(
     /* Select the smallest, not yet sorted big bucket. */
     {
       Int best_size, best_bucket, best_idx;
-      best_size = 900000;
-      for (j = i; j < num_big; j++)
+
+      best_idx = i;
+      best_bucket = bigOrder[i];
+      best_size = qqBigSize[bigOrder[i]];
+
+      for (j = i+1; j < num_big; j++)
       {
         ss = bigOrder[j];
         if (qqBigSize[ss] < best_size)
@@ -1032,7 +1036,6 @@ void fallbackQSort3 ( Int* fmap,
 
 /* Here BH stands for `bucket header'. */
 #define       SET_BH(zz)  bhtab[(zz) >> 6] |= ((Long)1 << ((zz) & 63))
-#define     CLEAR_BH(zz)  bhtab[(zz) >> 6] &= ~((Long)1 << ((zz) & 63))
 #define     ISSET_BH(zz)  (bhtab[(zz) >> 6] & ((Long)1 << ((zz) & 63)))
 #define      WORD_BH(zz)  bhtab[(zz) >> 6]
 #define UNALIGNED_BH(zz)  ((zz) & 63)

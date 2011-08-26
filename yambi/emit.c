@@ -17,6 +17,8 @@
 
 #include <config.h>
 
+#include <stdlib.h>  /* abort() */
+
 #include "decode.h"
 
 
@@ -60,6 +62,8 @@ emit_data(YBdec_t *state, Byte *b, Int m)
   /* Excuse me, but the following is a write-only code.  It wasn't written
      for readability or maintainability, but rather for high efficiency. */
   switch (state->rle_state) {
+  default:
+    abort();
   case 1:
     if (unlikely(!m--)) break;
     s = (s << 8) ^ YB_crc_table[(s >> 24) ^ (*b++ = c)];

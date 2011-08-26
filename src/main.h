@@ -68,7 +68,7 @@ __attribute__((format(printf, 1, 2)))
 void
 log_fatal(const char *fmt, ...)
 #ifdef __GNUC__
-__attribute__((format(printf, 1, 2)))
+__attribute__((format(printf, 1, 2), noreturn))
 #endif
 ;
 

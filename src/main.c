@@ -38,6 +38,9 @@ static pid_t pid;
 
 
 static void
+#ifdef __GNUC__
+__attribute__((noreturn))
+#endif
 bailout(void)
 {
   sigset_t tmp_set;
