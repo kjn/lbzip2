@@ -14,6 +14,7 @@
 #include <fcntl.h>           /* open() */
 
 #include "utimens.h"         /* fdutimens() */
+#include "stat-time.h"       /* get_stat_atime() */
 
 #include "main.h"            /* pname */
 #include "lbunzip2.h"        /* lbunzip2_wrap() */
@@ -1517,10 +1518,8 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
   {
     struct timespec ts[2];
 
-    ts[0].tv_sec = sbuf->st_atime;
-    ts[0].tv_nsec = 0;
-    ts[1].tv_sec = sbuf->st_mtime;
-    ts[1].tv_nsec = 0;
+    ts[0] = get_stat_atime(sbuf);
+    ts[1] = get_stat_mtime(sbuf);
 
     if (-1 == fdutimens(outfd, *output_pathname, ts)) {
       log_warning("%s: fdutimens(\"%s\"): %s\n", pname, *output_pathname,
