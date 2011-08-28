@@ -4,9 +4,9 @@
 
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
-#include <sys/time.h>     /* gettimeofday() */
 #include <unistd.h>       /* isatty() */
 
+#include "timespec.h"     /* gettime() */
 #include "yambi.h"        /* YBenc_t */
 
 #include "main.h"         /* pname */
@@ -388,15 +388,6 @@ reord_dealloc(void *ptr, void *ignored)
 }
 
 
-/* If tv1 < tv2, return tv2 - tv1. Otherwise return 0. */
-static double
-timeval_diff(struct timeval tv1, struct timeval tv2)
-{
-  return (tv1.tv_sec <= tv2.tv_sec) ? tv2.tv_sec - tv1.tv_sec +
-      0.000001 * ((double)tv2.tv_usec - (double)tv1.tv_usec) : 0;
-}
-
-
 static void
 mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
     struct filespec *ospec, int bs100k, int verbose)
@@ -407,8 +398,8 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
       : YB_TRAILER_SIZE];
   YBobs_t *obs;
   off_t uncompr_total;
-  struct timeval start_time,
-      last_time;
+  struct timespec start_time,
+      next_time;
   int progress;
 
   /*
@@ -417,16 +408,10 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
      2) stderr is connected to a terminal device
      3) the input file is a regular file
      4) the input file is nonempty
-
-    Although SUSv2-compliant gettimeofday() should always return 0,
-    many systems document possibility of returning -1 on failure.
-    The list of systems that may return nonzero values includes:
-    GNU, Linux, NetBSD, FreeBSD, SysV, OSX, SunOS, z/OS, AIX, HP-UX.
-    If we get a non-zero value, we simply don't display the progress info.
   */
-  if ((progress = verbose && (0 < ispec->size) && isatty(STDERR_FILENO) &&
-      0 == gettimeofday(&start_time, 0))) {
-    last_time = start_time;
+  if ((progress = verbose && (0 < ispec->size) && isatty(STDERR_FILENO))) {
+    gettime(&start_time);
+    next_time = start_time;
     log_info("%s: progress: %.2f%%\r", pname, 0.0);
   }
 
@@ -515,15 +500,15 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
 
       uncompr_total += reord_w2m_blk->uncompr_size;
       if (progress) {
-        struct timeval time_now;
+        struct timespec time_now;
 
-        if (0 == gettimeofday(&time_now, 0) &&
-            timeval_diff(last_time, time_now) >= 0.1) {
+        gettime(&time_now);
+        if (timespec_cmp(next_time, time_now) <= 0) {
           double completed,
               elapsed;
 
-          last_time = time_now;
-          elapsed = timeval_diff(start_time, time_now);
+          next_time = timespec_add(time_now, dtotimespec(0.1));
+          elapsed = timespectod(timespec_sub(time_now, start_time));
           completed = (double)uncompr_total / ispec->size;
 
           if (elapsed < 5)

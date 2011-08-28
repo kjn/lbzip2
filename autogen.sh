@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-gnulib-tool --add-import pthread utimens warnings
+modules="pthread utimens warnings timespec-add timespec-sub dtotimespec"
 
+gnulib-tool --add-import $modules
 aclocal -Im4
 autoconf
 autoheader
