@@ -427,8 +427,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   if ((progress = verbose && (0 < ispec->size) && isatty(STDERR_FILENO) &&
       0 == gettimeofday(&start_time, 0))) {
     last_time = start_time;
-    log_info("%s: %s%s%s: progress: %.2f%%\r", pname, ispec->sep,
-        ispec->fmt, ispec->sep, 0.0);
+    log_info("%s: progress: %.2f%%\r", pname, 0.0);
   }
 
   /* Init obs and write out stream header. */
@@ -528,12 +527,10 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
           completed = (double)uncompr_total / ispec->size;
 
           if (elapsed < 5)
-            log_info("%s: %s%s%s: progress: %.2f%%\r", pname, ispec->sep,
-                ispec->fmt, ispec->sep, 100 * completed);
+            log_info("%s: progress: %.2f%%\r", pname, 100 * completed);
           else
-            log_info("%s: %s%s%s: progress: %.2f%%, ETA: %.0f s    \r",
-                pname, ispec->sep, ispec->fmt, ispec->sep, 100 * completed,
-                elapsed * (1 / completed - 1));
+            log_info("%s: progress: %.2f%%, ETA: %.0f s    \r",
+                pname, 100 * completed, elapsed * (1 / completed - 1));
         }
       }
 
