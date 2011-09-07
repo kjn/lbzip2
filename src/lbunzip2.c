@@ -7,6 +7,7 @@
 #include <assert.h>       /* assert() */
 #include <string.h>       /* memcpy() */
 #include <signal.h>       /* SIGUSR2 */
+#include <arpa/inet.h>    /* htonl() */
 
 #include "yambi.h"        /* YBdec_t */
 
@@ -61,7 +62,7 @@ struct s2w_blk                   /* Splitter to workers. */
   struct s2w_blk *next;          /* First part of next block belongs to us. */
   unsigned refno;                /* Threads not yet done with this block. */
   size_t loaded;                 /* Number of bytes in compr. */
-  char unsigned compr[MX_SPLIT]; /* Data read from stdin. */
+  uint32_t compr[MX_SPLIT / 4u]; /* Data read from stdin. */
 };
 
 
@@ -349,9 +350,11 @@ m2s_q_uninit(struct m2s_q *m2s_q, unsigned num_free)
 
 
 static void
-split_chkstart(const char unsigned *comprp, size_t filled,
-    struct filespec *ispec)
+split_chkstart(const void *comprvp, size_t filled, struct filespec *ispec)
 {
+  const char unsigned *comprp;
+
+  comprp = comprvp;
   if (filled >= sizeof intro && 0 == memcmp(comprp, intro, NUM_SHDR)) {
     comprp += NUM_SHDR;
     if (0x31u <= (unsigned)*comprp && 0x39u >= (unsigned)*comprp) {
@@ -392,7 +395,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
 
     /* Fill block. */
     vacant = sizeof s2w_blk->compr;
-    xread(ispec, s2w_blk->compr, &vacant);
+    xread(ispec, (void *)s2w_blk->compr, &vacant);
 
     if (0u == id) {
       /*
@@ -1064,7 +1067,7 @@ again:
   first_s2w_blk_id = s2w_blk->id;
   ibits_left = 0u;
   ipos = 0u;
-  assert(ipos < s2w_blk->loaded);
+  assert(0u < s2w_blk->loaded);
 
   bzip2_blk_id = 0u;
   w2w_blk = 0;
@@ -1072,7 +1075,7 @@ again:
 
   do {  /* never seen magic */
     if (0 == ibits_left) {
-      if (s2w_blk->loaded == ipos) {
+      if (s2w_blk->loaded / 4u == ipos) {
         if (sizeof s2w_blk->compr == s2w_blk->loaded) {
           log_fatal("%s: %s%s%s: missing bzip2 block header in full first"
               " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
@@ -1090,8 +1093,9 @@ again:
         goto again;
       }
 
-      ibitbuf = s2w_blk->compr[ipos++];
-      ibits_left = CHAR_BIT;
+      ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+      ibits_left = 32u;
+      ipos++;
     }
 
     bit = ibitbuf >> --ibits_left & 1u;
@@ -1106,7 +1110,7 @@ again:
   for (;;) {  /* first block */
     do {  /* in bzip2 */
       if (0 == ibits_left) {
-        if (s2w_blk->loaded == ipos) {
+        if (s2w_blk->loaded / 4u == ipos) {
           if (sizeof s2w_blk->compr > s2w_blk->loaded) {
             log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
                 " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
@@ -1121,12 +1125,13 @@ again:
           }
 
           ipos = 0u;
-          assert(ipos < s2w_blk->loaded);
+          assert(0u < s2w_blk->loaded);
           goto in_second;
         }
 
-        ibitbuf = s2w_blk->compr[ipos++];
-        ibits_left = CHAR_BIT;
+        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+        ibits_left = 32u;
+        ipos++;
       }
 
       bit = ibitbuf >> --ibits_left & 1u;
@@ -1155,7 +1160,7 @@ again:
 
     do {  /* out bzip2 */
       if (0 == ibits_left) {
-        if (s2w_blk->loaded == ipos) {
+        if (s2w_blk->loaded / 4u == ipos) {
           if (sizeof s2w_blk->compr > s2w_blk->loaded) {
             xlock(&sw2w_q->proceed);
             assert(0 == s2w_blk->next);
@@ -1174,12 +1179,13 @@ again:
           }
 
           ipos = 0u;
-          assert(ipos < s2w_blk->loaded);
+          assert(0u < s2w_blk->loaded);
           goto out_second;
         }
 
-        ibitbuf = s2w_blk->compr[ipos++];
-        ibits_left = CHAR_BIT;
+        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+        ibits_left = 32u;
+        ipos++;
       }
 
       bit = ibitbuf >> --ibits_left & 1u;
@@ -1197,7 +1203,7 @@ again:
   for (;;) {  /* second block */
     do {  /* in bzip2 */
       if (0 == ibits_left) {
-        if (s2w_blk->loaded == ipos) {
+        if (s2w_blk->loaded / 4u == ipos) {
           log_fatal("%s: %s%s%s: %s second input block\n",
               sizeof s2w_blk->compr == s2w_blk->loaded ?
               "missing bzip2 block header in full" :
@@ -1206,8 +1212,9 @@ again:
           }
 
       in_second:
-        ibitbuf = s2w_blk->compr[ipos++];
-        ibits_left = CHAR_BIT;
+        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+        ibits_left = 32u;
+        ipos++;
       }
 
       bit = ibitbuf >> --ibits_left & 1u;
@@ -1225,7 +1232,7 @@ again:
       }
 
       if (magic_hdr == search) {
-        if (sizeof eos + (size_t)(0u < ibits_left) <= ipos) {
+        if (sizeof eos + (size_t)((ibits_left + 7u) / 8u) <= 4u * ipos) {
           xlock(&sw2w_q->proceed);
           work_release(s2w_blk, sw2w_q, w2m_q);
           work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
@@ -1243,7 +1250,7 @@ again:
 
     do {  /* out bzip2 */
       if (0 == ibits_left) {
-        if (s2w_blk->loaded == ipos) {
+        if (s2w_blk->loaded / 4u == ipos) {
           if (sizeof s2w_blk->compr == s2w_blk->loaded) {
             log_fatal("%s: %s%s%s: missing bzip2 block header in full"
                 " second input block\n", pname, ispec->sep, ispec->fmt,
@@ -1261,8 +1268,9 @@ again:
         }
 
       out_second:
-        ibitbuf = s2w_blk->compr[ipos++];
-        ibits_left = CHAR_BIT;
+        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+        ibits_left = 32u;
+        ipos++;
       }
 
       bit = ibitbuf >> --ibits_left & 1u;
@@ -1270,7 +1278,7 @@ again:
 
     } while (magic_hdr != search);  /* out bzip2 */
 
-    if (sizeof eos + (size_t)(0u < ibits_left) <= ipos) {
+    if (sizeof eos + (size_t)((ibits_left + 7u) / 8u) <= 4u * ipos) {
       xlock(&sw2w_q->proceed);
       work_release(s2w_blk, sw2w_q, w2m_q);
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
