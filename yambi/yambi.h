@@ -18,7 +18,7 @@
 #ifndef YB_YAMBI_H
 #define YB_YAMBI_H
 
-#include <stddef.h>  /* size_t */
+#include <sys/types.h>  /* size_t */
 
 
 /* Data types. */
