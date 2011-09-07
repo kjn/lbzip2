@@ -895,8 +895,8 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
   if (UINT_MAX / blf < (unsigned)mx_worker) {
     mx_worker = UINT_MAX / blf;
   }
-  if ((size_t)-1 / sizeof(pthread_t) < (unsigned)mx_worker) {
-    mx_worker = (size_t)-1 / sizeof(pthread_t);
+  if (SIZE_MAX / sizeof(pthread_t) < (unsigned)mx_worker) {
+    mx_worker = SIZE_MAX / sizeof(pthread_t);
   }
 
   opts->num_worker = 0u;
@@ -1257,7 +1257,7 @@ suffix_xform(const char *compr_pathname, char **decompr_pathname)
       prefix_len = len - suffix[ofs].compr_len;
       if (0 == strcmp(compr_pathname + prefix_len, suffix[ofs].compr)) {
         if (0 != decompr_pathname) {
-          if ((size_t)-1 - prefix_len < suffix[ofs].decompr_len + 1u) {
+          if (SIZE_MAX - prefix_len < suffix[ofs].decompr_len + 1u) {
             log_fatal("%s: \"%s\": size_t overflow in dpn_alloc\n", pname,
                 compr_pathname);
           }
@@ -1450,7 +1450,7 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
           size_t len;
 
           len = strlen(operand->val);
-          if ((size_t)-1 - sizeof ".bz2" < len) {
+          if (SIZE_MAX - sizeof ".bz2" < len) {
             log_fatal("%s: \"%s\": size_t overflow in cpn_alloc\n", pname,
                 operand->val);
           }

@@ -568,11 +568,11 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   w2m_q_init(&w2m_q, num_worker);
   m2s_q_init(&m2s_q, num_slot);
 
-  if ((size_t)-1 < (unsigned)bs100k * 100000u) {
+  if (SIZE_MAX < (unsigned)bs100k * 100000u) {
     log_fatal("%s: %s%s%s: size_t overflow in sizeof_plain\n", pname,
         ispec->sep, ispec->fmt, ispec->sep);
   }
-  if ((size_t)-1 - sizeof(struct s2w_blk) < (unsigned)bs100k * 100000u) {
+  if (SIZE_MAX - sizeof(struct s2w_blk) < (unsigned)bs100k * 100000u) {
     log_fatal("%s: %s%s%s: size_t overflow in sizeof_s2w_blk\n", pname,
         ispec->sep, ispec->fmt, ispec->sep);
   }
@@ -589,7 +589,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   work_arg.exponential = exponential;
 
   assert(0u < num_worker);
-  assert((size_t)-1 / sizeof *worker >= num_worker);
+  assert(SIZE_MAX / sizeof *worker >= num_worker);
   worker = xalloc(num_worker * sizeof *worker);
   for (i = 0u; i < num_worker; ++i) {
     xcreate(&worker[i], work_wrap, &work_arg);

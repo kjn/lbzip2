@@ -1487,7 +1487,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   work_arg.ispec = ispec;
 
   assert(0u < num_worker);
-  assert((size_t)-1 / sizeof *worker >= num_worker);
+  assert(SIZE_MAX / sizeof *worker >= num_worker);
   worker = xalloc(num_worker * sizeof *worker);
   for (i = 0u; i < num_worker; ++i) {
     xcreate(&worker[i], work_wrap, &work_arg);
