@@ -77,7 +77,9 @@
    Finally sort them according to the 1st character.
 */
 
-#include <config.h>
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
 
 #include <setjmp.h>     /* setjmp() */
 #include <string.h>     /* memcmp() */

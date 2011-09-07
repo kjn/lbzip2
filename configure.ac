@@ -51,6 +51,7 @@ AC_SYS_LARGEFILE
 
 dnl Headers
 AC_HEADER_STDC
+AC_HEADER_ASSERT
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h])
 
 dnl Types

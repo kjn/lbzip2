@@ -1,6 +1,8 @@
 /* main.c,v 1.75 2010/03/03 01:12:45 lacos Exp */
 
-#include <config.h>
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
 
 #include <unistd.h>          /* unlink() */
 #include <signal.h>          /* kill() */

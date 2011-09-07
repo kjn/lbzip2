@@ -1,6 +1,8 @@
 /* lbzip2.c,v 1.26 2009/12/20 19:24:06 lacos Exp */
 
-#include <config.h>
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
 
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
