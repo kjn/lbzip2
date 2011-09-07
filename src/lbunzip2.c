@@ -47,73 +47,11 @@ static const char unsigned eos[NUM_BHDR] = {
 };
 
 /*
-  We calculate an upper bound on the size of any bzip2 stream containing one
-  bzip2 block, and so on the distance between adjacent bzip2 block headers in a
-  concatenated sequence of (non-empty) bzip2 streams.
-
-  x
-    Byte string.
-
-  size(x)
-    Number of bytes in x.
-
-  RLE(x)
-    Byte string created from x by the first stage run-length encoder.
-
-  nosplit(x)
-    True iff the RLE passes RLE(x) to the BWT... as one BWT input block.
-
-  BWT...(y)
-    Full bzip2 stream created from y by the compression subchain that starts at
-    the BWT. For y to be a valid argument, there must be an x so that
-
-      RLE(x) = y && nosplit(x)
-
-
-  Claim. For any given positive integer K, if there exists an x0 so that
-
-    size(x0) = K && nosplit(x0)
-    && max { size(BWT...(RLE(x))) | nosplit(x) } = size(BWT...(RLE(x0)))
-
-  then
-
-    max { size(BWT...(RLE(x))) | nosplit(x) } <= roundup(K * 101%) + 600
-
-  Proof. From the documentation of BZ2_bzBuffToBuffCompress():
-
-    "To guarantee that the compressed data will fit in its buffer, allocate an
-    output buffer of size 1% larger than the uncompressed data, plus six
-    hundred extra bytes."
-
-  Ie.
-
-    size(BWT...(RLE(x0))) <= roundup(size(x0) * 101%) + 600
-
-  Thus
-
-    max { size(BWT...(RLE(x))) | nosplit(x) } = size(BWT...(RLE(x0)))
-    <= roundup(size(x0) * 101%) + 600 = roundup(K * 101%) + 600
-
-
-  Since we know from the bzip2 source that
-
-    max { size(RLE(x)) | nosplit(x) } = 899,985
-
-  we choose K = 899,985, and hereby assume that a matching x0 exists.
-
-  (We can create for sure a byte string of size 899,985 that the RLE doesn't
-  lengthen, shorten, or split during encoding, and thus gives the BWT...
-  subchain a maximal BWT input block: (AB){449990}C{5}. What we *assume* is
-  that there exists a byte string which *additionally* ensures
-  uncompressibility after the RLE, yielding a maximal BWT... output. This
-  assumption should be safe.)
-
-  This gives us the following upper bound.
+  We assume that there exists an upper bound on the size of any bzip2 block,
+  i.e. we don't try to support arbitarly large blocks.
 */
-#define MX_BZIP2 ((size_t)(((900000u - 20u + 5u) * 101u + 99u) / 100u + 600u))
-
-/* Size of bzip2 byte string that will contain at least one block header. */
-#define MX_SPLIT ((size_t)(MX_BZIP2 + sizeof eos + 1u))
+#define MX_SPLIT ((size_t)(1024u * 1024u))
+#define MX_BZIP2 ((size_t)(MX_SPLIT - (sizeof eos + 1u)))
 
 struct s2w_blk                   /* Splitter to workers. */
 {
@@ -758,17 +696,6 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
 
 
 static void
-work_push_num_rel(struct w2m_q *w2m_q)
-{
-  xlock(&w2m_q->av_or_ex_or_rel);
-  if (0u == w2m_q->num_rel++) {
-    xsignal(&w2m_q->av_or_ex_or_rel);
-  }
-  xunlock(&w2m_q->av_or_ex_or_rel);
-}
-
-
-static void
 work_oflush(struct w2w_blk **p_w2w_blk, uint64_t s2w_blk_id,
     uint64_t *bzip2_blk_id, int last_bzip2, struct sw2w_q *sw2w_q)
 {
@@ -1025,11 +952,33 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
 }
 
 
-static struct s2w_blk *
-work_get_second(struct s2w_blk **p_next,
-    struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
+static void
+work_release(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
+    struct w2m_q *w2m_q)
 {
-  /* Hold "xlock_pred(&sw2w_q->proceed)" on entry. Will hold on return. */
+  assert(0u < s2w_blk->refno);
+  if (0u == --s2w_blk->refno) {
+    assert(s2w_blk != sw2w_q->next_scan);
+    xunlock(&sw2w_q->proceed);
+    (*freef)(s2w_blk);
+    xlock(&w2m_q->av_or_ex_or_rel);
+    if (0u == w2m_q->num_rel++) {
+      xsignal(&w2m_q->av_or_ex_or_rel);
+    }
+    xunlock(&w2m_q->av_or_ex_or_rel);
+  }
+  else {
+    xunlock(&sw2w_q->proceed);
+  }
+}
+
+
+static struct s2w_blk *
+work_get_second(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
+    struct w2m_q *w2m_q, struct filespec *ispec)
+{
+  xlock_pred(&sw2w_q->proceed);
+
   for (;;) {
     /* Decompression enjoys absolute priority over scanning. */
     if (0 != sw2w_q->deco_head) {
@@ -1047,7 +996,9 @@ work_get_second(struct s2w_blk **p_next,
     }
     else {
       if (0 != sw2w_q->next_scan || sw2w_q->eof) {
-        assert(0 == sw2w_q->next_scan || 0 != *p_next);
+        struct s2w_blk *next;
+
+        assert(0 == sw2w_q->next_scan || 0 != s2w_blk->next);
         /*
           If "next_scan" is non-NULL: "next_scan" became a pointer to the
           current first element to scan either by assuming the values of the
@@ -1055,15 +1006,17 @@ work_get_second(struct s2w_blk **p_next,
           "next_scan" (including the one we're now trying to get the next one
           for), or by being updated by the splitter, but then the splitter
           updated "atch_scan->next" too. Thus no such "next" pointer can be 0.
-          Also, "next_scan" becomes non-NULL no later than "*p_next", see
-          split().
+          Also, "next_scan" becomes non-NULL no later than "s2w_blk->next",
+          see split().
 
           If "next_scan" is NULL and so we're here because the splitter hit
           EOF: we'll return NULL iff we're trying to get the next input block
           for the last input block.
         */
 
-        return *p_next;
+        next = s2w_blk->next;
+        work_release(s2w_blk, sw2w_q, w2m_q);
+        return next;
       }
 
       xwait(&sw2w_q->proceed);
@@ -1075,157 +1028,99 @@ work_get_second(struct s2w_blk **p_next,
 static void
 work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
 {
-  for (;;) {
-    struct s2w_blk *s2w_blk;
-    uint64_t first_s2w_blk_id;
-    int in_second;
-    unsigned ibitbuf,
-        ibits_left;
-    size_t ipos;
-    enum istate {
-      IST_NEVER,    /* -> IST_IN_BZIP2 */
-      IST_IN_BZIP2, /* -> IST_IN_BZIP2, -> IST_OUT_BZIP2 */
-      IST_OUT_BZIP2 /* -> IST_IN_BZIP2 */
-    } istate;
+  struct s2w_blk *s2w_blk;
+  uint64_t first_s2w_blk_id;
+  unsigned ibitbuf,
+      ibits_left;
+  size_t ipos;
 
-    uint64_t bzip2_blk_id;
+  uint64_t bzip2_blk_id;
 
-    struct w2w_blk *w2w_blk;
-    unsigned rbitbuf;
+  struct w2w_blk *w2w_blk;
+  unsigned rbitbuf;
 
-    uint64_t search;
+  unsigned bit;
+  uint64_t search;
 
-    xlock_pred(&sw2w_q->proceed);
-    s2w_blk = work_get_first(sw2w_q, w2m_q, ispec);
-    if (0 == s2w_blk) {
-      xunlock(&sw2w_q->proceed);
-      break;
-    }
-    sw2w_q->next_scan = s2w_blk->next;
+again:
+  xlock_pred(&sw2w_q->proceed);
+  s2w_blk = work_get_first(sw2w_q, w2m_q, ispec);
+  if (0 == s2w_blk) {
     xunlock(&sw2w_q->proceed);
 
-    first_s2w_blk_id = s2w_blk->id;
-    in_second = 0;
-    ibits_left = 0u;
-    ipos = 0u;
-    assert(ipos < s2w_blk->loaded);
-    istate = IST_NEVER;
+    /* Notify muxer when last worker exits. */
+    xlock(&w2m_q->av_or_ex_or_rel);
+    if (0u == --w2m_q->working && 0u == w2m_q->num_rel && 0 == w2m_q->head) {
+      xsignal(&w2m_q->av_or_ex_or_rel);
+    }
+    xunlock(&w2m_q->av_or_ex_or_rel);
+    return;
+  }
+  sw2w_q->next_scan = s2w_blk->next;
+  xunlock(&sw2w_q->proceed);
 
-    bzip2_blk_id = 0u;
+  first_s2w_blk_id = s2w_blk->id;
+  ibits_left = 0u;
+  ipos = 0u;
+  assert(ipos < s2w_blk->loaded);
 
-    w2w_blk = 0;
+  bzip2_blk_id = 0u;
+  w2w_blk = 0;
+  search = 0u;
 
-    search = 0u;
-    for (;;) {
-      unsigned bit;
-      int is_hdr;
+  do {  /* never seen magic */
+    if (0 == ibits_left) {
+      if (s2w_blk->loaded == ipos) {
+        if (sizeof s2w_blk->compr == s2w_blk->loaded) {
+          log_fatal("%s: %s%s%s: missing bzip2 block header in full first"
+              " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+        }
 
+        /* Short first input block without a bzip2 block header. */
+        assert(sizeof s2w_blk->compr > s2w_blk->loaded);
+
+        xlock(&sw2w_q->proceed);
+        assert(0 == s2w_blk->next);
+        assert(sw2w_q->eof);
+        work_release(s2w_blk, sw2w_q, w2m_q);
+
+        assert(0 == w2w_blk);
+        goto again;
+      }
+
+      ibitbuf = s2w_blk->compr[ipos++];
+      ibits_left = CHAR_BIT;
+    }
+
+    bit = ibitbuf >> --ibits_left & 1u;
+    search = (search << 1 | bit) & magic_mask;
+  } while (magic_hdr != search);  /* never seen magic */
+
+  w2w_blk = xalloc(sizeof *w2w_blk);
+  w2w_blk->reconstructed = sizeof intro;
+  w2w_blk->rbits_left = CHAR_BIT;
+  rbitbuf = 0u;
+
+  for (;;) {  /* first block */
+    do {  /* in bzip2 */
       if (0 == ibits_left) {
         if (s2w_blk->loaded == ipos) {
-          int short_input;
-          struct s2w_blk *release;
-
-          short_input = 0;
-
-          if (in_second) {
-            if (sizeof s2w_blk->compr == s2w_blk->loaded) {
-              assert(IST_IN_BZIP2 == istate || IST_OUT_BZIP2 == istate);
-              log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                  " second input block\n", pname, ispec->sep, ispec->fmt,
-                  ispec->sep);
-            }
-
-            if (IST_IN_BZIP2 == istate) {
-              log_fatal("%s: %s%s%s: unterminated bzip2 block in short second"
-                  " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-            }
-
-            assert(IST_OUT_BZIP2 == istate);
-            /* Terminated bzip2 block at end of short second input block. */
-            short_input = 1;
+          if (sizeof s2w_blk->compr > s2w_blk->loaded) {
+            log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
+                " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
           }
-          else {
-            if (sizeof s2w_blk->compr > s2w_blk->loaded) {
-              switch (istate) {
-                case IST_IN_BZIP2:
-                  log_fatal("%s: %s%s%s: unterminated bzip2 block in short"
-                      " first input block\n", pname, ispec->sep, ispec->fmt,
-                      ispec->sep);
+          assert(sizeof s2w_blk->compr == s2w_blk->loaded);
 
-                case IST_OUT_BZIP2:
-                  /*
-                    Terminated bzip2 block at end of short first input block.
-                  */
-                  break;
+          s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
 
-                default:
-                case IST_NEVER:
-                  /* Short first input block without a bzip2 block header. */
-                  break;
-              }
-              short_input = 1;
-            }
-            else {
-              assert(sizeof s2w_blk->compr == s2w_blk->loaded);
-              if (IST_NEVER == istate) {
-                log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                    " first input block\n", pname, ispec->sep, ispec->fmt,
-                    ispec->sep);
-              }
-            }
+          if (0 == s2w_blk) {
+            log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
+                " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
           }
 
-          release = s2w_blk;
-
-          if (short_input) {
-            xlock(&sw2w_q->proceed);
-            assert(0 == s2w_blk->next);
-            assert(sw2w_q->eof);
-          }
-          else {
-            assert(!in_second);
-            xlock_pred(&sw2w_q->proceed);
-            s2w_blk = work_get_second(&s2w_blk->next, sw2w_q, w2m_q, ispec);
-          }
-
-          assert(0u < release->refno);
-          if (0u == --release->refno) {
-            assert(release != sw2w_q->next_scan);
-            xunlock(&sw2w_q->proceed);
-            (*freef)(release);
-            work_push_num_rel(w2m_q);
-          }
-          else {
-            xunlock(&sw2w_q->proceed);
-          }
-
-          if (!short_input && 0 == s2w_blk) {
-            assert(!in_second);
-            if (IST_IN_BZIP2 == istate) {
-              log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
-                  " input block\n", pname, ispec->sep, ispec->fmt,
-                  ispec->sep);
-            }
-
-            assert(IST_OUT_BZIP2 == istate);
-            short_input = 1;
-          }
-
-          if (short_input) {
-            if (IST_OUT_BZIP2 == istate) {
-              work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
-                  sw2w_q);
-            }
-            else {
-              assert(!in_second && IST_NEVER == istate && 0 == w2w_blk);
-            }
-
-            break;
-          }
-
-          in_second = 1;
           ipos = 0u;
           assert(ipos < s2w_blk->loaded);
+          goto in_second;
         }
 
         ibitbuf = s2w_blk->compr[ipos++];
@@ -1234,73 +1129,159 @@ work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
 
       bit = ibitbuf >> --ibits_left & 1u;
       search = (search << 1 | bit) & magic_mask;
-      is_hdr = magic_hdr == search;
 
-      if (IST_IN_BZIP2 == istate) {
-        /* Push bit to bzip2 block being reconstructed. */
-        rbitbuf = rbitbuf << 1 | bit;
-        if (0u == --w2w_blk->rbits_left) {
-          if (sizeof w2w_blk->streamdata == w2w_blk->reconstructed) {
-            log_fatal("%s: %s%s%s: compressed block too long\n", pname,
-                ispec->sep, ispec->fmt, ispec->sep);
-          }
-          w2w_blk->streamdata[w2w_blk->reconstructed++] = rbitbuf;
-          w2w_blk->rbits_left = CHAR_BIT;
+      /* Push bit to bzip2 block being reconstructed. */
+      rbitbuf = rbitbuf << 1 | bit;
+      if (0u == --w2w_blk->rbits_left) {
+        if (sizeof w2w_blk->streamdata == w2w_blk->reconstructed) {
+          log_fatal("%s: %s%s%s: compressed block too long\n", pname,
+              ispec->sep, ispec->fmt, ispec->sep);
         }
-
-        if (magic_eos == search) {
-          istate = IST_OUT_BZIP2;
-          assert(!is_hdr);
-        }
+        w2w_blk->streamdata[w2w_blk->reconstructed++] = rbitbuf;
+        w2w_blk->rbits_left = CHAR_BIT;
       }
 
-      if (is_hdr) {
-        int last_bzip2;
-
-        last_bzip2 = in_second
-            && (sizeof eos + (size_t)(0u < ibits_left) <= ipos);
-
-        if (last_bzip2) {
-          assert(IST_IN_BZIP2 == istate || IST_OUT_BZIP2 == istate);
-          xlock(&sw2w_q->proceed);
-          assert(0u < s2w_blk->refno);
-          if (0u == --s2w_blk->refno) {
-            assert(s2w_blk != sw2w_q->next_scan);
-            xunlock(&sw2w_q->proceed);
-            (*freef)(s2w_blk);
-            work_push_num_rel(w2m_q);
-          }
-          else {
-            xunlock(&sw2w_q->proceed);
-          }
-        }
-
-        if (IST_IN_BZIP2 == istate || IST_OUT_BZIP2 == istate) {
-          work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, last_bzip2,
-              sw2w_q);
-        }
-
-        if (last_bzip2) {
-          break;
-        }
+      if (magic_hdr == search) {
+        work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
         w2w_blk = xalloc(sizeof *w2w_blk);
         w2w_blk->reconstructed = sizeof intro;
         w2w_blk->rbits_left = CHAR_BIT;
         rbitbuf = 0u;
-        istate = IST_IN_BZIP2;
       }
+    } while (magic_eos != search);  /* in bzip2 */
+
+    do {  /* out bzip2 */
+      if (0 == ibits_left) {
+        if (s2w_blk->loaded == ipos) {
+          if (sizeof s2w_blk->compr > s2w_blk->loaded) {
+            xlock(&sw2w_q->proceed);
+            assert(0 == s2w_blk->next);
+            assert(sw2w_q->eof);
+            work_release(s2w_blk, sw2w_q, w2m_q);
+            s2w_blk = 0;
+          }
+          else {
+            assert(sizeof s2w_blk->compr == s2w_blk->loaded);
+            s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
+          }
+
+          if (0 == s2w_blk) {
+            work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
+            goto again;
+          }
+
+          ipos = 0u;
+          assert(ipos < s2w_blk->loaded);
+          goto out_second;
+        }
+
+        ibitbuf = s2w_blk->compr[ipos++];
+        ibits_left = CHAR_BIT;
+      }
+
+      bit = ibitbuf >> --ibits_left & 1u;
+      search = (search << 1 | bit) & magic_mask;
+    } while (magic_hdr != search);  /* out bzip2 */
+
+    work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
+
+    w2w_blk = xalloc(sizeof *w2w_blk);
+    w2w_blk->reconstructed = sizeof intro;
+    w2w_blk->rbits_left = CHAR_BIT;
+    rbitbuf = 0u;
+  }  /* first block */
+ 
+  for (;;) {  /* second block */
+    do {  /* in bzip2 */
+      if (0 == ibits_left) {
+        if (s2w_blk->loaded == ipos) {
+          log_fatal("%s: %s%s%s: %s second input block\n",
+              sizeof s2w_blk->compr == s2w_blk->loaded ?
+              "missing bzip2 block header in full" :
+              "unterminated bzip2 block in short",
+              pname, ispec->sep, ispec->fmt, ispec->sep);
+          }
+
+      in_second:
+        ibitbuf = s2w_blk->compr[ipos++];
+        ibits_left = CHAR_BIT;
+      }
+
+      bit = ibitbuf >> --ibits_left & 1u;
+      search = (search << 1 | bit) & magic_mask;
+
+      /* Push bit to bzip2 block being reconstructed. */
+      rbitbuf = rbitbuf << 1 | bit;
+      if (0u == --w2w_blk->rbits_left) {
+        if (sizeof w2w_blk->streamdata == w2w_blk->reconstructed) {
+          log_fatal("%s: %s%s%s: compressed block too long\n", pname,
+              ispec->sep, ispec->fmt, ispec->sep);
+        }
+        w2w_blk->streamdata[w2w_blk->reconstructed++] = rbitbuf;
+        w2w_blk->rbits_left = CHAR_BIT;
+      }
+
+      if (magic_hdr == search) {
+        if (sizeof eos + (size_t)(0u < ibits_left) <= ipos) {
+          xlock(&sw2w_q->proceed);
+          work_release(s2w_blk, sw2w_q, w2m_q);
+          work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
+          goto again;
+        }
+
+        work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
+
+        w2w_blk = xalloc(sizeof *w2w_blk);
+        w2w_blk->reconstructed = sizeof intro;
+        w2w_blk->rbits_left = CHAR_BIT;
+        rbitbuf = 0u;
+      }
+    } while (magic_eos != search);  /* in bzip2 */
+
+    do {  /* out bzip2 */
+      if (0 == ibits_left) {
+        if (s2w_blk->loaded == ipos) {
+          if (sizeof s2w_blk->compr == s2w_blk->loaded) {
+            log_fatal("%s: %s%s%s: missing bzip2 block header in full"
+                " second input block\n", pname, ispec->sep, ispec->fmt,
+                ispec->sep);
+          }
+
+          /* Terminated bzip2 block at end of short second input block. */
+          xlock(&sw2w_q->proceed);
+          assert(0 == s2w_blk->next);
+          assert(sw2w_q->eof);
+          work_release(s2w_blk, sw2w_q, w2m_q);
+
+          work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
+          goto again;
+        }
+
+      out_second:
+        ibitbuf = s2w_blk->compr[ipos++];
+        ibits_left = CHAR_BIT;
+      }
+
+      bit = ibitbuf >> --ibits_left & 1u;
+      search = (search << 1 | bit) & magic_mask;
+
+    } while (magic_hdr != search);  /* out bzip2 */
+
+    if (sizeof eos + (size_t)(0u < ibits_left) <= ipos) {
+      xlock(&sw2w_q->proceed);
+      work_release(s2w_blk, sw2w_q, w2m_q);
+      work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
+      goto again;
     }
 
-    assert(0 == w2w_blk);
-  }
+    work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
-  /* Notify muxer when last worker exits. */
-  xlock(&w2m_q->av_or_ex_or_rel);
-  if (0u == --w2m_q->working && 0u == w2m_q->num_rel && 0 == w2m_q->head) {
-    xsignal(&w2m_q->av_or_ex_or_rel);
-  }
-  xunlock(&w2m_q->av_or_ex_or_rel);
+    w2w_blk = xalloc(sizeof *w2w_blk);
+    w2w_blk->reconstructed = sizeof intro;
+    w2w_blk->rbits_left = CHAR_BIT;
+    rbitbuf = 0u;
+  }  /* second block */
 }
 
 
