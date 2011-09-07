@@ -18,82 +18,40 @@ gl_EARLY
 
 AC_ARG_ENABLE([warnings],
   [AS_HELP_STRING([--enable-warnings],
-    [try to enable many C compiler warnings])],
-  [
-if test "x$enableval" = xyes
-then
-  for kjn_warn in \
-    '' \
-    all \
-    extra \
-    format-y2k \
-    format-nonliteral \
-    format-security \
-    init-self \
-    missing-include-dirs \
-    switch-default \
-    switch-enum \
-    unused \
-    unknown-pragmas \
-    strict-aliasing \
-    float-equal \
-    declaration-after-statement \
-    shadow \
-    pointer-arith \
-    bad-function-cast \
-    cast-qual \
-    cast-align \
-    write-strings \
-    logical-op \
-    aggregate-return \
-    strict-prototypes \
-    old-style-definition \
-    missing-prototypes \
-    missing-declarations \
-    missing-noreturn \
-    missing-format-attribute \
-    packed \
-    redundant-decls \
-    nested-externs \
-    unreachable-code \
-    inline \
-    invalid-pch \
-    long-long \
-    vla \
-    volatile-register-var \
-    disabled-optimization \
-    stack-protector \
-    overlength-strings \
-    builtin-macro-redefined \
-    mudflap \
-    packed-bitfield-compat \
-    sync-nand \
-    attributes \
-    coverage-mismatch \
-    multichar \
-    unused-macros \
-    extra-tokens
-  do
-    gl_WARN_ADD([-W$kjn_warn])
-  done
-  CPPFLAGS="$kjn_save_flags"
+      [try to enable many C compiler warnings])],
+      [AS_VAR_IF([enableval], [yes], [
+    m4_foreach([warn], [format-y2k, format-nonliteral, format-security, vla,
+        init-self, missing-include-dirs, switch-default, switch-enum, unused,
+        unknown-pragmas, strict-aliasing, float-equal, shadow, pointer-arith,
+        declaration-after-statement, bad-function-cast, cast-qual, cast-align,
+        write-strings, logical-op, aggregate-return, strict-prototypes, extra,
+        old-style-definition, missing-prototypes, missing-declarations, inline,
+        missing-noreturn, missing-format-attribute, packed, redundant-decls,
+        nested-externs, unreachable-code, invalid-pch, long-long, multichar,
+        volatile-register-var, disabled-optimization, stack-protector, mudflap,
+        overlength-strings, builtin-macro-redefined, packed-bitfield-compat,
+        sync-nand, attributes, coverage-mismatch, unused-macros, extra-tokens],
+        [m4_set_add([kjn_warn_set], warn)])
 
-  AC_SUBST([WARN_CFLAGS])
-fi])
+    for kjn_warn in '' all extra m4_set_dump([kjn_warn_set], [ ])
+    do :
+      gl_WARN_ADD([-W$kjn_warn])
+    done
+
+    AC_SUBST([WARN_CFLAGS])
+  ])
+])
 
 AC_C_CONST
 AC_C_VOLATILE
-AC_C_RESTRICT
-AC_C_INLINE
+dnl no need restrict and inline for now
+dnl AC_C_RESTRICT
+dnl AC_C_INLINE
 AC_SYS_LARGEFILE
 
 dnl Headers
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h])
-AC_CHECK_HEADERS([fcntl.h])
-AC_CHECK_HEADERS([limits.h])
-AC_CHECK_HEADERS([stddef.h])
-AC_CHECK_HEADERS([sys/time.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h])
 
 dnl Types
 AC_TYPE_UINT8_T
@@ -108,12 +66,7 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 
 dnl Functions
-AC_FUNC_MALLOC
-AC_CHECK_FUNCS([bzero])
-AC_CHECK_FUNCS([gettimeofday])
-AC_CHECK_FUNCS([strrchr])
-AC_CHECK_FUNCS([strtol])
-AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+AC_CHECK_FUNCS([bzero strrchr strtol])
 
 gl_INIT
 
