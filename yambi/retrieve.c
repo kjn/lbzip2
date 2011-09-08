@@ -24,17 +24,12 @@
 #include "decode.h"
 
 
-#define Trace(x)
-
-
-
-#define STREAM_MAGIC_MIN 0x425A6831
-#define STREAM_MAGIC_MAX 0x425A6839
-#define HEADER_MAGIC_HI  0x314159
-#define HEADER_MAGIC_LO  0x265359
-#define TRAILER_MAGIC_HI 0x177245
-#define TRAILER_MAGIC_LO 0x385090
-
+#if 0
+# include <stdio.h>
+# define Trace(x) fprintf x
+#else
+# define Trace(x)
+#endif
 
 
 /* Start table width */
@@ -70,7 +65,7 @@
    but the code below doesn't diectly follow the description in the paper.
 */
 static int
-make_tree(YBibs_t *ibs,   /* the IBS where to store created tables */
+make_tree(YBdec_t *dec,   /* where to store created tables */
           Int t,          /* tree index */
           const Byte *L,  /* code lengths */
           Int n)          /* alphabet size */
@@ -90,10 +85,10 @@ make_tree(YBibs_t *ibs,   /* the IBS where to store created tables */
 
   Long v;
 
-  C = ibs->tree[t].count;
-  B = ibs->tree[t].base;
-  P = ibs->tree[t].perm;
-  S = ibs->tree[t].start;
+  C = dec->tree[t].count;
+  B = dec->tree[t].base;
+  P = dec->tree[t].perm;
+  S = dec->tree[t].start;
 
   /* Count symbol lengths. */
   for (k = 0; k <= MAX_CODE_LENGTH; k++)
@@ -203,138 +198,27 @@ make_tree(YBibs_t *ibs,   /* the IBS where to store created tables */
 
 
 
-#define REFILL(ss)                              \
+#define GET(vv,nn)                              \
   do                                            \
   {                                             \
-    if (in_avail < 4)                           \
-    {                                           \
-      togo = 4;                                 \
-      ibs->recv_state = ss;                     \
-    case ss:                                    \
-      while (in_avail && togo)                  \
-      {                                         \
-        w += 8;                                 \
-        v |= (Long)*in++ << (64-w);             \
-        in_avail--;                             \
-        togo--;                                 \
-      }                                         \
-      if (togo)                                 \
-        goto save_and_ret;                      \
-    }                                           \
-    else                                        \
-    {                                           \
-      v |= (Long)peekl(in) << (32-w);           \
-      w += 32;                                  \
-      in += 4;                                  \
-      in_avail -= 4;                            \
-    }                                           \
-  }                                             \
-  while (0)
-
-#define REFILL_1(ss)                            \
-  do                                            \
-  {                                             \
-    if (in_avail < 1)                           \
-    {                                           \
-      togo = 1;                                 \
-      ibs->recv_state = ss;                     \
-    case ss:                                    \
-      while (in_avail && togo)                  \
-      {                                         \
-        w += 8;                                 \
-        v |= (Long)*in++ << (64-w);             \
-        in_avail--;                             \
-        togo--;                                 \
-      }                                         \
-      if (togo)                                 \
-        goto save_and_ret;                      \
-    }                                           \
-    else                                        \
-    {                                           \
-      v |= (Long)in[0] << (64-w-8);             \
-      w += 8;                                   \
-      in += 1;                                  \
-      in_avail -= 1;                            \
-    }                                           \
-  }                                             \
-  while (0)
-
-#define GET(vv,nn,ss)                           \
-  do                                            \
-  {                                             \
-    if (w < (nn)) { REFILL(ss); }               \
+    assert(w >= (nn));                          \
     (vv) = v >> (64-(nn));                      \
     w -= (nn);                                  \
     v <<= (nn);                                 \
   }                                             \
   while (0)
 
-#define GET_SLOW(vv,nn,ss)                      \
-  do                                            \
-  {                                             \
-    while (w < (nn)) { REFILL_1(ss); }          \
-    (vv) = v >> (64-(nn));                      \
-    w -= (nn);                                  \
-    v <<= (nn);                                 \
-  }                                             \
-  while (0)
+#define W_RANGE(from,to) assert(w+1 >= (from)+1 && w <= (to))
 
+#define S_INIT         1
+#define S_BWT_IDX      2
+#define S_BITMAP_BIG   3
+#define S_BITMAP_SMALL 4
+#define S_SELECTOR_MTF 5
+#define S_DELTA_TAG    6
+#define S_PREFIX       7
+#define S_TRAILER      8
 
-#define S_NEW_STREAM 0
-#define S_DATA_BLOCK 1
-#define S_DONE       2
-
-#define S_MAGIC          10
-#define S_HEADER_1       11
-#define S_HEADER_2       12
-#define S_CRC            13
-#define S_RAND           14
-#define S_BWT_IDX        15
-#define S_BITMAP_BIG     16
-#define S_BITMAP_SMALL   17
-#define S_NUM_TREES      18
-#define S_NUM_SELECTORS  19
-#define S_SELECTOR_MTF   20
-#define S_DELTA_BASE     21
-#define S_DELTA_TAG      22
-#define S_PREFIX         24
-#define S_CRC2           25
-
-
-
-YBibs_t *
-YBibs_init(void)
-{
-  YBibs_t *ibs;
-
-  ibs = xalloc(sizeof(YBibs_t));
-
-  ibs->dec = 0;
-  ibs->recv_state = S_NEW_STREAM;
-  ibs->crc = 0;
-  ibs->next_shift = 0;
-  ibs->canceled = 0;
-
-  ibs->save_v = 0;
-  ibs->save_w = 0;
-  ibs->save_big = 0;
-  ibs->save_small = 0;
-  ibs->save_i = 0;
-  ibs->save_t = 0;
-  ibs->save_s = 0;
-  ibs->save_r = 0;
-  ibs->save_j = 0;
-  ibs->save_T = 0;
-  ibs->save_x = 0;
-  ibs->save_k = 0;
-  ibs->save_g = 0;
-  ibs->save_togo = 0;
-  ibs->save_magic1 = 0;
-  ibs->save_magic2 = 0;
-  ibs->save_has_block = 0;
-
-  return ibs;
-}
 
 
 YBdec_t *
@@ -343,18 +227,11 @@ YBdec_init(void)
   YBdec_t *dec;
 
   dec = xalloc(sizeof(YBdec_t));
-
-  dec->ibs = 0;
+  dec->rle_state = 0;
+  dec->rle_crc = 0xffffffff;
+  dec->state = S_INIT;
 
   return dec;
-}
-
-
-void
-YBibs_destroy(YBibs_t *ibs)
-{
-  assert(ibs != 0);
-  xfree(ibs);
 }
 
 
@@ -366,57 +243,17 @@ YBdec_destroy(YBdec_t *dec)
 }
 
 
-void
-YBdec_join(YBdec_t *dec)
-{
-  assert(dec != 0);
-  assert(dec->ibs != 0);
-
-  if (dec->rle_state != 0xDEAD)
-  {
-    dec->ibs->canceled = 1;
-  }
-  else
-  {
-    dec->ibs->crc ^= ((dec->rle_crc >> dec->block_shift) |
-                      (dec->rle_crc << (32 - dec->block_shift)));
-  }
-}
-
-
-int
-YBibs_check(YBibs_t *ibs)
-{
-  assert(ibs != 0);
-
-  if (ibs->canceled)
-    return YB_CANCELED;
-
-  if (ibs->next_crc != ((ibs->crc << ibs->next_shift) |
-                        (ibs->crc >> (32 - ibs->next_shift))))
-  {
-    Trace(("combined crc error (is 0x%08X, should be 0x%08X)\n",
-           ((ibs->crc << ibs->next_shift) |
-            (ibs->crc >> (32 - ibs->next_shift))), ibs->next_crc));
-    return YB_ERR_STRMCRC;
-  }
-
-  return YB_OK;
-}
-
-
 /* TODO: add optimization similar to inflate_fast from gzip. */
 /* TODO: add prefetchnta to avoid lookup tables pollution. */
 int
-YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
+YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
+    unsigned *bit_buf, unsigned *bits_left)
 {
-  /* These two used to be function parameters, but the function
-     prototype changed since then. */
-  const Byte *in;  /* pointer to the next input byte */
+  const Int *in;  /* pointer to the next input byte */
   Int in_avail;    /* number of input bytes available */
 
-  Long v;  /* next 0-64 bits of input stream, left aligned */
-  int w;   /* available bits in v */
+  Long v;  /* next 0-63 bits of input stream, left-aligned, zero-padded */
+  Int w;   /* available bits in v */
   Short big;    /* big descriptor of the bitmap */
   Short small;  /* small descriptor of the bitmap */
   int i;
@@ -430,139 +267,115 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
   Short x; /* lookahead bits */
   int k;   /* code length */
   int g;   /* group number */
-  int togo;  /* number of bytes that still need to be read */
-  Int magic1;
-  Int magic2;
-  int has_block;  /* bool, another block is present after current block */
 
 
   assert(dec != 0);
-  assert(ibs != 0);
   assert(buf != 0);
-  assert(dec->ibs == 0 || dec->ibs == ibs);
-  assert(ibs->dec == 0 || ibs->dec == dec);
 
-  in = (const Byte *)buf;
-  in_avail = *buf_sz;
+  Trace((stderr, "retrieve called with ipos=%u, w=%u, v=0x%X\n",
+         (unsigned)*ipos_p, *bits_left, *bit_buf));
 
+  in = (const Int *)buf + *ipos_p;
+  in_avail = ipos_lim - *ipos_p;
+  assert(in_avail >= 1);
 
-  /*=== RESTORE SAVED AUTOMATIC VARIABLES ===*/
+  w = *bits_left;
+  if (w > 0)
+    v = (Long)*bit_buf << (64-w);
+  else
+    v = 0;
 
-#define RESTORE(var) var = ibs->save_##var
-  RESTORE(v);
-  RESTORE(w);
-  RESTORE(big);
-  RESTORE(small);
-  RESTORE(i);
-  RESTORE(t);
-  RESTORE(s);
-  RESTORE(r);
-  RESTORE(j);
-  RESTORE(T);
-  RESTORE(x);
-  RESTORE(k);
-  RESTORE(g);
-  RESTORE(togo);
-  RESTORE(magic1);
-  RESTORE(magic2);
-  RESTORE(has_block);
-#undef RESTORE
-
-
-  switch (ibs->recv_state)
+  switch (dec->state)
   {
-  case S_DONE:
-    *buf_sz = in_avail;
-    return YB_DONE;
+  case S_INIT:
+    W_RANGE(0,31);
+    v |= (Long)peekl(in) << (32-w);
+    w += 32;
+    in++;
+    in_avail--;
+    Trace((stderr, "retrieve init: w=%u, v=0x%lX\n", w, v));
 
-  case S_NEW_STREAM:
+    W_RANGE(32,63);
+    GET(dec->expect_crc, 32);
+    Trace((stderr, "retrieve init: CRC is 0x%X\n", dec->expect_crc));
 
-    /*=== RETRIEVE STREAM HEADER ===*/
-
-    /* Read stream magic. */
-    GET(magic1, 32, S_MAGIC);
-    if (magic1 < STREAM_MAGIC_MIN || magic1 > STREAM_MAGIC_MAX)
-    {
-      Trace(("invalid stream magic\n"));
-      return YB_ERR_MAGIC;
+    W_RANGE(0,31);
+    if (unlikely(in_avail == 0)) {
+      dec->state = S_BWT_IDX;
+      *ipos_p = in - (const Int *)buf;
+      *bits_left = w;
+      *bit_buf = v >> (64-w);
+      Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+      return YB_UNDERFLOW;
     }
+  case S_BWT_IDX:
+    Trace((stderr, "v=0x%lX, w=%u\n", v, w));
+    v |= (Long)peekl(in) << (32-w);
+    w += 32;
+    Trace((stderr, "v=0x%lX, w=%u\n", v, w));
+    in++;
+    in_avail--;
 
-    ibs->max_block_size = (magic1 - STREAM_MAGIC_MIN + 1) * 100000UL;
+    W_RANGE(32,63);
+    GET(dec->rand, 1);
+    Trace((stderr, "rand_bit=%d\n", dec->rand));
 
-
-    /*=== RETRIEVE BLOCK HEADER ===*/
-
-  block_header:
-    GET(magic1, 24, S_HEADER_1);
-    GET(magic2, 24, S_HEADER_2);
-
-    if (magic1 == TRAILER_MAGIC_HI && magic2 == TRAILER_MAGIC_LO)
-    {
-      GET_SLOW(ibs->next_crc, 32, S_CRC);
-
-      if (has_block)
-      {
-        has_block = 0;
-        ibs->recv_state = S_DONE;
-        ibs->save_v = v;
-        ibs->save_w = w;
-        *buf_sz = in_avail;
-        return YB_OK;
-      }
-
-      assert(w == 0);
-      *buf_sz = in_avail;
-      return YB_DONE;
-    }
-
-    if (magic1 != HEADER_MAGIC_HI ||
-        magic2 != HEADER_MAGIC_LO)
-    {
-      Trace(("invalid header magic.\n"));
-      return YB_ERR_HEADER;
-    }
-
-    GET(ibs->next_crc, 32, S_CRC2);
-
-    if (has_block)
-    {
-      has_block = 0;
-      ibs->recv_state = S_DATA_BLOCK;
-      ibs->save_v = v;
-      ibs->save_w = w;
-      *buf_sz = in_avail;
-      return YB_OK;
-    }
-
-
-    /*=== RETRIEVE BLOCK DATA ===*/
-
-  case S_DATA_BLOCK:
-
-    ibs->dec = dec;
-    dec->ibs = ibs;
-
-    ibs->next_shift = (ibs->next_shift + 1) % 32;
-    dec->block_shift = ibs->next_shift;
-    dec->rle_state = 0;
-    dec->rle_crc = 0xFFFFFFFF;
-    dec->expect_crc = ibs->next_crc;
-
-    /* Get rand flag. */
-    GET(dec->rand, 1, S_RAND);
-
-    /* Get BWT index. */
-    GET(dec->bwt_idx, 24, S_BWT_IDX);
+    W_RANGE(31,62);
+    GET(dec->bwt_idx, 24);
+    Trace((stderr, "bwt_idx=%u\n", dec->bwt_idx));
+    W_RANGE(7,38);
 
 
     /*=== RETRIEVE BITMAP ===*/
 
+    if (w < 32) {
+      if (unlikely(in_avail == 0)) {
+        dec->state = S_BITMAP_BIG;
+        *ipos_p = in - (const Int *)buf;
+        *bits_left = w;
+        *bit_buf = v >> (64-w);
+        Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+        return YB_UNDERFLOW;
+      }
+    case S_BITMAP_BIG:
+      v |= (Long)peekl(in) << (32-w);
+      w += 32;
+      in++;
+      in_avail--;
+    }
+    W_RANGE(32,63);
+    GET(big, 16); W_RANGE(16,47);
+    small = 0;
     k = 0;
     j = 0;
-    GET(big, 16, S_BITMAP_BIG);
-    small = 0;
     do {
-      if (big & 0x8000) { GET(small, 16, S_BITMAP_SMALL); }
+      if (big & 0x8000) {
+        GET(small, 16); W_RANGE(0,47);
+        if (w < 32) {
+          if (unlikely(in_avail == 0)) {
+            dec->state = S_BITMAP_SMALL;
+            dec->save_1 = j;
+            dec->save_2 = k;
+            dec->save_3 = big;
+            dec->save_4 = small;
+            *ipos_p = in - (const Int *)buf;
+            *bits_left = w;
+            *bit_buf = v >> (64-w);
+            Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+            return YB_UNDERFLOW;
+          case S_BITMAP_SMALL:
+            j = dec->save_1;
+            k = dec->save_2;
+            big = dec->save_3;
+            small = dec->save_4;
+          }
+          v |= (Long)peekl(in) << (32-w);
+          w += 32;
+          in++;
+          in_avail--;
+        }
+        W_RANGE(32,63);
+      }
       do {
         dec->imtf_slide[IMTF_SLIDE_LENGTH - 256 + k] = j++;
         k += small >> 15;
@@ -573,32 +386,33 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
     if (k == 0)
     {
-      Trace(("empty alphabet\n"));
+      Trace((stderr, "empty alphabet\n"));
       return YB_ERR_BITMAP;
     }
 
     dec->alpha_size = k+2;
 
 
-    GET(ibs->num_trees, 3, S_NUM_TREES);
-    if (ibs->num_trees < MIN_TREES || ibs->num_trees > MAX_TREES)
+    W_RANGE(32,63);
+    GET(dec->num_trees, 3); W_RANGE(29,60);
+    if (dec->num_trees < MIN_TREES || dec->num_trees > MAX_TREES)
     {
-      Trace(("bad number of trees (%d, should be from 2 to 6)\n",
-             ibs->num_trees));
+      Trace((stderr, "bad number of trees (%d, should be from 2 to 6)\n",
+             dec->num_trees));
       return YB_ERR_TREES;
     }
 
-    GET(ibs->num_selectors, 15, S_NUM_SELECTORS);
-    if (ibs->num_selectors == 0)
+    GET(dec->num_selectors, 15); W_RANGE(14,45);
+    if (dec->num_selectors == 0)
     {
-      Trace(("no selectors\n"));
+      Trace((stderr, "no selectors\n"));
       return YB_ERR_GROUPS;
     }
 
 
     /*=== RETRIEVE SELECTOR MTF VALUES ===*/
 
-    for (i = 0; i < ibs->num_selectors; i++)
+    for (i = 0; i < dec->num_selectors; i++)
     {
       /* The following is a lookup table for determining the position
          of the first zero bit (starting at the most significant bit)
@@ -617,29 +431,47 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
                                       2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
                                       3,3,3,3,3,3,3,3,4,4,4,4,5,5,6,7, };
 
-      if (w < 6)
-        REFILL(S_SELECTOR_MTF);
-
+      assert(w >= 6);
       k = table[v >> (64-6)];
 
-      if (unlikely(k > ibs->num_trees))
+      if (unlikely(k > dec->num_trees))
       {
-        Trace(("bad selector mtfv\n"));
+        Trace((stderr, "bad selector mtfv\n"));
         return YB_ERR_SELECTOR;
       }
 
       v <<= k;
       w -= k;
 
-      ibs->selector[i] = k-1;
-    }
+      dec->selector[i] = k-1;
 
+      if (w < 11) {
+        if (unlikely(in_avail == 0)) {
+          dec->state = S_SELECTOR_MTF;
+          dec->save_1 = i;
+          *ipos_p = in - (const Int *)buf;
+          *bits_left = w;
+          *bit_buf = v >> (64-w);
+          Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+          return YB_UNDERFLOW;
+        case S_SELECTOR_MTF:
+          i = dec->save_1;
+        }
+        v |= (Long)peekl(in) << (32-w);
+        w += 32;
+        in++;
+        in_avail--;
+      }
+    }
+    W_RANGE(11,44);
 
     /*=== RETRIEVE DECODING TABLES ===*/
 
-    for (t = 0; t < ibs->num_trees; t++)
+    for (t = 0; t < dec->num_trees; t++)
     {
-      GET(x, 5, S_DELTA_BASE);
+      W_RANGE(11,44);
+      GET(x, 5);
+      W_RANGE(6,39);
 
       for (s = 0; s < dec->alpha_size; s++)
       {
@@ -671,29 +503,54 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
                                     2,2,2,2,2,2,2,2,3,3,4,2,1,1,2,0, };
 
         do {
-          if (unlikely(w < 6))
-            REFILL(S_DELTA_TAG);
+          assert(w >= 6);
           k = v >> (64-6);
           x += R[k];
           if (unlikely(x < 3+MIN_CODE_LENGTH || x > 3+MAX_CODE_LENGTH))
           {
-            Trace(("bad code length\n"));
+            Trace((stderr, "bad code length\n"));
             return YB_ERR_DELTA;
           }
           x -= 3;
           k = L[k];
           w -= k;
           v <<= k;
+          W_RANGE(0,41);
+
+          if (unlikely(w < 11)) {
+            if (unlikely(in_avail == 0)) {
+              dec->state = S_DELTA_TAG;
+              dec->save_1 = x;
+              dec->save_2 = k;
+              dec->save_3 = s;
+              dec->save_4 = t;
+              *ipos_p = in - (const Int *)buf;
+              *bits_left = w;
+              *bit_buf = v >> (64-w);
+              Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+              return YB_UNDERFLOW;
+            case S_DELTA_TAG:
+              x = dec->save_1;
+              k = dec->save_2;
+              s = dec->save_3;
+              t = dec->save_4;
+            }
+            v |= (Long)peekl(in) << (32-w);
+            w += 32;
+            in++;
+            in_avail--;
+          }
+          W_RANGE(11,42);
         }
         while (unlikely(k == 6));
 
-        ((Byte *)ibs->tree[t].start)[s] = x;
+        ((Byte *)dec->tree[t].start)[s] = x;
       }
-      r = make_tree(ibs, t, (Byte *)ibs->tree[t].start,
+      r = make_tree(dec, t, (Byte *)dec->tree[t].start,
                     dec->alpha_size);
       if (!r)
         r = t;
-      ibs->mtf[t] = r;  /* Initialise MTF state. */
+      dec->mtf[t] = r;  /* Initialise MTF state. */
     }
 
 
@@ -712,38 +569,38 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
     j = 0;
 
     /* Bound selectors at 18001 so they don't overflow tt16[]. */
-    if (ibs->num_selectors > 18001)
-      ibs->num_selectors = 18001;
+    if (dec->num_selectors > 18001)
+      dec->num_selectors = 18001;
 
-    for (g = 0; g < ibs->num_selectors; g++)
+    for (g = 0; g < dec->num_selectors; g++)
     {
       /* We started a new group, time to (possibly) switch to a new tree.
          We check the selector table to determine which tree to use.
          If the value we looked up is 6 or 7, it means decode error
          (values of 6 and 7 are special cases, they denote invalid trees). */
-      i = ibs->selector[g];
+      i = dec->selector[g];
 
-      t = ibs->mtf[i];
+      t = dec->mtf[i];
       if (unlikely(t >= 6))
       {
         if (t == 6) {
-          Trace(("oversubscribed prefix code\n"));
+          Trace((stderr, "oversubscribed prefix code\n"));
           return YB_ERR_PREFIX;
         }
         else {
-          Trace(("incomplete prefix code\n"));
+          Trace((stderr, "incomplete prefix code\n"));
           return YB_ERR_INCOMPLT;
         }
       }
 
       while (i > 0)
       {
-        ibs->mtf[i] = ibs->mtf[i-1];
+        dec->mtf[i] = dec->mtf[i-1];
         i--;
       }
-      ibs->mtf[0] = t;
+      dec->mtf[0] = t;
 
-      T = &ibs->tree[t];
+      T = &dec->tree[t];
 
       /* There are up to GROUP_SIZE codes in any group. */
       assert(i == 0);
@@ -752,7 +609,30 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
         /* We are about to decode a prefix code.  We need lookahead of
            20 bits at the beginning (the greatest possible code length)
            to reduce number of bitwise operations to absolute minimum. */
-        if (unlikely(w < MAX_CODE_LENGTH)) { REFILL(S_PREFIX); }
+        W_RANGE(0,50);
+        if (unlikely(w < MAX_CODE_LENGTH)) {
+          if (unlikely(in_avail == 0)) {
+            dec->state = S_PREFIX;
+            dec->save_1 = g;
+            dec->save_2 = i;
+            dec->save_3 = j;
+            *ipos_p = in - (const Int *)buf;
+            *bits_left = w;
+            *bit_buf = v >> (64-w);
+            Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+            return YB_UNDERFLOW;
+          case S_PREFIX:
+            g = dec->save_1;
+            i = dec->save_2;
+            j = dec->save_3;
+            T = &dec->tree[dec->mtf[0]];
+          }
+          v |= (Long)peekl(in) << (32-w);
+          w += 32;
+          in++;
+          in_avail--;
+        }
+        W_RANGE(20,51);
 
         /* Use a table lookup to determine minimal code length quickly.
            For lengths <= SW, this table always gives precise reults.
@@ -787,50 +667,67 @@ YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec, const void *buf, size_t *buf_sz)
 
           if (j == 0)
           {
-            Trace(("empty block\n"));
+            Trace((stderr, "empty block\n"));
             return YB_ERR_EMPTY;
           }
 
+          W_RANGE(0,50);
           dec->num_mtfv = j;
-          has_block = 1;
-          ibs->dec = 0;
-          goto block_header;
+
+          j = 2;
+          k = 0;
+          while (j > 0) {
+            if (w < 24) {
+              if (unlikely(in_avail == 0)) {
+                dec->state = S_TRAILER;
+                dec->save_1 = j;
+                dec->save_2 = k;
+                *ipos_p = in - (const Int *)buf;
+                *bits_left = w;
+                *bit_buf = v >> (64-w);
+                Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
+                return YB_UNDERFLOW;
+              case S_TRAILER:
+                j = dec->save_1;
+                k = dec->save_2;
+              }
+              v |= (Long)peekl(in) << (32-w);
+              w += 32;
+              in++;
+              in_avail--;
+            }
+            j--;
+            GET(i, 24);
+            if (j == 1)
+              k = i;
+          }
+
+          if ((k != 0x314159 || i != 0x265359) &&
+              (k != 0x177245 || i != 0x385090))
+          {
+            Trace((stderr, "retrieve: return YB_ERR_HEADER\n"));
+            return YB_ERR_HEADER;
+          }
+
+          assert(w < 32);
+          *ipos_p = in - (const Int *)buf;
+          *bits_left = w;
+          *bit_buf = v >> (64-w);
+          dec->state = 0;
+          Trace((stderr, "@return: bwt_idx=%d\n", dec->bwt_idx));
+          return (k == 0x314159) ? YB_OK : YB_DONE;
         }
 
         dec->tt16[j++] = s;
       }
     }
 
-    Trace(("no EOB in the last group\n"));
+    Trace((stderr, "no EOB in the last group\n"));
     return YB_ERR_UNTERM;
 
   default:
     abort();
   }
-
-#define SAVE(var) ibs->save_##var = var
-save_and_ret:
-  SAVE(v);
-  SAVE(w);
-  SAVE(big);
-  SAVE(small);
-  SAVE(i);
-  SAVE(t);
-  SAVE(s);
-  SAVE(r);
-  SAVE(j);
-  SAVE(T);
-  SAVE(x);
-  SAVE(k);
-  SAVE(g);
-  SAVE(togo);
-  SAVE(magic1);
-  SAVE(magic2);
-  SAVE(has_block);
-#undef SAVE
-
-  *buf_sz = in_avail;
-  return YB_UNDERFLOW;
 }
 
 

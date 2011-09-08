@@ -52,51 +52,9 @@ struct Tree {
   Short perm[MAX_ALPHA_SIZE];
 };
 
-struct YBibs_s
-{
-  YBdec_t *dec;
-
-  int recv_state;
-  Int max_block_size;
-  Int next_crc;
-  unsigned next_shift;
-  Int crc;
-  int canceled;
-
-  Long save_v;
-  int save_w;
-  Short save_big;
-  Short save_small;
-  int save_i;
-  int save_t;
-  Int save_s;
-  int save_r;
-  Int save_j;
-  struct Tree *save_T;
-  Short save_x;
-  int save_k;
-  int save_g;
-  int save_togo;
-  Int save_magic1;
-  Int save_magic2;
-  int save_has_block;
-
-  Byte selector[32767];
-  int num_trees;
-  int num_selectors;
-  int mtf[MAX_TREES];
-  struct Tree tree[MAX_TREES];
-};
-
 
 struct YBdec_s
 {
-  YBibs_t *ibs;
-
-  /* Block sequence number modulo 32. It's required only to compute
-     the stream CRC */
-  unsigned block_shift;
-
   /* Stuff for UnRLE. */
   Int rle_index;  /* current index in the IBWT list */
   Int rle_avail;  /* compressed bytes still available in the IBWT list */
@@ -105,6 +63,7 @@ struct YBdec_s
   Byte rle_char;  /* byte the state transition depends on it) */
   Byte rle_prev;  /* byte associated to the current FSA state */
 
+  /* General "high-level" stuff. */
   Int rand;            /* rand flag (1 if block is randomised, 0 otherwise) */
   Int bwt_idx;         /* BWT primary index */
   Int block_size;      /* compressed block size */
@@ -112,6 +71,20 @@ struct YBdec_s
   Int num_mtfv;        /* number of MTF values */
   Int alpha_size;      /* number of distinct prefix codes */
   Int expect_crc;      /* expected block CRC */
+
+  /* Stuff for retrieve. */
+  int state;
+  Byte selector[32767];
+  int num_trees;
+  int num_selectors;
+  int mtf[MAX_TREES];
+  struct Tree tree[MAX_TREES];
+
+  /* Save area for retrieve code. */
+  Int save_1;
+  Int save_2;
+  Int save_3;
+  Int save_4;
 
   /* Stuff for IMTF. */
   Byte *imtf_row[IMTF_NUM_ROWS];

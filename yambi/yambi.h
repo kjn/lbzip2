@@ -22,7 +22,6 @@
 
 
 /* Data types. */
-typedef struct YBibs_s YBibs_t;  /* IBS (input bit-stream) */
 typedef struct YBobs_s YBobs_t;  /* OBS (output bit-stream) */
 typedef struct YBdec_s YBdec_t;  /* decoder */
 typedef struct YBenc_s YBenc_t;  /* encoder */
@@ -58,11 +57,6 @@ typedef unsigned long  YBcrc_t;  /* CRC32 */
 #define YB_ERR_BWTIDX   (-116)  /* primary index too large */
 
 
-/* Allocate and initialise an YBibs_t structure, and return a pointer to it.
-*/
-YBibs_t *YBibs_init(void);
-
-
 /* Allocate and initialise an YBdec_t structure, and return a pointer to it.
 */
 YBdec_t *YBdec_init(void);
@@ -81,8 +75,8 @@ YBdec_t *YBdec_init(void);
                     are consumed in this case)
      otherwise    - data format error
 */
-int YBibs_retrieve(YBibs_t *ibs, YBdec_t *dec,
-                   const void *buf, size_t *buf_sz);
+int YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p,
+                   size_t ipos_lim, unsigned *bitbuf, unsigned *bits_left);
 
 
 /* Decode the block.  If everything goes OK, return YB_OK.
@@ -105,30 +99,11 @@ int YBdec_work(YBdec_t *d);
 int YBdec_emit(YBdec_t *d, void *buf, size_t *buf_sz);
 
 
-void YBdec_join(YBdec_t *d);
-
-
-/* Compare calculated and stored combined CRCs of this YBibs_t structure.
-   It may not be called before all blocks related to this YBibs_t are
-   joined. Return YB_OK if no error was detected, YB_CANCELED if any
-   of joined blocks wasn't decompressed correctly, YB_CRC_ERROR if combined
-   CRC is invalid.
- */
-int YBibs_check(YBibs_t *ibs);
-
-
 /* Destroy the YBdec_t structure and release any resources associated to it.
    It must be called after any blocks related to this dec were released.
    After this operation, the YBdec_t structure may be no longer used.
 */
 void YBdec_destroy(YBdec_t *dec);
-
-
-/* Destroy the YBibs_t structure and release any resources associated to it.
-   It must be called after any blocks related to this ibs were released.
-   After this operation, the YBibs_t structure may be no longer used.
-*/
-void YBibs_destroy(YBibs_t *ibs);
 
 
 /* Return a pointer to a static string containing a textual representation

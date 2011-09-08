@@ -16,9 +16,6 @@
 #include "lacos_rbtree.h" /* struct lacos_rbtree_node */
 
 
-/* Number of bytes in CRC. */
-#define NUM_CRC ((size_t)4)
-
 /* Number of bytes in stream header, without block size. */
 #define NUM_SHDR ((size_t)3)
 
@@ -32,10 +29,6 @@ static const uint64_t
 /* 48 bit bzip2 block header. */
 static const uint64_t
     magic_hdr = (uint64_t)0x3141lu << 32 | (uint64_t)0x59265359lu;
-
-/* 48 bit bzip2 end of stream marker. */
-static const uint64_t
-    magic_eos = (uint64_t)0x1772lu << 32 | (uint64_t)0x45385090lu;
 
 /* Bzip2 stream header, block size 9, and block header together. */
 static const char unsigned intro[NUM_SHDR + (size_t)1 + NUM_BHDR] = {
@@ -54,7 +47,6 @@ static const char unsigned eos[NUM_BHDR] = {
   i.e. we don't try to support arbitarly large blocks.
 */
 #define MX_SPLIT ((size_t)(1024u * 1024u))
-#define MX_BZIP2 ((size_t)(MX_SPLIT - (sizeof eos + 1u)))
 
 struct s2w_blk                   /* Splitter to workers. */
 {
@@ -78,10 +70,7 @@ struct w2w_blk              /* Worker to workers. */
 {
   struct w2w_blk_id id;     /* Stdin blk idx & bzip2 blk idx in former. */
   struct w2w_blk *next;     /* Next block in list (unordered). */
-  size_t reconstructed;     /* Number of bytes in streamdata. */
-  char unsigned
-      streamdata[MX_BZIP2]; /* One-block bzip2 stream to decompress. */
-  unsigned rbits_left;      /* After the byte @ strd[rctr-1], [1..CHAR_BIT]. */
+  YBdec_t *ybdec;           /* Partly decompressed block. */
 };
 
 
@@ -549,90 +538,17 @@ split_wrap(void *v_split_arg)
 
 
 static void
-work_compl(struct w2w_blk *w2w_blk, struct filespec *ispec)
-{
-  unsigned fb,
-      ub,
-      save_bitbuf;
-  char unsigned eos_crc[sizeof eos + NUM_CRC];
-
-  assert(w2w_blk->reconstructed <= sizeof w2w_blk->streamdata);
-
-  if (w2w_blk->reconstructed < sizeof intro + NUM_CRC + sizeof eos) {
-    log_fatal("%s: %s%s%s: compressed block too short\n", pname, ispec->sep,
-        ispec->fmt, ispec->sep);
-  }
-
-  (void)memcpy(w2w_blk->streamdata, intro, sizeof intro);
-
-  fb = w2w_blk->rbits_left;
-  ub = CHAR_BIT - fb;
-
-  w2w_blk->reconstructed -= sizeof eos;
-  if (0u < ub) {
-    save_bitbuf = (unsigned)w2w_blk->streamdata[w2w_blk->reconstructed] >> fb;
-  }
-
-  if (sizeof w2w_blk->streamdata - w2w_blk->reconstructed
-      < sizeof eos_crc + (size_t)(0u < ub)) {
-    log_fatal("%s: %s%s%s: compressed block too long\n", pname, ispec->sep,
-        ispec->fmt, ispec->sep);
-  }
-
-  if (0u < ub) {
-    size_t ctr;
-
-    (void)memcpy(eos_crc, eos, sizeof eos);
-    (void)memcpy(eos_crc + sizeof eos, w2w_blk->streamdata + sizeof intro,
-        NUM_CRC);
-
-    w2w_blk->streamdata[w2w_blk->reconstructed++]
-        = save_bitbuf << fb | (unsigned)eos_crc[0u] >> ub;
-    for (ctr = 1u; ctr < sizeof eos_crc; ++ctr) {
-      w2w_blk->streamdata[w2w_blk->reconstructed++]
-          = (unsigned)eos_crc[ctr - 1u] << fb | (unsigned)eos_crc[ctr] >> ub;
-    }
-    w2w_blk->streamdata[w2w_blk->reconstructed++]
-        = (unsigned)eos_crc[sizeof eos_crc - 1u] << fb;
-  }
-  else {
-    (void)memcpy(w2w_blk->streamdata + w2w_blk->reconstructed, eos,
-        sizeof eos);
-    w2w_blk->reconstructed += sizeof eos;
-    (void)memcpy(w2w_blk->streamdata + w2w_blk->reconstructed,
-        w2w_blk->streamdata + sizeof intro, NUM_CRC);
-    w2w_blk->reconstructed += NUM_CRC;
-  }
-}
-
-
-static void
 work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
     struct filespec *ispec)
 {
   int ybret;
   uint64_t decompr_blk_id;
-  YBibs_t *ibs;
-  YBdec_t *dec;
-  void *ibuf, *obuf;
-  size_t ileft, oleft;
+  void *obuf;
+  size_t oleft;
 
   decompr_blk_id = 0u;
 
-  ibs = YBibs_init();
-  dec = YBdec_init();
-
-  ibuf = w2w_blk->streamdata;
-  ileft = w2w_blk->reconstructed;
-  ybret = YBibs_retrieve(ibs, dec, ibuf, &ileft);
-  if (ybret == YB_UNDERFLOW)
-    log_fatal("%s: %s%s%s: misrecognized a bit-sequence as a block"
-        " delimiter\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-  if (ybret != YB_OK)
-    log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
-        pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
-
-  ybret = YBdec_work(dec);
+  ybret = YBdec_work(w2w_blk->ybdec);
   if (ybret != YB_OK)
     log_fatal("%s: %s%s%s: data error while decompressing block: %s\n",
         pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
@@ -644,13 +560,10 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
 
     obuf = w2m_blk->decompr;
     oleft = sizeof w2m_blk->decompr;
-    ybret = YBdec_emit(dec, obuf, &oleft);
+    ybret = YBdec_emit(w2w_blk->ybdec, obuf, &oleft);
     if (ybret == YB_OK) {
-      YBdec_join(dec);
-      ybret = YBibs_check(ibs);
-      assert(ybret == YB_OK);
     }
-    else if (ybret != YB_UNDERFLOW)
+    else if (YB_UNDERFLOW != ybret)
       log_fatal("%s: %s%s%s: data error while emitting block: %s\n",
           pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
 
@@ -693,10 +606,9 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
       xsignal(&w2m_q->av_or_ex_or_rel);
     }
     xunlock(&w2m_q->av_or_ex_or_rel);
-  } while (ybret == YB_UNDERFLOW);
+  } while (YB_UNDERFLOW == ybret);
 
-  YBdec_destroy(dec);
-  YBibs_destroy(ibs);
+  YBdec_destroy(w2w_blk->ybdec);
 }
 
 
@@ -819,7 +731,6 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
       sw2w_q->deco_head = deco->next;
       xunlock(&sw2w_q->proceed);
 
-      work_compl(deco, ispec);
       work_decompr(deco, w2m_q, ispec);
       (*freef)(deco);
 
@@ -993,7 +904,6 @@ work_get_second(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
       sw2w_q->deco_head = deco->next;
       xunlock(&sw2w_q->proceed);
 
-      work_compl(deco, ispec);
       work_decompr(deco, w2m_q, ispec);
       (*freef)(deco);
 
@@ -1042,10 +952,10 @@ work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
   uint64_t bzip2_blk_id;
 
   struct w2w_blk *w2w_blk;
-  unsigned rbitbuf;
 
   unsigned bit;
   uint64_t search;
+  int ybret;
 
 again:
   xlock_pred(&sw2w_q->proceed);
@@ -1093,7 +1003,7 @@ again:
         goto again;
       }
 
-      ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+      ibitbuf = htonl(s2w_blk->compr[ipos]);
       ibits_left = 32u;
       ipos++;
     }
@@ -1103,60 +1013,44 @@ again:
   } while (magic_hdr != search);  /* never seen magic */
 
   w2w_blk = xalloc(sizeof *w2w_blk);
-  w2w_blk->reconstructed = sizeof intro;
-  w2w_blk->rbits_left = CHAR_BIT;
-  rbitbuf = 0u;
+  w2w_blk->ybdec = YBdec_init();
 
   for (;;) {  /* first block */
     do {  /* in bzip2 */
-      if (0 == ibits_left) {
-        if (s2w_blk->loaded / 4u == ipos) {
-          if (sizeof s2w_blk->compr > s2w_blk->loaded) {
-            log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
-                " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-          }
-          assert(sizeof s2w_blk->compr == s2w_blk->loaded);
+      ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
+          s2w_blk->loaded / 4u, &ibitbuf, &ibits_left);
+      if (YB_UNDERFLOW == ybret) {
+        if (sizeof s2w_blk->compr > s2w_blk->loaded) {
+          log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
+              " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+        }
+        assert(sizeof s2w_blk->compr == s2w_blk->loaded);
 
-          s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
+        s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
 
-          if (0 == s2w_blk) {
-            log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
-                " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-          }
-
-          ipos = 0u;
-          assert(0u < s2w_blk->loaded);
-          goto in_second;
+        if (0 == s2w_blk) {
+          log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
+              " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
         }
 
-        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
-        ibits_left = 32u;
-        ipos++;
+        ipos = 0u;
+        assert(0u < s2w_blk->loaded);
+        goto in_second;
       }
-
-      bit = ibitbuf >> --ibits_left & 1u;
-      search = (search << 1 | bit) & magic_mask;
-
-      /* Push bit to bzip2 block being reconstructed. */
-      rbitbuf = rbitbuf << 1 | bit;
-      if (0u == --w2w_blk->rbits_left) {
-        if (sizeof w2w_blk->streamdata == w2w_blk->reconstructed) {
-          log_fatal("%s: %s%s%s: compressed block too long\n", pname,
-              ispec->sep, ispec->fmt, ispec->sep);
-        }
-        w2w_blk->streamdata[w2w_blk->reconstructed++] = rbitbuf;
-        w2w_blk->rbits_left = CHAR_BIT;
-      }
-
-      if (magic_hdr == search) {
+      else if (YB_OK == ybret) {
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
         w2w_blk = xalloc(sizeof *w2w_blk);
-        w2w_blk->reconstructed = sizeof intro;
-        w2w_blk->rbits_left = CHAR_BIT;
-        rbitbuf = 0u;
+        w2w_blk->ybdec = YBdec_init();
       }
-    } while (magic_eos != search);  /* in bzip2 */
+      else if (YB_DONE == ybret) {
+        break;
+      }
+      else {
+        log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
+            pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+      }
+    } while (1);  /* in bzip2 */
 
     do {  /* out bzip2 */
       if (0 == ibits_left) {
@@ -1183,7 +1077,7 @@ again:
           goto out_second;
         }
 
-        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+        ibitbuf = htonl(s2w_blk->compr[ipos]);
         ibits_left = 32u;
         ipos++;
       }
@@ -1195,43 +1089,22 @@ again:
     work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
     w2w_blk = xalloc(sizeof *w2w_blk);
-    w2w_blk->reconstructed = sizeof intro;
-    w2w_blk->rbits_left = CHAR_BIT;
-    rbitbuf = 0u;
+    w2w_blk->ybdec = YBdec_init();
   }  /* first block */
  
   for (;;) {  /* second block */
     do {  /* in bzip2 */
-      if (0 == ibits_left) {
-        if (s2w_blk->loaded / 4u == ipos) {
-          log_fatal("%s: %s%s%s: %s second input block\n",
-              sizeof s2w_blk->compr == s2w_blk->loaded ?
-              "missing bzip2 block header in full" :
-              "unterminated bzip2 block in short",
-              pname, ispec->sep, ispec->fmt, ispec->sep);
-          }
-
-      in_second:
-        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
-        ibits_left = 32u;
-        ipos++;
+    in_second:
+      ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
+          s2w_blk->loaded / 4u, &ibitbuf, &ibits_left);
+      if (YB_UNDERFLOW == ybret) {
+        log_fatal("%s: %s%s%s: %s second input block\n",
+            sizeof s2w_blk->compr == s2w_blk->loaded ?
+            "missing bzip2 block header in full" :
+            "unterminated bzip2 block in short",
+            pname, ispec->sep, ispec->fmt, ispec->sep);
       }
-
-      bit = ibitbuf >> --ibits_left & 1u;
-      search = (search << 1 | bit) & magic_mask;
-
-      /* Push bit to bzip2 block being reconstructed. */
-      rbitbuf = rbitbuf << 1 | bit;
-      if (0u == --w2w_blk->rbits_left) {
-        if (sizeof w2w_blk->streamdata == w2w_blk->reconstructed) {
-          log_fatal("%s: %s%s%s: compressed block too long\n", pname,
-              ispec->sep, ispec->fmt, ispec->sep);
-        }
-        w2w_blk->streamdata[w2w_blk->reconstructed++] = rbitbuf;
-        w2w_blk->rbits_left = CHAR_BIT;
-      }
-
-      if (magic_hdr == search) {
+      else if (YB_OK == ybret) {
         if (sizeof eos + (size_t)((ibits_left + 7u) / 8u) <= 4u * ipos) {
           xlock(&sw2w_q->proceed);
           work_release(s2w_blk, sw2w_q, w2m_q);
@@ -1242,11 +1115,16 @@ again:
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
         w2w_blk = xalloc(sizeof *w2w_blk);
-        w2w_blk->reconstructed = sizeof intro;
-        w2w_blk->rbits_left = CHAR_BIT;
-        rbitbuf = 0u;
+        w2w_blk->ybdec = YBdec_init();
       }
-    } while (magic_eos != search);  /* in bzip2 */
+      else if (YB_DONE == ybret) {
+        break;
+      }
+      else {
+        log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
+            pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+      }
+    } while (1);  /* in bzip2 */
 
     do {  /* out bzip2 */
       if (0 == ibits_left) {
@@ -1268,7 +1146,7 @@ again:
         }
 
       out_second:
-        ibitbuf = htonl(ipos[(uint32_t *)s2w_blk->compr]);
+        ibitbuf = htonl(s2w_blk->compr[ipos]);
         ibits_left = 32u;
         ipos++;
       }
@@ -1288,9 +1166,7 @@ again:
     work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
     w2w_blk = xalloc(sizeof *w2w_blk);
-    w2w_blk->reconstructed = sizeof intro;
-    w2w_blk->rbits_left = CHAR_BIT;
-    rbitbuf = 0u;
+    w2w_blk->ybdec = YBdec_init();
   }  /* second block */
 }
 

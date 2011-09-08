@@ -24,7 +24,12 @@
 #include "decode.h"
 
 
-#define Trace(x)
+#if 0
+# include <stdio.h>
+# define Trace(x) fprintf x
+#else
+# define Trace(x)
+#endif
 
 #define M1 0xFFFFFFFFu
 
@@ -195,7 +200,7 @@ YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz)
 
   if (rv == M1)
   {
-    Trace(("missing run length\n"));
+    Trace((stderr, "missing run length\n"));
     return YB_ERR_RUNLEN;
   }
 
@@ -203,7 +208,7 @@ YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz)
   {
     if (dec->rle_crc != dec->expect_crc)
     {
-      Trace(("block CRC mismatch (computed 0x%08lX, "
+      Trace((stderr, "block CRC mismatch (computed 0x%08lX, "
              "expected 0x%08lX)\n", (unsigned long)dec->rle_crc,
              (unsigned long)dec->expect_crc));
       return YB_ERR_BLKCRC;

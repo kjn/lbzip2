@@ -181,6 +181,8 @@ YBdec_work(YBdec_t *state)
 
   Int ftab[256];  /* frequency table used in counting sort */
 
+  assert(state->state == 0);
+
   /* Initialise IBWT frequency table. */
   for (s = 0; s < 256; s++)
     ftab[s] = 0;
@@ -210,7 +212,7 @@ YBdec_work(YBdec_t *state)
     /* At this point we most likely have a run of one or more bytes.
        Zero-length run is possible only at the beginning, once per block,
        so any optimizations inolving zero-length runs are pointless. */
-    if (unlikely(j + r > state->ibs->max_block_size))
+    if (unlikely(j + r > 900000))
       return YB_ERR_OVERFLOW;
     ftab[runChar] += r;
     while (r--)
@@ -223,7 +225,7 @@ YBdec_work(YBdec_t *state)
 
   /* At this point we must have an unfinished run, let's finish it. */
   assert(r > 0);
-  if (unlikely(j + r > state->ibs->max_block_size))
+  if (unlikely(j + r > 900000))
     return YB_ERR_OVERFLOW;
   ftab[runChar] += r;
   while (r--)
@@ -234,7 +236,11 @@ YBdec_work(YBdec_t *state)
 
   /* Sanity-check the BWT primary index. */
   if (state->bwt_idx >= state->block_size)
+  {
+    Trace((stderr, "primary index %u too large, should be %u max.\n",
+           (unsigned)state->bwt_idx, (unsigned)state->block_size));
     return YB_ERR_BWTIDX;
+  }
 
   /* Transform counts into indices (cumulative counts). */
   cum = 0;
