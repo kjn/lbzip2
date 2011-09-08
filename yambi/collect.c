@@ -358,11 +358,3 @@ YBenc_collect(YBenc_t *enc, const void *buf, size_t *buf_sz)
     return YB_OVERFLOW;
   return YB_OK;
 }
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

@@ -61,11 +61,3 @@ struct YBenc_s
 
 void YBpriv_block_sort(YBenc_t *s);
 Int YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf);
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

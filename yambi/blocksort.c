@@ -1224,11 +1224,3 @@ ok:
   xfree(ftab);
   xfree(ptr);
 }
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

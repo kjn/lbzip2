@@ -785,11 +785,3 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
 
   return cost;
 }
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

@@ -94,11 +94,3 @@ struct YBdec_s
   Short tt16[900050];
   Int tt[900000];
 };
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

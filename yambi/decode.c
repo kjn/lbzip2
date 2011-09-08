@@ -344,11 +344,3 @@ YBerr_detail(int code)
 
   return msg_table[-code + YB_ERR_MAGIC];
 }
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

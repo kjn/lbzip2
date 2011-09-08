@@ -222,10 +222,3 @@ YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz)
   *buf_sz = 0;
   return YB_UNDERFLOW;
 }
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

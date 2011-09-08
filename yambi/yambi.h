@@ -148,11 +148,3 @@ void YBobs_destroy(YBobs_t *obs);
 
 
 #endif /* YB_YAMBI_H */
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */

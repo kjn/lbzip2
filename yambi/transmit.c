@@ -134,11 +134,3 @@ YBenc_transmit(YBenc_t *s, void *buf)
 
   assert(p == (Byte *)buf + s->out_expect_len);
 }
-
-
-/* Local Variables: */
-/* mode: C */
-/* c-file-style: "bsd" */
-/* c-basic-offset: 2 */
-/* indent-tabs-mode: nil */
-/* End: */
