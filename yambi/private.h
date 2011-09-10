@@ -31,7 +31,7 @@ typedef uint64_t Long;
 typedef int64_t  SLong;
 
 
-/* Memoty allocation stuff, provided by lbzip2. */
+/* Memory allocation stuff, provided by lbzip2. */
 void *xalloc(size_t size);
 extern void (*freef)(void *ptr);
 #define xfree(x) ((*freef)(x))

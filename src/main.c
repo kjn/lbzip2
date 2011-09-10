@@ -431,8 +431,14 @@ void (*freef)(void *ptr);
 static void
 trace_free(void *ptr)
 {
-  log_info("%lu: free(%p)\n", (long unsigned)pid, ptr);
-  free(ptr);
+  /*
+    While it's perfectly fine to pass a null pointer to free(),
+    we don't want to see that in malloc trace.
+   */
+  if (0 != ptr) {
+    log_info("%lu: free(%p)\n", (long unsigned)pid, ptr);
+    free(ptr);
+  }
 }
 
 

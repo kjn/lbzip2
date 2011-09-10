@@ -91,6 +91,6 @@ struct YBdec_s
   Byte imtf_slide[IMTF_SLIDE_LENGTH];
 
   /* Big arrays. */
-  Short tt16[900050];
-  Int tt[900000];
+  Short *tt16;
+  Int *tt;
 };

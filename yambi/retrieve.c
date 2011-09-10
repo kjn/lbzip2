@@ -230,6 +230,8 @@ YBdec_init(void)
   dec->rle_state = 0;
   dec->rle_crc = 0xffffffff;
   dec->state = S_INIT;
+  dec->tt16 = 0;
+  dec->tt = 0;
 
   return dec;
 }
@@ -239,6 +241,8 @@ void
 YBdec_destroy(YBdec_t *dec)
 {
   assert(dec != 0);
+  xfree(dec->tt16);
+  xfree(dec->tt);
   xfree(dec);
 }
 
@@ -263,6 +267,7 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
   Int j;
 
   struct Tree *T;
+  Short *tt16;
 
   Short x; /* lookahead bits */
   int k;   /* code length */
@@ -568,9 +573,11 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
 
     j = 0;
 
-    /* Bound selectors at 18001 so they don't overflow tt16[]. */
+    /* Bound selectors at 18001 and allocate tt16[]. */
     if (dec->num_selectors > 18001)
       dec->num_selectors = 18001;
+    tt16 = xalloc(dec->num_selectors * GROUP_SIZE * sizeof(Short));
+    dec->tt16 = tt16;
 
     for (g = 0; g < dec->num_selectors; g++)
     {
@@ -626,6 +633,7 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
             i = dec->save_2;
             j = dec->save_3;
             T = &dec->tree[dec->mtf[0]];
+            tt16 = dec->tt16;
           }
           v |= (Long)peekl(in) << (32-w);
           w += 32;
@@ -718,7 +726,7 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
           return (k == 0x314159) ? YB_OK : YB_DONE;
         }
 
-        dec->tt16[j++] = s;
+        tt16[j++] = s;
       }
     }
 

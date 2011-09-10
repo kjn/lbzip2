@@ -181,6 +181,9 @@ YBdec_work(YBdec_t *state)
 
   Int ftab[256];  /* frequency table used in counting sort */
 
+  const Short *tt16;
+  Int *tt;
+
   assert(state->state == 0);
 
   /* Initialise IBWT frequency table. */
@@ -192,10 +195,13 @@ YBdec_work(YBdec_t *state)
     state->imtf_row[i] = state->imtf_slide + IMTF_SLIDE_LENGTH - 256
       + i * IMTF_ROW_WIDTH;
 
+  tt = xalloc(900000u * sizeof(Int));
+  state->tt = tt;
+  tt16 = state->tt16;
 
   for (i = 0; i < state->num_mtfv; i++)
   {
-    s = state->tt16[i];
+    s = tt16[i];
 
     /* If we decoded a RLE symbol, increase run length and keep going.
        However, we need to stop accepting RLE symbols if the run gets
@@ -222,6 +228,10 @@ YBdec_work(YBdec_t *state)
     shift = 0;
     r = 1;
   }
+
+  /* Reclaim memory occupied by tt16 as it's no longer needed. */
+  xfree(state->tt16);
+  state->tt16 = 0;
 
   /* At this point we must have an unfinished run, let's finish it. */
   assert(r > 0);
