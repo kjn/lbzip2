@@ -966,7 +966,7 @@ again:
 
   bzip2_blk_id = 0u;
   w2w_blk = 0;
-  search = 0u;
+  search = (uint64_t)-1;
 
   do {  /* never seen magic */
     if (0 == ibits_left) {
@@ -1037,6 +1037,7 @@ again:
       }
     } while (1);  /* in bzip2 */
 
+    search = (uint64_t)-1;
     do {  /* out bzip2 */
       if (0 == ibits_left) {
         if (s2w_blk->loaded / 4u == ipos) {
@@ -1111,6 +1112,7 @@ again:
       }
     } while (1);  /* in bzip2 */
 
+    search = (uint64_t)-1;
     do {  /* out bzip2 */
       if (0 == ibits_left) {
         if (s2w_blk->loaded / 4u == ipos) {
