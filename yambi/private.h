@@ -31,12 +31,6 @@ typedef uint64_t Long;
 typedef int64_t  SLong;
 
 
-/* Memory allocation stuff, provided by lbzip2. */
-void *xalloc(size_t size);
-extern void (*freef)(void *ptr);
-#define xfree(x) ((*freef)(x))
-
-
 /* These macros load (peek) or store (poke) 16 or 32-bit values from/to
    memory pointed by p.  The pointer p must be properly aligned. The casts
    to void * are only to prevent compiler warnings about unaligned access.

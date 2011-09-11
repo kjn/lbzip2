@@ -19,7 +19,9 @@
 # include <config.h>
 #endif
 
-#include <stdlib.h>  /* abort() */
+#include <stdlib.h>  /* free() */
+
+#include "xalloc.h"  /* xmalloc() */
 
 #include "decode.h"
 
@@ -226,7 +228,7 @@ YBdec_init(void)
 {
   YBdec_t *dec;
 
-  dec = xalloc(sizeof(YBdec_t));
+  dec = xmalloc(sizeof(YBdec_t));
   dec->rle_state = 0;
   dec->rle_crc = 0xffffffff;
   dec->state = S_INIT;
@@ -241,9 +243,9 @@ void
 YBdec_destroy(YBdec_t *dec)
 {
   assert(dec != 0);
-  xfree(dec->tt16);
-  xfree(dec->tt);
-  xfree(dec);
+  free(dec->tt16);
+  free(dec->tt);
+  free(dec);
 }
 
 
@@ -576,7 +578,7 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
     /* Bound selectors at 18001 and allocate tt16[]. */
     if (dec->num_selectors > 18001)
       dec->num_selectors = 18001;
-    tt16 = xalloc(dec->num_selectors * GROUP_SIZE * sizeof(Short));
+    tt16 = xmalloc(dec->num_selectors * GROUP_SIZE * sizeof(Short));
     dec->tt16 = tt16;
 
     for (g = 0; g < dec->num_selectors; g++)

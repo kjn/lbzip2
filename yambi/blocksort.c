@@ -82,8 +82,11 @@
 #endif
 
 #include <setjmp.h>     /* setjmp() */
+#include <stdlib.h>     /* free() */
 #include <string.h>     /* memcmp() */
 #include <strings.h>    /* bzero() */
+
+#include "xalloc.h"     /* xmalloc() */
 
 #include "encode.h"
 
@@ -1054,7 +1057,7 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
 
 
   nBhtab = (nblock + 2*64 + 63) / 64;
-  bhtab = xalloc(nBhtab * sizeof(Long));
+  bhtab = xmalloc(nBhtab * sizeof(Long));
   bzero(bhtab, nBhtab * sizeof(Long));
 
   /*-- set sentinel bits for block-end detection --*/
@@ -1079,7 +1082,7 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
     "exponential radix sort" (!), inspired by the
     Manber-Myers suffix array construction algorithm.
     --*/
-  eclass = xalloc(nblock * sizeof(Int));
+  eclass = xmalloc(nblock * sizeof(Int));
 
   /* This is an implementation of Bucket-Pointer Refinement algorithm
      as described in a paper "An Incomplex Algorithm for Fast Suffix
@@ -1148,8 +1151,8 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
     if (d >= nblock || nNotDone == 0) break;
   }
 
-  xfree(eclass);
-  xfree(bhtab);
+  free(eclass);
+  free(bhtab);
 }
 
 
@@ -1183,8 +1186,8 @@ YBpriv_block_sort(YBenc_t *s)
 
   /* Sort buckets.  After the sort ftab contains the first location
      of every small bucket. */
-  ptr = xalloc(nblock * sizeof(Int));
-  ftab = xalloc(65537 * sizeof(Int));
+  ptr = xmalloc(nblock * sizeof(Int));
+  ftab = xmalloc(65537 * sizeof(Int));
   bucket_sort(ptr, block, ftab, nblock);
   bzero(bigDone, 256);
 
@@ -1221,6 +1224,6 @@ YBpriv_block_sort(YBenc_t *s)
 
 ok:
   assert(s->bwt_idx < nblock);
-  xfree(ftab);
-  xfree(ptr);
+  free(ftab);
+  free(ptr);
 }

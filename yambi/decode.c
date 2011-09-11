@@ -19,7 +19,9 @@
 # include <config.h>
 #endif
 
-#include <stdlib.h>  /* abort() */
+#include <stdlib.h>  /* free() */
+
+#include "xalloc.h"  /* xmalloc() */
 
 #include "decode.h"
 
@@ -195,7 +197,7 @@ YBdec_work(YBdec_t *state)
     state->imtf_row[i] = state->imtf_slide + IMTF_SLIDE_LENGTH - 256
       + i * IMTF_ROW_WIDTH;
 
-  tt = xalloc(900000u * sizeof(Int));
+  tt = xmalloc(900000u * sizeof(Int));
   state->tt = tt;
   tt16 = state->tt16;
 
@@ -230,7 +232,7 @@ YBdec_work(YBdec_t *state)
   }
 
   /* Reclaim memory occupied by tt16 as it's no longer needed. */
-  xfree(state->tt16);
+  free(state->tt16);
   state->tt16 = 0;
 
   /* At this point we must have an unfinished run, let's finish it. */
@@ -297,7 +299,7 @@ YBdec_work(YBdec_t *state)
            state->block_size));
 
     /* Allocate a temporary array to hold the block. */
-    block = xalloc(state->block_size);
+    block = xmalloc(state->block_size);
 
     /* Copy the IBWT linked list into the termporary array. */
     j = state->rle_index;
@@ -320,7 +322,7 @@ YBdec_work(YBdec_t *state)
     state->rle_index = 0;
 
     /* Release the temoprary array. */
-    xfree(block);
+    free(block);
   }
 
   return 0;

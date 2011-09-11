@@ -22,9 +22,11 @@
 
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
+#include <stdlib.h>       /* free() */
 #include <unistd.h>       /* isatty() */
 
 #include "timespec.h"     /* gettime() */
+#include "xalloc.h"       /* xmalloc() */
 #include "yambi.h"        /* YBenc_t */
 
 #include "main.h"         /* pname */
@@ -187,7 +189,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec *ispec,
     }
     --m2s_q->num_free;
     xunlock(&m2s_q->av);
-    s2w_blk = xalloc(sizeof(struct s2w_blk) + sizeof_plain);
+    s2w_blk = xmalloc(sizeof(struct s2w_blk) + sizeof_plain);
 
     /* Fill block. */
     vacant = sizeof_plain;
@@ -196,7 +198,7 @@ split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec *ispec,
 
     if (sizeof_plain == vacant) {
       /* EOF on first read. */
-      (*freef)(s2w_blk);
+      free(s2w_blk);
       xlock(&m2s_q->av);
       ++m2s_q->num_free;
       xunlock(&m2s_q->av);
@@ -271,7 +273,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
   size_t ileft;           /* input bytes left (not yet consumed) */
   size_t sub_i;           /* current subblock index */
 
-  w2m_blk = xalloc(sizeof(struct w2m_blk));
+  w2m_blk = xmalloc(sizeof(struct w2m_blk));
 
   ibuf = (char unsigned *)(s2w_blk + 1);
   ileft = s2w_blk->loaded;
@@ -305,7 +307,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
       Now we know the exact compressed block size. Allocate the output buffer
       and transmit the block into it.
     */
-    buf = xalloc(size);
+    buf = xmalloc(size);
     YBenc_transmit(enc, buf);
 
     /* The encoder is no longer needed. Release memory. */
@@ -355,7 +357,7 @@ work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential)
     xunlock(&s2w_q->av_or_eof);
 
     work_compr(s2w_blk, w2m_q, bs100k, exponential);
-    (*freef)(s2w_blk);
+    free(s2w_blk);
   }
 
   /* Notify muxer when last worker exits. */
@@ -395,14 +397,14 @@ work_wrap(void *v_work_arg)
 static void *
 reord_alloc(size_t size, void *ignored)
 {
-  return xalloc(size);
+  return xmalloc(size);
 }
 
 
 static void
 reord_dealloc(void *ptr, void *ignored)
 {
-  (*freef)(ptr);
+  free(ptr);
 }
 
 
@@ -504,7 +506,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
         xwrite(ospec, reord_w2m_blk->subblock[sub_i].buf,
             reord_w2m_blk->subblock[sub_i].size);
 
-        (*freef)(reord_w2m_blk->subblock[sub_i].buf);
+        free(reord_w2m_blk->subblock[sub_i].buf);
         YBobs_join(obs, &reord_w2m_blk->subblock[sub_i].crc);
       } while (++sub_i < reord_w2m_blk->n_subblocks);
 
@@ -546,7 +548,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
       );
 
       /* Release "reord_w2m_blk". */
-      (*freef)(reord_w2m_blk);
+      free(reord_w2m_blk);
     } while (0 != reord);
   
     xlock_pred(&w2m_q->av_or_exit);
@@ -608,7 +610,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
 
   assert(0u < num_worker);
   assert(SIZE_MAX / sizeof *worker >= num_worker);
-  worker = xalloc(num_worker * sizeof *worker);
+  worker = xmalloc(num_worker * sizeof *worker);
   for (i = 0u; i < num_worker; ++i) {
     xcreate(&worker[i], work_wrap, &work_arg);
   }
@@ -619,7 +621,7 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   do {
     xjoin(worker[--i]);
   } while (0u < i);
-  (*freef)(worker);
+  free(worker);
 
   xjoin(splitter);
 

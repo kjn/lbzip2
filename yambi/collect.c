@@ -19,6 +19,10 @@
 # include <config.h>
 #endif
 
+#include <stdlib.h>  /* free() */
+
+#include "xalloc.h"  /* xmalloc() */
+
 #include "encode.h"
 
 
@@ -31,7 +35,7 @@
 YBobs_t *
 YBobs_init(unsigned long max_block_size, void *buf)
 {
-  YBobs_t *obs = xalloc(sizeof(YBobs_t));
+  YBobs_t *obs = xmalloc(sizeof(YBobs_t));
   Byte *p = buf;
   unsigned long bs100k = (max_block_size + 100000 - 1) / 100000;
 
@@ -48,7 +52,7 @@ YBobs_init(unsigned long max_block_size, void *buf)
 void
 YBobs_destroy(YBobs_t *obs)
 {
-  xfree(obs);
+  free(obs);
 }
 
 void
@@ -81,7 +85,7 @@ YBenc_init(unsigned long max_block_size,
            unsigned prefix_factor)
 {
   int i;
-  YBenc_t *s = xalloc(sizeof(YBenc_t));
+  YBenc_t *s = xmalloc(sizeof(YBenc_t));
 
   /* Using assertions to guard parameters is fine because the documentation
      states explictly states that passing illegal agruments causes undefined
@@ -98,12 +102,12 @@ YBenc_init(unsigned long max_block_size,
   s->shallow_factor = shallow_factor;
   s->prefix_factor = prefix_factor;
 
-  s->cmap = xalloc(256 * sizeof(Byte));
-  s->selector = xalloc((18000+1+1) * sizeof(Byte));
-  s->selectorMTF = xalloc((18000+1+7) * sizeof(Byte));
-  s->block = xalloc((max_block_size+1000) * sizeof(Byte));
+  s->cmap = xmalloc(256 * sizeof(Byte));
+  s->selector = xmalloc((18000+1+1) * sizeof(Byte));
+  s->selectorMTF = xmalloc((18000+1+7) * sizeof(Byte));
+  s->block = xmalloc((max_block_size+1000) * sizeof(Byte));
   /* +1000 because mtfv is also used to store quadrants */
-  s->mtfv = xalloc((max_block_size+1000) * sizeof(Short));
+  s->mtfv = xmalloc((max_block_size+1000) * sizeof(Short));
 
 
   for (i = 0; i < 256; i++)
@@ -118,13 +122,13 @@ YBenc_destroy(YBenc_t *enc)
 {
   assert(enc != 0);
 
-  xfree(enc->cmap);
-  xfree(enc->selector);
-  xfree(enc->selectorMTF);
-  xfree(enc->mtfv);
-  xfree(enc->block);
+  free(enc->cmap);
+  free(enc->selector);
+  free(enc->selectorMTF);
+  free(enc->mtfv);
+  free(enc->block);
 
-  xfree(enc);
+  free(enc);
 }
 
 

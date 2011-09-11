@@ -27,8 +27,9 @@ if test x"$1" = x-r; then
 fi
 
 set -x
-gnulib-tool --add-import pthread utimens warnings timespec-add timespec-sub \
-    dtotimespec stat-time lstat malloc-gnu fprintf-posix inttypes
+gnulib-tool --avoid=xalloc-die --add-import pthread utimens warnings \
+    timespec-add timespec-sub dtotimespec stat-time lstat malloc-gnu \
+    fprintf-posix inttypes xalloc
 
 aclocal -Im4
 autoconf

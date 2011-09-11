@@ -20,11 +20,13 @@
 # include <config.h>
 #endif
 
-#include <assert.h>       /* assert() */
-#include <string.h>       /* memcpy() */
-#include <signal.h>       /* SIGUSR2 */
 #include <arpa/inet.h>    /* htonl() */
+#include <assert.h>       /* assert() */
+#include <signal.h>       /* SIGUSR2 */
+#include <string.h>       /* memcpy() */
+#include <stdlib.h>       /* free() */
 
+#include "xalloc.h"       /* xmalloc() */
 #include "yambi.h"        /* YBdec_t */
 
 #include "main.h"         /* pname */
@@ -396,7 +398,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
     }
     --m2s_q->num_free;
     xunlock(&m2s_q->av);
-    s2w_blk = xalloc(sizeof *s2w_blk);
+    s2w_blk = xmalloc(sizeof *s2w_blk);
 
     /* Fill block. */
     vacant = sizeof s2w_blk->compr;
@@ -413,7 +415,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
 
     if (sizeof s2w_blk->compr == vacant) {
       /* Empty input block. */
-      (*freef)(s2w_blk);
+      free(s2w_blk);
       s2w_blk = 0;
     }
     else {
@@ -572,7 +574,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
   do {
     struct w2m_blk *w2m_blk;
 
-    w2m_blk = xalloc(sizeof *w2m_blk);
+    w2m_blk = xmalloc(sizeof *w2m_blk);
 
     obuf = w2m_blk->decompr;
     oleft = sizeof w2m_blk->decompr;
@@ -748,7 +750,7 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
       xunlock(&sw2w_q->proceed);
 
       work_decompr(deco, w2m_q, ispec);
-      (*freef)(deco);
+      free(deco);
 
       xlock_pred(&sw2w_q->proceed);
     }
@@ -892,7 +894,7 @@ work_release(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
   if (0u == --s2w_blk->refno) {
     assert(s2w_blk != sw2w_q->next_scan);
     xunlock(&sw2w_q->proceed);
-    (*freef)(s2w_blk);
+    free(s2w_blk);
     xlock(&w2m_q->av_or_ex_or_rel);
     if (0u == w2m_q->num_rel++) {
       xsignal(&w2m_q->av_or_ex_or_rel);
@@ -921,7 +923,7 @@ work_get_second(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
       xunlock(&sw2w_q->proceed);
 
       work_decompr(deco, w2m_q, ispec);
-      (*freef)(deco);
+      free(deco);
 
       xlock_pred(&sw2w_q->proceed);
     }
@@ -1028,7 +1030,7 @@ again:
     search = (search << 1 | bit) & magic_mask;
   } while (magic_hdr != search);  /* never seen magic */
 
-  w2w_blk = xalloc(sizeof *w2w_blk);
+  w2w_blk = xmalloc(sizeof *w2w_blk);
   w2w_blk->ybdec = YBdec_init();
 
   for (;;) {  /* first block */
@@ -1056,7 +1058,7 @@ again:
       else if (YB_OK == ybret) {
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
-        w2w_blk = xalloc(sizeof *w2w_blk);
+        w2w_blk = xmalloc(sizeof *w2w_blk);
         w2w_blk->ybdec = YBdec_init();
       }
       else if (YB_DONE == ybret) {
@@ -1104,7 +1106,7 @@ again:
 
     work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
-    w2w_blk = xalloc(sizeof *w2w_blk);
+    w2w_blk = xmalloc(sizeof *w2w_blk);
     w2w_blk->ybdec = YBdec_init();
   }  /* first block */
  
@@ -1130,7 +1132,7 @@ again:
 
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
-        w2w_blk = xalloc(sizeof *w2w_blk);
+        w2w_blk = xmalloc(sizeof *w2w_blk);
         w2w_blk->ybdec = YBdec_init();
       }
       else if (YB_DONE == ybret) {
@@ -1181,7 +1183,7 @@ again:
 
     work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
 
-    w2w_blk = xalloc(sizeof *w2w_blk);
+    w2w_blk = xmalloc(sizeof *w2w_blk);
     w2w_blk->ybdec = YBdec_init();
   }  /* second block */
 }
@@ -1209,14 +1211,14 @@ work_wrap(void *v_work_arg)
 static void *
 reord_alloc(size_t size, void *ignored)
 {
-  return xalloc(size);
+  return xmalloc(size);
 }
 
 
 static void
 reord_dealloc(void *ptr, void *ignored)
 {
-  (*freef)(ptr);
+  free(ptr);
 }
 
 
@@ -1269,7 +1271,7 @@ mux_write(struct lacos_rbtree_node **reord, struct w2m_blk_nid *reord_needed,
     );
 
     /* Release "reord_w2m_blk". */
-    (*freef)(reord_w2m_blk);
+    free(reord_w2m_blk);
   } while (0 != *reord);
 }
 
@@ -1390,7 +1392,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
 
   assert(0u < num_worker);
   assert(SIZE_MAX / sizeof *worker >= num_worker);
-  worker = xalloc(num_worker * sizeof *worker);
+  worker = xmalloc(num_worker * sizeof *worker);
   for (i = 0u; i < num_worker; ++i) {
     xcreate(&worker[i], work_wrap, &work_arg);
   }
@@ -1401,7 +1403,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   do {
     xjoin(worker[--i]);
   } while (0u < i);
-  (*freef)(worker);
+  free(worker);
 
   xjoin(splitter);
 

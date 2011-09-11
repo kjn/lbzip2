@@ -31,8 +31,9 @@
 #include <sys/stat.h>        /* lstat() */
 #include <fcntl.h>           /* open() */
 
-#include "utimens.h"         /* fdutimens() */
 #include "stat-time.h"       /* get_stat_atime() */
+#include "utimens.h"         /* fdutimens() */
+#include "xalloc.h"          /* xmalloc() */
 
 #include "main.h"            /* pname */
 #include "lbunzip2.h"        /* lbunzip2_wrap() */
@@ -385,64 +386,7 @@ log_fatal(const char *fmt, ...)
 }
 
 
-/* (III) Memory allocation. */
-
-static void *(*mallocf)(size_t size);
-
-
-static void *
-trace_malloc(size_t size)
-{
-  void *ret;
-  int save_errno;
-
-  assert(0u < size);
-  ret = malloc(size);
-  if (0 == ret) {
-    save_errno = errno;
-  }
-  log_info("%lu: malloc(%lu) == %p\n", (long unsigned)pid, (long unsigned)size,
-      ret);
-  if (0 == ret) {
-    errno = save_errno;
-  }
-
-  return ret;
-}
-
-
-void *
-xalloc(size_t size)
-{
-  void *ret;
-
-  ret = (*mallocf)(size);
-  if (0 == ret) {
-    log_fatal("%s: (*mallocf)(): %s\n", pname, err2str(errno));
-  }
-
-  return ret;
-}
-
-
-void (*freef)(void *ptr);
-
-
-static void
-trace_free(void *ptr)
-{
-  /*
-    While it's perfectly fine to pass a null pointer to free(),
-    we don't want to see that in malloc trace.
-   */
-  if (0 != ptr) {
-    log_info("%lu: free(%p)\n", (long unsigned)pid, ptr);
-    free(ptr);
-  }
-}
-
-
-/* (IV) Threading utilities. */
+/* (III) Threading utilities. */
 
 void
 xinit(struct cond *cond)
@@ -600,7 +544,7 @@ xraise(int sig)
 }
 
 
-/* (V) File I/O utilities. */
+/* (IV) File I/O utilities. */
 
 void
 xread(struct filespec *ispec, char unsigned *buffer, size_t *vacant)
@@ -656,10 +600,15 @@ xwrite(struct filespec *ospec, const char unsigned *buffer, size_t size)
 }
 
 
-/* Private stuff, only callable/accessible for the main thread. */
+/* Called when one of xalloc functions fails. */
+void
+xalloc_die(void)
+{
+  log_fatal("%s: xalloc: %s\n", pname, err2str(errno));
+}
 
-/* Name of environtment variable that sets allocation tracing. */
-static const char ev_trace[] = "LBZIP2_TRACE_ALLOC";
+
+/* Private stuff, only callable/accessible for the main thread. */
 
 enum outmode
 {
@@ -729,9 +678,6 @@ usage(unsigned mx_worker)
     "  BZIP2, BZIP        : Insert arguments betwen PROG and the rest of the\n"
     "                       command line. Tokens are separated by spaces and\n"
     "                       tabs; no escaping.\n"
-    "  LBZIP2_TRACE_ALLOC : If set to a non-empty value, print a memory\n"
-    "                       allocation trace to stderr. Check trace with\n"
-    "                       \"malloc_trace.pl\".\n"
     "\n"
     "Options:\n"
     "  -n WTHRS           : Set the number of (de)compressor threads to\n"
@@ -887,7 +833,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
         for (tok = strtok(ev_val, envsep); 0 != tok; tok = strtok(0, envsep)) {
           struct arg *arg;
 
-          arg = xalloc(sizeof *arg);
+          arg = xmalloc(sizeof *arg);
           arg->next = 0;
           arg->val = tok;
           *link_at = arg;
@@ -899,7 +845,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
     for (ofs = 1u; ofs < argc; ++ofs) {
       struct arg *arg;
 
-      arg = xalloc(sizeof *arg);
+      arg = xmalloc(sizeof *arg);
       arg->next = 0;
       arg->val = argv[ofs];
       *link_at = arg;
@@ -1072,7 +1018,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
                 if ('\0' == *argscan) {
                   /* Drop this argument, as it wasn't an operand. */
                   next = arg->next;
-                  (*freef)(arg);
+                  free(arg);
                   *link_at = next;
 
                   /* Move to next argument, which is an option argument. */
@@ -1099,7 +1045,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
 
         /* This wasn't an operand, drop it. */
         next = arg->next;
-        (*freef)(arg);
+        free(arg);
         *link_at = next;
       } /* argument holds options */
     } /* arguments loop */
@@ -1107,7 +1053,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
     if (AS_USAGE == args_state || AS_VERSION == args_state) {
       for (arg = *operands; 0 != arg; arg = next) {
         next = arg->next;
-        (*freef)(arg);
+        free(arg);
       }
       if (AS_USAGE == args_state)
         usage(mx_worker);
@@ -1286,7 +1232,7 @@ suffix_xform(const char *compr_pathname, char **decompr_pathname)
                 compr_pathname);
           }
           *decompr_pathname
-              = xalloc(prefix_len + suffix[ofs].decompr_len + 1u);
+              = xmalloc(prefix_len + suffix[ofs].decompr_len + 1u);
           (void)memcpy(*decompr_pathname, compr_pathname, prefix_len);
           (void)strcpy(*decompr_pathname + prefix_len, suffix[ofs].decompr);
         }
@@ -1478,7 +1424,7 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
             log_fatal("%s: \"%s\": size_t overflow in cpn_alloc\n", pname,
                 operand->val);
           }
-          tmp = xalloc(len + sizeof ".bz2");
+          tmp = xmalloc(len + sizeof ".bz2");
           (void)memcpy(tmp, operand->val, len);
           (void)strcpy(tmp + len, ".bz2");
         }
@@ -1497,7 +1443,7 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
         if (-1 == ospec->fd) {
           log_warning("%s: skipping \"%s\": open(\"%s\"): %s\n", pname,
               operand->val, tmp, err2str(errno));
-          (*freef)(tmp);
+          free(tmp);
         }
         else {
           *output_pathname = tmp;
@@ -1556,7 +1502,7 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
         err2str(errno));
   }
 
-  (*freef)(*output_pathname);
+  free(*output_pathname);
   *output_pathname = 0;
 }
 
@@ -1718,20 +1664,6 @@ main(int argc, char **argv)
   pname = strrchr(argv[0], '/');
   pname = pname ? pname + 1 : argv[0];
 
-  {
-    const char *ev_val;
-
-    ev_val = getenv(ev_trace);
-    if (0 != ev_val && '\0' != *ev_val) {
-      mallocf = trace_malloc;
-      freef = trace_free;
-    }
-    else {
-      mallocf = malloc;
-      freef = free;
-    }
-  }
-
   /*
     SIGPIPE and SIGXFSZ will be blocked in all sub-threads during the entire
     lifetime of the process. Any EPIPE or EFBIG write() condition will be
@@ -1821,7 +1753,7 @@ main(int argc, char **argv)
       struct arg *next;
 
       next = operands->next;
-      (*freef)(operands);
+      free(operands);
       operands = next;
     }
   } while (0 != operands);

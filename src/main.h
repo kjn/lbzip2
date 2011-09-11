@@ -89,22 +89,7 @@ __attribute__((format(printf, 1, 2), noreturn))
 ;
 
 
-/* (III) Memory allocation. */
-
-/* Allocate memory. If unsuccessful, call log_fatal(). */
-void *
-xalloc(size_t size);
-
-/*
-  Memory deallocation function pointer, set up by the main thread before
-  starting any threads. It may call log_info().
-*/
-extern void (*freef)(void *ptr);
-
-
-/*
-  (IV) Threading utilities. If they fail, they call log_fatal().
-*/
+/* (III) Threading utilities. If they fail, they call log_fatal(). */
 
 struct cond
 {
@@ -148,9 +133,7 @@ void
 xraise(int sig);
 
 
-/*
-  (V) File I/O utilities. If they fail, they call log_fatal().
-*/
+/* (IV) File I/O utilities. If they fail, they call log_fatal(). */
 
 /*
   The file specifier.
