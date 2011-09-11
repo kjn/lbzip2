@@ -87,9 +87,26 @@ struct w2w_blk_id
 struct w2w_blk              /* Worker to workers. */
 {
   struct w2w_blk_id id;     /* Stdin blk idx & bzip2 blk idx in former. */
-  struct w2w_blk *next;     /* Next block in list (unordered). */
   YBdec_t *ybdec;           /* Partly decompressed block. */
 };
+
+
+static int
+w2w_blk_cmp(const void *v_a, const void *v_b)
+{
+  const struct w2w_blk_id *a,
+      *b;
+
+  a = &((const struct w2w_blk *)v_a)->id;
+  b = &((const struct w2w_blk *)v_b)->id;
+
+  return
+        a->s2w_blk_id   < b->s2w_blk_id   ? -1
+      : a->s2w_blk_id   > b->s2w_blk_id   ?  1
+      : a->bzip2_blk_id < b->bzip2_blk_id ? -1
+      : a->bzip2_blk_id > b->bzip2_blk_id ?  1
+      : 0;
+}
 
 
 struct sw2w_q                /* Splitter and workers to workers queue. */
@@ -97,7 +114,7 @@ struct sw2w_q                /* Splitter and workers to workers queue. */
   struct cond proceed;       /* See below. */
   struct s2w_blk *next_scan; /* Scan this stdin block for bzip2 blocks. */
   int eof;                   /* Splitter done with producing s2w_blk's. */
-  struct w2w_blk *deco_head; /* Unordered list of bzip2 streams to decompr. */
+  struct pqueue deco_q;      /* Queue of bzip2 streams to decompress. */
   unsigned scanning;         /* # of workers currently producing w2w_blk's. */
 };
 /*
@@ -111,16 +128,16 @@ struct sw2w_q                /* Splitter and workers to workers queue. */
     stricter one (!A) does not, so spurious wakeups are rare.
 
   The proceed predicate for work_get_first():
-  !A: 0 != deco_head || 0 != next_scan || (eof && 0u == scanning)
+  !A: !empty(deco_q) || 0 != next_scan || (eof && 0u == scanning)
 
   Necessary condition so there is any worker blocking in work_get_first():
-  A: 0 == deco_head && 0 == next_scan && (!eof || 0u < scanning)
+  A: empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning)
 
   The proceed predicate for work_get_second():
-  !B: 0 != deco_head || 0 != next_scan || eof
+  !B: !empty(deco_q) || 0 != next_scan || eof
 
   Necessary condition so there is any worker blocking in work_get_second():
-  B: 0 == deco_head && 0 == next_scan && !eof
+  B: empty(deco_q) && 0 == next_scan && !eof
 
   B is stricter than A, B implies A,
   !A is stricter than !B, !A implies !B.
@@ -142,12 +159,12 @@ struct sw2w_q                /* Splitter and workers to workers queue. */
   (A && !A') || (B && !B')
 
   (
-    (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
-    && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+    (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
+    && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
   )
   || (
-    (0 == deco_head && 0 == next_scan && !eof)
-    && (0 != deco_head' || 0 != next_scan' || eof')
+    (empty(deco_q) && 0 == next_scan && !eof)
+    && (!empty(deco_q') || 0 != next_scan' || eof')
   )
 
   A spurious wakeup happens when we send the broadcast because of B && !B' (the
@@ -158,50 +175,50 @@ struct sw2w_q                /* Splitter and workers to workers queue. */
   B && !B' && !!A'
   B && !B' && A'
 
-  (0 == deco_head && 0 == next_scan && !eof)
-  && (0 != deco_head' || 0 != next_scan' || eof')
-  && (0 == deco_head' && 0 == next_scan' && (!eof' || 0u < scanning'))
+  (empty(deco_q) && 0 == next_scan && !eof)
+  && (!empty(deco_q') || 0 != next_scan' || eof')
+  && (empty(deco_q') && 0 == next_scan' && (!eof' || 0u < scanning'))
 
   from A':
 
-  0 == deco_head'
+  empty(deco_q')
   0 == next_scan'
 
-  (0 == deco_head && 0 == next_scan && !eof)
+  (empty(deco_q) && 0 == next_scan && !eof)
   && (0 || 0 || eof')
-  && (0 == deco_head' && 0 == next_scan' && (!eof' || 0u < scanning'))
+  && (empty(deco_q') && 0 == next_scan' && (!eof' || 0u < scanning'))
 
-  (0 == deco_head && 0 == next_scan && !eof)
+  (empty(deco_q) && 0 == next_scan && !eof)
   && eof'
-  && (0 == deco_head' && 0 == next_scan' && (!eof' || 0u < scanning'))
+  && (empty(deco_q') && 0 == next_scan' && (!eof' || 0u < scanning'))
 
   For this to be true, 1 == eof' must hold.
 
-  (0 == deco_head && 0 == next_scan && !eof)
+  (empty(deco_q) && 0 == next_scan && !eof)
   && eof'
-  && (0 == deco_head' && 0 == next_scan' && (0 || 0u < scanning'))
+  && (empty(deco_q') && 0 == next_scan' && (0 || 0u < scanning'))
 
-  (0 == deco_head && 0 == next_scan && !eof)
+  (empty(deco_q) && 0 == next_scan && !eof)
   && eof'
-  && (0 == deco_head' && 0 == next_scan' && (0u < scanning'))
+  && (empty(deco_q') && 0 == next_scan' && (0u < scanning'))
 
-  0 == deco_head
+  empty(deco_q)
   && 0 == next_scan
   && !eof
   && eof'
-  && 0 == deco_head'
+  && empty(deco_q')
   && 0 == next_scan'
   && 0u < scanning'
 
   This means, that before the change, there was nothing to decompress, nothing
   to scan, and we didn't reach EOF:
 
-  0 == deco_head && 0 == next_scan && !eof
+  empty(deco_q) && 0 == next_scan && !eof
 
   and furthermore, after the change, there is still nothing to decompress,
   nothing to scan, some workers are still scanning, and we reached EOF:
 
-  eof' && 0 == deco_head' && 0 == next_scan' && 0u < scanning'
+  eof' && empty(deco_q') && 0 == next_scan' && 0u < scanning'
 
   The key is the EOF transition. That happens only once in the lifetime of the
   process.
@@ -215,7 +232,7 @@ sw2w_q_init(struct sw2w_q *sw2w_q, unsigned num_worker)
   xinit(&sw2w_q->proceed);
   sw2w_q->next_scan = 0;
   sw2w_q->eof = 0;
-  sw2w_q->deco_head = 0;
+  pqueue_init(&sw2w_q->deco_q, w2w_blk_cmp);
   sw2w_q->scanning = num_worker;
 }
 
@@ -224,7 +241,7 @@ static void
 sw2w_q_uninit(struct sw2w_q *sw2w_q)
 {
   assert(0u == sw2w_q->scanning);
-  assert(0 == sw2w_q->deco_head);
+  pqueue_uninit(&sw2w_q->deco_q);
   assert(0 != sw2w_q->eof);
   assert(0 == sw2w_q->next_scan);
   xdestroy(&sw2w_q->proceed);
@@ -434,32 +451,32 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
     assert(!sw2w_q->eof);
     /*
       (
-        (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
-        && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+        (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
+        && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
       )
       || (
-        (0 == deco_head && 0 == next_scan && !eof)
-        && (0 != deco_head' || 0 != next_scan' || eof')
+        (empty(deco_q) && 0 == next_scan && !eof)
+        && (!empty(deco_q') || 0 != next_scan' || eof')
       )
 
       --> !eof
 
       (
-        (0 == deco_head && 0 == next_scan && (1 || 0u < scanning))
-        && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+        (empty(deco_q) && 0 == next_scan && (1 || 0u < scanning))
+        && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
       )
       || (
-        (0 == deco_head && 0 == next_scan && 1)
-        && (0 != deco_head' || 0 != next_scan' || eof')
+        (empty(deco_q) && 0 == next_scan && 1)
+        && (!empty(deco_q') || 0 != next_scan' || eof')
       )
 
       (
-        (0 == deco_head && 0 == next_scan)
-        && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+        (empty(deco_q) && 0 == next_scan)
+        && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
       )
       || (
-        (0 == deco_head && 0 == next_scan)
-        && (0 != deco_head' || 0 != next_scan' || eof')
+        (empty(deco_q) && 0 == next_scan)
+        && (!empty(deco_q') || 0 != next_scan' || eof')
       )
     */
     if (0 == sw2w_q->next_scan) {
@@ -470,29 +487,29 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
         --> 0 != next_scan' || eof'
 
         (
-          (0 == deco_head && 1)
-          && (0 != deco_head' || 0 != next_scan' || (1 && 0u == scanning'))
+          (empty(deco_q) && 1)
+          && (!empty(deco_q') || 0 != next_scan' || (1 && 0u == scanning'))
         )
         || (
-          (0 == deco_head && 1)
-          && (0 != deco_head' || 1)
+          (empty(deco_q) && 1)
+          && (!empty(deco_q') || 1)
         )
 
         (
-          (0 == deco_head)
-          && (0 != deco_head' || 0 != next_scan' || (0u == scanning'))
+          (empty(deco_q))
+          && (!empty(deco_q') || 0 != next_scan' || (0u == scanning'))
         )
-        || (0 == deco_head)
+        || (empty(deco_q))
 
-        (0 == deco_head)
+        (empty(deco_q))
         && (
-          (0 != deco_head' || 0 != next_scan' || (0u == scanning'))
+          (!empty(deco_q') || 0 != next_scan' || (0u == scanning'))
           || 1
         )
 
-        (0 == deco_head)
+        (empty(deco_q))
       */
-      if (0 == sw2w_q->deco_head) {
+      if (pqueue_empty(&sw2w_q->deco_q)) {
         xbroadcast(&sw2w_q->proceed);
       }
     }
@@ -501,12 +518,12 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
       --> 0 == (0 == next_scan)
 
       (
-        (0 == deco_head && 0)
-        && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+        (empty(deco_q) && 0)
+        && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
       )
       || (
-        (0 == deco_head && 0)
-        && (0 != deco_head' || 0 != next_scan' || eof')
+        (empty(deco_q) && 0)
+        && (!empty(deco_q') || 0 != next_scan' || eof')
       )
 
       0
@@ -647,58 +664,57 @@ work_oflush(struct w2w_blk **p_w2w_blk, uint64_t s2w_blk_id,
   assert(0u < sw2w_q->scanning);
   /*
     (
-      (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
-      && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+      (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
+      && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
     )
     || (
-      (0 == deco_head && 0 == next_scan && !eof)
-      && (0 != deco_head' || 0 != next_scan' || eof')
+      (empty(deco_q) && 0 == next_scan && !eof)
+      && (!empty(deco_q') || 0 != next_scan' || eof')
     )
 
     --> 1 == (0u < scanning),
     --> scanning' = scanning, 0 == (0u == scanning')
 
     (
-      (0 == deco_head && 0 == next_scan && (!eof || 1))
-      && (0 != deco_head' || 0 != next_scan' || (eof' && 0))
+      (empty(deco_q) && 0 == next_scan && (!eof || 1))
+      && (!empty(deco_q') || 0 != next_scan' || (eof' && 0))
     )
     || (
-      (0 == deco_head && 0 == next_scan && !eof)
-      && (0 != deco_head' || 0 != next_scan' || eof')
+      (empty(deco_q) && 0 == next_scan && !eof)
+      && (!empty(deco_q') || 0 != next_scan' || eof')
     )
 
     (
-      (0 == deco_head && 0 == next_scan)
-      && (0 != deco_head' || 0 != next_scan')
+      (empty(deco_q) && 0 == next_scan)
+      && (!empty(deco_q') || 0 != next_scan')
     )
     || (
-      (0 == deco_head && 0 == next_scan && !eof)
-      && (0 != deco_head' || 0 != next_scan' || eof')
+      (empty(deco_q) && 0 == next_scan && !eof)
+      && (!empty(deco_q') || 0 != next_scan' || eof')
     )
 
-    (0 == deco_head && 0 == next_scan)
+    (empty(deco_q) && 0 == next_scan)
     && (
-      (0 != deco_head' || 0 != next_scan')
-      || (!eof && (0 != deco_head' || 0 != next_scan' || eof'))
+      (!empty(deco_q') || 0 != next_scan')
+      || (!eof && (!empty(deco_q') || 0 != next_scan' || eof'))
     )
 
     --> next_scan' = next_scan
     --> eof' = eof
-    --> 1 == (0 != deco_head')
+    --> 1 == (!empty(deco_q'))
 
-    (0 == deco_head && 0 == next_scan)
+    (empty(deco_q) && 0 == next_scan)
     && (
       (1 || 0 != next_scan)
       || (!eof && (1 || 0 != next_scan || eof))
     )
 
-    0 == deco_head && 0 == next_scan
+    empty(deco_q) && 0 == next_scan
   */
-  if (0 == sw2w_q->deco_head && 0 == sw2w_q->next_scan) {
+  if (pqueue_empty(&sw2w_q->deco_q) && 0 == sw2w_q->next_scan) {
     xbroadcast(&sw2w_q->proceed);
   }
-  w2w_blk->next = sw2w_q->deco_head;
-  sw2w_q->deco_head = w2w_blk;
+  pqueue_insert(&sw2w_q->deco_q, w2w_blk);
   xunlock(&sw2w_q->proceed);
 
   *p_w2w_blk = 0;
@@ -719,34 +735,34 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
   --sw2w_q->scanning;
   for (;;) {
     /* Decompression enjoys absolute priority over scanning. */
-    if (0 != sw2w_q->deco_head) {
+    if (!pqueue_empty(&sw2w_q->deco_q)) {
       /*
         (
-          (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
-          && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+          (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
+          && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
         )
         || (
-          (0 == deco_head && 0 == next_scan && !eof)
-          && (0 != deco_head' || 0 != next_scan' || eof')
+          (empty(deco_q) && 0 == next_scan && !eof)
+          && (!empty(deco_q') || 0 != next_scan' || eof')
         )
 
-        --> 0 == (0 == deco_head)
+        --> 0 == (empty(deco_q))
 
         (
           (0 && 0 == next_scan && (!eof || 0u < scanning))
-          && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+          && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
         )
         || (
           (0 && 0 == next_scan && !eof)
-          && (0 != deco_head' || 0 != next_scan' || eof')
+          && (!empty(deco_q') || 0 != next_scan' || eof')
         )
 
         0
       */
       struct w2w_blk *deco;
 
-      deco = sw2w_q->deco_head;
-      sw2w_q->deco_head = deco->next;
+      deco = pqueue_peek(&sw2w_q->deco_q);
+      pqueue_pop(&sw2w_q->deco_q);
       xunlock(&sw2w_q->proceed);
 
       work_decompr(deco, w2m_q, ispec);
@@ -758,27 +774,27 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
       if (0 != sw2w_q->next_scan) {
         /*
           (
-            (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
+            (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
             && (
-              0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning')
+              !empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning')
             )
           )
           || (
-            (0 == deco_head && 0 == next_scan && !eof)
-            && (0 != deco_head' || 0 != next_scan' || eof')
+            (empty(deco_q) && 0 == next_scan && !eof)
+            && (!empty(deco_q') || 0 != next_scan' || eof')
           )
 
           --> 0 == (0 == next_scan)
 
           (
-            (0 == deco_head && 0 && (!eof || 0u < scanning))
+            (empty(deco_q) && 0 && (!eof || 0u < scanning))
             && (
-              0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning')
+              !empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning')
             )
           )
           || (
-            (0 == deco_head && 0 && !eof)
-            && (0 != deco_head' || 0 != next_scan' || eof')
+            (empty(deco_q) && 0 && !eof)
+            && (!empty(deco_q') || 0 != next_scan' || eof')
           )
 
           0
@@ -790,18 +806,18 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
       if (sw2w_q->eof && 0u == sw2w_q->scanning) {
         /*
           (
-            (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
+            (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
             && (
-              0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning')
+              !empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning')
             )
           )
           || (
-            (0 == deco_head && 0 == next_scan && !eof)
-            && (0 != deco_head' || 0 != next_scan' || eof')
+            (empty(deco_q) && 0 == next_scan && !eof)
+            && (!empty(deco_q') || 0 != next_scan' || eof')
           )
 
-          -->                          1 == (0 == deco_head)
-          --> deco_head' == deco_head, 0 == (0 != deco_head')
+          -->                          1 == (empty(deco_q))
+          --> deco_q' == deco_q,       0 == (!empty(deco_q'))
           -->                          1 == (0 == next_scan)
           --> next_scan' == next_scan, 0 == (0 != next_scan')
           -->              1 == eof
@@ -846,19 +862,19 @@ work_get_first(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
 
       /*
         (
-          (0 == deco_head && 0 == next_scan && (!eof || 0u < scanning))
-          && (0 != deco_head' || 0 != next_scan' || (eof' && 0u == scanning'))
+          (empty(deco_q) && 0 == next_scan && (!eof || 0u < scanning))
+          && (!empty(deco_q') || 0 != next_scan' || (eof' && 0u == scanning'))
         )
         || (
-          (0 == deco_head && 0 == next_scan && !eof)
-          && (0 != deco_head' || 0 != next_scan' || eof')
+          (empty(deco_q) && 0 == next_scan && !eof)
+          && (!empty(deco_q') || 0 != next_scan' || eof')
         )
 
-        --> 1 == (0 == deco_head)
+        --> 1 == (empty(deco_q))
         --> 1 == (0 == next_scan)
         --> 0 == (eof && 0u == scanning')
         --> eof == eof', 0 == (eof' && 0u == scanning')
-        --> deco_head == deco_head', 0 == (0 != deco_head')
+        --> deco_q == deco_q', 0 == (!empty(deco_q'))
         --> next_scan == next_scan', 0 == (0 != next_scan')
 
         (
@@ -915,11 +931,11 @@ work_get_second(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
 
   for (;;) {
     /* Decompression enjoys absolute priority over scanning. */
-    if (0 != sw2w_q->deco_head) {
+    if (!pqueue_empty(&sw2w_q->deco_q)) {
       struct w2w_blk *deco;
 
-      deco = sw2w_q->deco_head;
-      sw2w_q->deco_head = deco->next;
+      deco = pqueue_peek(&sw2w_q->deco_q);
+      pqueue_pop(&sw2w_q->deco_q);
       xunlock(&sw2w_q->proceed);
 
       work_decompr(deco, w2m_q, ispec);
