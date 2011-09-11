@@ -34,12 +34,6 @@
 #include "pqueue.h"       /* struct pqueue */
 
 
-/* Number of bytes in stream header, without block size. */
-#define NUM_SHDR ((size_t)3)
-
-/* Number of bytes in both block header and end of stream marker. */
-#define NUM_BHDR ((size_t)6)
-
 /* 48 bit mask for bzip2 block header and end of stream marker. */
 static const uint64_t
     magic_mask = (uint64_t)0xFFFFlu << 32 | (uint64_t)0xFFFFFFFFlu;
@@ -47,18 +41,6 @@ static const uint64_t
 /* 48 bit bzip2 block header. */
 static const uint64_t
     magic_hdr = (uint64_t)0x3141lu << 32 | (uint64_t)0x59265359lu;
-
-/* Bzip2 stream header, block size 9, and block header together. */
-static const char unsigned intro[NUM_SHDR + (size_t)1 + NUM_BHDR] = {
-    0x42u, 0x5Au, 0x68u,
-    0x39u,
-    0x31u, 0x41u, 0x59u, 0x26u, 0x53u, 0x59u
-};
-
-/* Bzip2 end of stream marker. */
-static const char unsigned eos[NUM_BHDR] = {
-    0x17u, 0x72u, 0x45u, 0x38u, 0x50u, 0x90u
-};
 
 /*
   We assume that there exists an upper bound on the size of any bzip2 block,
@@ -374,28 +356,6 @@ m2s_q_uninit(struct m2s_q *m2s_q, unsigned num_free)
 
 
 static void
-split_chkstart(const void *comprvp, size_t filled, struct filespec *ispec)
-{
-  const char unsigned *comprp;
-
-  comprp = comprvp;
-  if (filled >= sizeof intro && 0 == memcmp(comprp, intro, NUM_SHDR)) {
-    comprp += NUM_SHDR;
-    if (0x31u <= (unsigned)*comprp && 0x39u >= (unsigned)*comprp) {
-      ++comprp;
-      if (0 == memcmp(comprp, intro + NUM_SHDR + (size_t)1, NUM_BHDR)
-          || 0 == memcmp(comprp, eos, NUM_BHDR)) {
-        return;
-      }
-    }
-  }
-
-  log_fatal("%s: %s%s%s doesn't start like a bzip2 stream\n", pname,
-      ispec->sep, ispec->fmt, ispec->sep);
-}
-
-
-static void
 split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
 {
   struct s2w_blk *atch_scan;
@@ -420,15 +380,6 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
     /* Fill block. */
     vacant = sizeof s2w_blk->compr;
     xread(ispec, (void *)s2w_blk->compr, &vacant);
-
-    if (0u == id) {
-      /*
-        This check is necessary if we want to remove the input file, because
-        the workers, by design, aren't offended by a missing bzip2 block header
-        in a non-full first input block.
-      */
-      split_chkstart(s2w_blk->compr, sizeof s2w_blk->compr - vacant, ispec);
-    }
 
     if (sizeof s2w_blk->compr == vacant) {
       /* Empty input block. */
@@ -1139,7 +1090,7 @@ again:
             pname, ispec->sep, ispec->fmt, ispec->sep);
       }
       else if (YB_OK == ybret) {
-        if (sizeof eos + (size_t)((ibits_left + 7u) / 8u) <= 4u * ipos) {
+        if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
           xlock(&sw2w_q->proceed);
           work_release(s2w_blk, sw2w_q, w2m_q);
           work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
@@ -1190,7 +1141,7 @@ again:
 
     } while (magic_hdr != search);  /* out bzip2 */
 
-    if (sizeof eos + (size_t)((ibits_left + 7u) / 8u) <= 4u * ipos) {
+    if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
       xlock(&sw2w_q->proceed);
       work_release(s2w_blk, sw2w_q, w2m_q);
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
