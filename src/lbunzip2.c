@@ -31,7 +31,7 @@
 
 #include "main.h"         /* pname */
 #include "lbunzip2.h"     /* lbunzip2() */
-#include "lacos_rbtree.h" /* struct lacos_rbtree_node */
+#include "pqueue.h"       /* struct pqueue */
 
 
 /* Number of bytes in stream header, without block size. */
@@ -1208,85 +1208,17 @@ work_wrap(void *v_work_arg)
 }
 
 
-static void *
-reord_alloc(size_t size, void *ignored)
-{
-  return xmalloc(size);
-}
-
-
-static void
-reord_dealloc(void *ptr, void *ignored)
-{
-  free(ptr);
-}
-
-
-static void
-mux_write(struct lacos_rbtree_node **reord, struct w2m_blk_nid *reord_needed,
-    struct filespec *ospec)
-{
-  assert(0 != *reord);
-
-  /*
-    Go on until the tree becomes empty or the next sub-block is found to be
-    missing.
-  */
-  do {
-    struct lacos_rbtree_node *reord_head;
-    struct w2m_blk *reord_w2m_blk;
-
-    reord_head = lacos_rbtree_min(*reord);
-    assert(0 != reord_head);
-
-    reord_w2m_blk = *(void **)reord_head;
-    if (!w2m_blk_id_eq(&reord_w2m_blk->id, reord_needed)) {
-      break;
-    }
-
-    /* Write out "reord_w2m_blk". */
-    xwrite(ospec, reord_w2m_blk->decompr, reord_w2m_blk->produced);
-
-    if (reord_w2m_blk->id.last_decompr) {
-      if (reord_w2m_blk->id.w2w_blk_id.last_bzip2) {
-        ++reord_needed->s2w_blk_id;
-        reord_needed->bzip2_blk_id = 0u;
-      }
-      else {
-        ++reord_needed->bzip2_blk_id;
-      }
-
-      reord_needed->decompr_blk_id = 0u;
-    }
-    else {
-      ++reord_needed->decompr_blk_id;
-    }
-
-    lacos_rbtree_delete(
-        reord,         /* new_root */
-        reord_head,    /* old_node */
-        0,             /* old_data */
-        reord_dealloc, /* dealloc() */
-        0              /* alloc_ctl */
-    );
-
-    /* Release "reord_w2m_blk". */
-    free(reord_w2m_blk);
-  } while (0 != *reord);
-}
-
-
 static void
 mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec)
 {
-  struct lacos_rbtree_node *reord;
+  struct pqueue reord;
   struct w2m_blk_nid reord_needed;
   unsigned working;
 
-  reord = 0;
   reord_needed.s2w_blk_id = 0u;
   reord_needed.bzip2_blk_id = 0u;
   reord_needed.decompr_blk_id = 0u;
+  pqueue_init(&reord, w2m_blk_cmp);
 
   xlock_pred(&w2m_q->av_or_ex_or_rel);
   do {
@@ -1317,34 +1249,51 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec)
       xunlock(&m2s_q->av);
     }
 
-    if (0 != w2m_blk) {
-      /* Merge sub-blocks fetched this time into tree. */
-      do {
-        int tmp;
-        struct lacos_rbtree_node *new_node;
-        struct w2m_blk *next;
+    /* Merge sub-blocks fetched this time into priority queue. */
+    while (0 != w2m_blk) {
+      struct w2m_blk *next;
 
-        tmp = lacos_rbtree_insert(
-            &reord,      /* new_root */
-            &new_node,   /* new_node */
-            w2m_blk,     /* new_data */
-            w2m_blk_cmp, /* cmp() */
-            reord_alloc, /* alloc() */
-            0            /* alloc_ctl */
-        );
-        /*
-          w2m_blk_id triplet collision shouldn't happen, and see reord_alloc()
-          too.
-        */
-        assert(0 == tmp);
+      pqueue_insert(&reord, w2m_blk);
 
-        next = w2m_blk->next;
-        w2m_blk->next = 0;
-        w2m_blk = next;
-      } while (0 != w2m_blk);
+      next = w2m_blk->next;
+      w2m_blk->next = 0;
+      w2m_blk = next;
+    }
 
-      /* Write out initial continuous sequence of reordered sub-blocks. */
-      mux_write(&reord, &reord_needed, ospec);
+    /*
+      Write out initial continuous sequence of reordered sub-blocks. Go on
+      until the queue becomes empty or the next sub-block is found to be
+      missing.
+    */
+    while (!pqueue_empty(&reord)) {
+      struct w2m_blk *reord_w2m_blk;
+
+      reord_w2m_blk = pqueue_peek(&reord);
+      if (!w2m_blk_id_eq(&reord_w2m_blk->id, &reord_needed)) {
+        break;
+      }
+
+      /* Write out "reord_w2m_blk". */
+      xwrite(ospec, reord_w2m_blk->decompr, reord_w2m_blk->produced);
+
+      if (reord_w2m_blk->id.last_decompr) {
+        if (reord_w2m_blk->id.w2w_blk_id.last_bzip2) {
+          ++reord_needed.s2w_blk_id;
+          reord_needed.bzip2_blk_id = 0u;
+        }
+        else {
+          ++reord_needed.bzip2_blk_id;
+        }
+
+        reord_needed.decompr_blk_id = 0u;
+      }
+      else {
+        ++reord_needed.decompr_blk_id;
+      }
+
+      /* Release "reord_w2m_blk". */
+      pqueue_pop(&reord);
+      free(reord_w2m_blk);
     }
 
     if (0u == working) {
@@ -1360,7 +1309,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec)
 
   assert(0u == reord_needed.decompr_blk_id);
   assert(0u == reord_needed.bzip2_blk_id);
-  assert(0 == reord);
+  pqueue_uninit(&reord);
 }
 
 

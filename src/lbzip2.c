@@ -31,7 +31,7 @@
 
 #include "main.h"         /* pname */
 #include "lbzip2.h"       /* lbzip2() */
-#include "lacos_rbtree.h" /* struct lacos_rbtree_node */
+#include "pqueue.h"       /* struct pqueue */
 
 
 /*
@@ -394,25 +394,11 @@ work_wrap(void *v_work_arg)
 }
 
 
-static void *
-reord_alloc(size_t size, void *ignored)
-{
-  return xmalloc(size);
-}
-
-
-static void
-reord_dealloc(void *ptr, void *ignored)
-{
-  free(ptr);
-}
-
-
 static void
 mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
     struct filespec *ospec, int bs100k, int verbose)
 {
-  struct lacos_rbtree_node *reord;
+  struct pqueue reord;
   uint64_t reord_needed;
   char unsigned buffer[YB_HEADER_SIZE > YB_TRAILER_SIZE ? YB_HEADER_SIZE
       : YB_TRAILER_SIZE];
@@ -439,9 +425,9 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   obs = YBobs_init(100000 * bs100k, buffer);
   xwrite(ospec, buffer, YB_HEADER_SIZE);
 
-  reord = 0;
   reord_needed = 0u;
   uncompr_total = 0;
+  pqueue_init(&reord, w2m_blk_cmp);
 
   xlock_pred(&w2m_q->av_or_exit);
   for (;;) {
@@ -461,22 +447,11 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
     w2m_q->head = 0;
     xunlock(&w2m_q->av_or_exit);
 
-    /* Merge blocks fetched this time into tree. */
+    /* Merge blocks fetched this time into priority queue. */
     do {
-      int tmp;
-      struct lacos_rbtree_node *new_node;
       struct w2m_blk *next;
 
-      tmp = lacos_rbtree_insert(
-          &reord,      /* new_root */
-          &new_node,   /* new_node */
-          w2m_blk,     /* new_data */
-          w2m_blk_cmp, /* cmp() */
-          reord_alloc, /* alloc() */
-          0            /* alloc_ctl */
-      );
-      /* Identifier collision shouldn't happen, and see reord_alloc() too. */
-      assert(0 == tmp);
+      pqueue_insert(&reord, w2m_blk);
 
       next = w2m_blk->next;
       w2m_blk->next = 0;
@@ -485,17 +460,13 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
 
     /*
       Write out initial continuous sequence of reordered blocks. Go on until
-      the tree becomes empty or the next block is found to be missing.
+      the queue becomes empty or the next block is found to be missing.
     */
     do {
-      struct lacos_rbtree_node *reord_head;
       struct w2m_blk *reord_w2m_blk;
       size_t sub_i;
 
-      reord_head = lacos_rbtree_min(reord);
-      assert(0 != reord_head);
-
-      reord_w2m_blk = *(void **)reord_head;
+      reord_w2m_blk = pqueue_peek(&reord);
       if (reord_w2m_blk->id != reord_needed) {
         break;
       }
@@ -539,17 +510,10 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
         }
       }
 
-      lacos_rbtree_delete(
-          &reord,        /* new_root */
-          reord_head,    /* old_node */
-          0,             /* old_data */
-          reord_dealloc, /* dealloc() */
-          0              /* alloc_ctl */
-      );
-
       /* Release "reord_w2m_blk". */
+      pqueue_pop(&reord);
       free(reord_w2m_blk);
-    } while (0 != reord);
+    } while (!pqueue_empty(&reord));
   
     xlock_pred(&w2m_q->av_or_exit);
     w2m_q->needed = reord_needed;
@@ -561,8 +525,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   xwrite(ospec, buffer, YB_TRAILER_SIZE);
 
   YBobs_destroy(obs);
-
-  assert(0 == reord);
+  pqueue_uninit(&reord);
 }
 
 
