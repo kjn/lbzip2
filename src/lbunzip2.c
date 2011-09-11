@@ -20,7 +20,7 @@
 # include <config.h>
 #endif
 
-#include <arpa/inet.h>    /* htonl() */
+#include <arpa/inet.h>    /* ntohl() */
 #include <assert.h>       /* assert() */
 #include <signal.h>       /* SIGUSR2 */
 #include <string.h>       /* memcpy() */
@@ -1021,7 +1021,7 @@ again:
         goto again;
       }
 
-      ibitbuf = htonl(s2w_blk->compr[ipos]);
+      ibitbuf = ntohl(s2w_blk->compr[ipos]);
       ibits_left = 32u;
       ipos++;
     }
@@ -1095,7 +1095,7 @@ again:
           goto out_second;
         }
 
-        ibitbuf = htonl(s2w_blk->compr[ipos]);
+        ibitbuf = ntohl(s2w_blk->compr[ipos]);
         ibits_left = 32u;
         ipos++;
       }
@@ -1164,7 +1164,7 @@ again:
         }
 
       out_second:
-        ibitbuf = htonl(s2w_blk->compr[ipos]);
+        ibitbuf = ntohl(s2w_blk->compr[ipos]);
         ibits_left = 32u;
         ipos++;
       }
