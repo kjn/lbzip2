@@ -17,7 +17,7 @@
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
 AC_PREREQ([2.68])
-AC_INIT([bzimp2], [current])
+AC_INIT([lbzip2], [current])
 AC_COPYRIGHT([Copyright (C) 2011 Mikolaj Izdebski
 
 This program is free software: you can redistribute it and/or modify

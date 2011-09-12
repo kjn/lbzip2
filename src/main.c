@@ -634,7 +634,7 @@ struct opts
 static const unsigned blf = 4u;
 
 /* Names of other recognized environment variables. */
-static const char * const ev_name[] = { "BZIMP2", "LBZIP2", "BZIP2", "BZIP" };
+static const char * const ev_name[] = { "LBZIP2", "BZIP2", "BZIP" };
 
 /* Separator characters in environment variable values. No escaping. */
 static const char envsep[] = " \t";
@@ -672,10 +672,10 @@ usage(unsigned mx_worker)
     "  <otherwise>        : Compress. Forceable with \"-z\".\n"
     "\n"
     "Environment variables:\n"
-    "  BZIMP2, LBZIP2,\n");
+    "  LBZIP2, BZIP2,\n");
 
   log_info(
-    "  BZIP2, BZIP        : Insert arguments betwen PROG and the rest of the\n"
+    "  BZIP               : Insert arguments betwen PROG and the rest of the\n"
     "                       command line. Tokens are separated by spaces and\n"
     "                       tabs; no escaping.\n"
     "\n"
@@ -685,10 +685,10 @@ usage(unsigned mx_worker)
 
   log_info(
 #ifdef _SC_NPROCESSORS_ONLN
-    "                       If this option is not specified, bzimp2 queries\n"
+    "                       If this option is not specified, lbzip2 queries\n"
     "                       the system for the number of online processors.\n"
 #else
-    "                       If this option is not specified, bzimp2 exits\n"
+    "                       If this option is not specified, lbzip2 exits\n"
     "                       with an error.\n"
 #endif
     "  -k, --keep         : Don't remove FILE operands. Open regular input\n"
