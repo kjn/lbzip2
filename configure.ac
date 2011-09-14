@@ -16,23 +16,8 @@
 
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
-AC_PREREQ([2.68])
+AC_PREREQ([2.67])
 AC_INIT([lbzip2], [current])
-AC_COPYRIGHT([Copyright (C) 2011 Mikolaj Izdebski
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -43,7 +28,6 @@ AM_SILENT_RULES([yes])
 
 AC_PROG_RANLIB
 AC_PROG_CC_C89
-AC_USE_SYSTEM_EXTENSIONS
 gl_EARLY
 
 
@@ -73,25 +57,12 @@ AC_ARG_ENABLE([warnings],
   ])
 ])
 
-AC_C_CONST
-AC_C_VOLATILE
-dnl no need restrict and inline for now
-dnl AC_C_RESTRICT
-dnl AC_C_INLINE
-AC_SYS_LARGEFILE
-
 dnl Headers
 AC_HEADER_STDC
 AC_HEADER_ASSERT
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h])
 
 dnl Types
-AC_TYPE_UINT8_T
-AC_TYPE_UINT16_T
-AC_TYPE_INT32_T
-AC_TYPE_UINT32_T
-AC_TYPE_INT64_T
-AC_TYPE_UINT64_T
 AC_TYPE_PID_T
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
@@ -104,3 +75,20 @@ gl_INIT
 
 AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile])
 AC_OUTPUT
+
+
+AC_COPYRIGHT([Copyright (C) 2011 Mikolaj Izdebski
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+])
