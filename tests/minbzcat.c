@@ -86,15 +86,17 @@ void init_crc() {
 }
 
 void make_tree(int t) {
-  unsigned short u[21], i, s;
+  unsigned short u[21], i, s, a;
   for (i = 0; i <= 20; i++)
     count[i] = 0;
   for (i = 0; i < as; i++)
     count[len[t][i]]++;
-  for (s = 0, i = 0; i <= 20; i++) {
+  for (a = 1, s = 0, i = 0; i <= 20; i++) {
     u[i] = s;
+    a *= 2;
+    if (count[i] > a) bad();
+    a -= count[i];
     s += count[i];
-    if (s > (1UL << i)) bad();
   }
   for (i = 0; i < as; i++)
     sorted[u[len[t][i]]++] = i;
