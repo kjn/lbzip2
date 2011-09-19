@@ -23,7 +23,7 @@ AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([lib/config.h])
 
-AM_INIT_AUTOMAKE([1.11])
+AM_INIT_AUTOMAKE([1.11 color-tests])
 AM_SILENT_RULES([yes])
 
 AC_PROG_RANLIB
@@ -73,7 +73,8 @@ AC_CHECK_FUNCS([bzero strrchr strtol])
 
 gl_INIT
 
-AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile
+    tests/Makefile])
 AC_OUTPUT
 
 

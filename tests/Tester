@@ -1,0 +1,12 @@
+#! /bin/sh
+set -e
+PATH=.:../src:$PATH
+test -r "$1"
+r1="$1".minbzcat."$$"
+r2="$1".lbzip2."$$"
+minbzcat <"$1" >"$r1" 2>/dev/null || xbad=1
+lbzip2 -dcq <"$1" 2>/dev/null >"$r2" || bad=1
+((test "$xbad" && test "$bad") || (test ! "$xbad" && test ! "$bad" &&
+    cmp "$r1" "$r2" 2>/dev/null)) || rc=1
+rm -f "$r1" "$r2"
+exit $rc

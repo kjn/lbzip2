@@ -22,7 +22,7 @@ set -e
 if test x"$1" = x-r; then
   rm -Rf lib m4 build-aux autom4te.cache
   rm -f configure aclocal.m4 INSTALL
-  for dir in . src yambi; do rm -f $dir/Makefile.in; done
+  for dir in . src yambi tests; do rm -f $dir/Makefile.in; done
   exit
 fi
 
