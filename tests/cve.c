@@ -43,7 +43,7 @@ main() {
   run((AMT/2+0x80000000) & 0xffffffff);
   /* now: lit={0,0} ftab={-BIG,0} */
   pb(2); /* 1 */
-  /* now: lit={0,1} ftab={-BIG,1}
+  /* now: lit={0,1} ftab={-BIG,1} */
   pb(2); /* 0 */
   /* now: lit={1,1} ftab={-BIG+1,1} */
   run((AMT/2+0x80000000) & 0xffffffff);
@@ -53,7 +53,7 @@ main() {
   run(AMT);
   /* now: lit={1,AMT+2} ftab={AMT+1,AMT+2} */
   pb(2); /* 0 */
-  /* now: lit={2,AMT+2} ftab={AMT+2,AMT+2}
+  /* now: lit={2,AMT+2} ftab={AMT+2,AMT+2} */
   pb(2); /* 1 */
   /* now: lit={2,AMT+3} ftab={AMT+2,AMT+3} */
   run(-AMT & 0xffffffff);
