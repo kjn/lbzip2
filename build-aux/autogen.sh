@@ -30,10 +30,14 @@ if test x"$1" = x-r; then
       do rm -f build-aux/$f; done
   rm -f configure aclocal.m4 INSTALL
   for dir in . src yambi tests; do rm -f $dir/Makefile.in; done
+  rm -f yambi/crctab.c
   exit
 fi
 
 set -x
+
+perl ./build-aux/make-crctab.pl
+
 gnulib-tool --avoid=xalloc-die --add-import pthread utimens warnings \
     timespec-add timespec-sub dtotimespec stat-time lstat malloc-gnu \
     fprintf-posix inttypes xalloc realloc-gnu largefile
