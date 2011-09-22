@@ -42,7 +42,7 @@
    derandomizing randomized blocks.  These numbers are strictly related
    to the bzip2 file format and they are not subject to change.
 */
-static const Short rand_table[512] = { 
+static const Short rand_table[512] = {
   619,720,127,481,931,816,813,233,566,247,985,724,205,454,863,491,
   741,242,949,214,733,859,335,708,621,574, 73,654,730,472,419,436,
   278,496,867,210,399,680,480, 51,878,465,811,169,869,675,611,697,

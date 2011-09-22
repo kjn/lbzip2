@@ -80,7 +80,7 @@ int YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p,
 
 
 /* Decode the block.  If everything goes OK, return YB_OK.
-   Any other return value indicated a decode error·
+   Any other return value indicated a decode error.
 */
 int YBdec_work(YBdec_t *d);
 
@@ -110,9 +110,6 @@ void YBdec_destroy(YBdec_t *dec);
    of the error code.
 */
 const char *YBerr_detail(int code);
-
-
-
 
 
 YBobs_t *YBobs_init(unsigned long max_block_size, void *buf);

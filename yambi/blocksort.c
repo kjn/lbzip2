@@ -273,7 +273,6 @@ bucket_sort(
 #undef SINGLE_BUCKET_SORT_PASS
 
 
-
 /*=========================================================================
   (III) THE MAIN SORTING ALGORITHM
   ========================================================================= */
@@ -438,7 +437,6 @@ med5(
 
 #undef CAS
 #undef PHI
-
 
 
 #define BZ_N_RADIX 2

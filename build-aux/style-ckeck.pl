@@ -46,19 +46,22 @@ sub msg { print "$f: @_\n"; ++$cnt }
 for $f (@ARGV) {
   open F, $f or msg "file doesn't exist" and next;
   undef $/; $_=<F>;
+  ++$nf;
 
   # ASCII chars, whitespaces, line length.
   /([^\x20-\x7e\n])/ and msg "contains prohibited chars";
   /[^\n]\n$/ or msg "doesn't end with a single NL";
-  / \n/ and msg "has trailing whitespace at NL";
+  / \n/ and msg "has trailing whitespace before NL";
   /\n{4}/ and msg "has more than 2 consec blank lines";
   /\n[^\n]{80}/ and msg "has line longer than 79 chars";
 
   # C specific stuff.
   m{^/\*-([^*]|\*[^/])*Copyright([^*]|\*[^/])*\*/}
       or msg "has missing copyright block";
-  $f =~ /\.h$/ or /\n *# *include *<config\.h>\n/
-      or msg "doesn't #include <config.h>";
+  $f =~ /\.h$/ xor /\n *# *include *<config\.h>\n/
+      or msg "missing or excessive #include <config.h>";
 }
 
-print $cnt ? "Total number of warnings: $cnt\n" : "No warnings\n";
+$nf='No' if !$nf;
+$cnt='no' if !$cnt;
+print "$nf file(s) checked, $cnt warning(s).\n";

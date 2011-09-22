@@ -514,7 +514,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
       pqueue_pop(&reord);
       free(reord_w2m_blk);
     } while (!pqueue_empty(&reord));
-  
+
     xlock_pred(&w2m_q->av_or_exit);
     w2m_q->needed = reord_needed;
   }

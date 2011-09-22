@@ -1077,7 +1077,7 @@ again:
     w2w_blk = xmalloc(sizeof *w2w_blk);
     w2w_blk->ybdec = YBdec_init();
   }  /* first block */
- 
+
   for (;;) {  /* second block */
     do {  /* in bzip2 */
     in_second:

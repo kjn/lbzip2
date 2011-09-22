@@ -1,18 +1,23 @@
-/* minbzcat - minimalistic bzcat
-   Copyright (C) 2011 Mikolaj Izdebski
+/*-
+  minbzcat - minimalistic bzcat
+  Copyright (C) 2011 Mikolaj Izdebski
 
-   Permission to use, copy, modify, and/or distribute this software for any
-   purpose with or without fee is hereby granted, provided that the above
-   copyright notice and this permission notice appear in all copies.
+  Permission to use, copy, modify, and/or distribute this software for any
+  purpose with or without fee is hereby granted, provided that the above
+  copyright notice and this permission notice appear in all copies.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+*/
 
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -22,7 +27,7 @@ unsigned long crc, mbs, rnd, bs, idx, as, nt, ns, nm;
 unsigned char blk[900000], len[6][259], sel[32767], mtf[256];
 unsigned short count[21], sorted[258], mv[900050];
 
-unsigned short tab[512] = { 
+unsigned short tab[512] = {
   619,720,127,481,931,816,813,233,566,247,985,724,205,454,863,491,
   741,242,949,214,733,859,335,708,621,574, 73,654,730,472,419,436,
   278,496,867,210,399,680,480, 51,878,465,811,169,869,675,611,697,
@@ -257,7 +262,7 @@ void emit() {
     write(c);
     if (c != d)
       r = 1;
-    else { 
+    else {
       r++;
       if (r >= 4) {
         unsigned j;

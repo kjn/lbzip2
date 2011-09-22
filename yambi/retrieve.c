@@ -199,7 +199,6 @@ make_tree(YBdec_t *dec,   /* where to store created tables */
 }
 
 
-
 #define GET(vv,nn)                              \
   do                                            \
   {                                             \
@@ -220,7 +219,6 @@ make_tree(YBdec_t *dec,   /* where to store created tables */
 #define S_DELTA_TAG    6
 #define S_PREFIX       7
 #define S_TRAILER      8
-
 
 
 YBdec_t *
