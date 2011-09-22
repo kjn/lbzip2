@@ -966,7 +966,7 @@ again:
 
   bzip2_blk_id = 0u;
   w2w_blk = 0;
-  search = (uint64_t)-1;
+  search = -1;
 
   do {  /* never seen magic */
     if (0 == ibits_left) {
@@ -1084,11 +1084,10 @@ again:
       ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
           s2w_blk->loaded / 4u, &ibitbuf, &ibits_left);
       if (YB_UNDERFLOW == ybret) {
-        log_fatal("%s: %s%s%s: %s second input block\n",
-            sizeof s2w_blk->compr == s2w_blk->loaded ?
+        log_fatal("%s: %s%s%s: %s second input block\n", pname, ispec->sep,
+            ispec->fmt, ispec->sep, sizeof s2w_blk->compr == s2w_blk->loaded ?
             "missing bzip2 block header in full" :
-            "unterminated bzip2 block in short",
-            pname, ispec->sep, ispec->fmt, ispec->sep);
+            "unterminated bzip2 block in short");
       }
       else if (YB_OK == ybret) {
         if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
