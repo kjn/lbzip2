@@ -35,7 +35,7 @@ NEWS for lbzip2                                                 -*- outline -*-
    lbzip2 is now licensed under the terms of GPL v3.0 or any later version.
    Former versions used to be released under GPL v2+.
 
-   lbzip2 doesn't depend on libbz2 anylonger.  Now it uses its own
+   lbzip2 doesn't depend on libbz2 any longer.  Now it uses its own
    implementation of bzip2 compression and decompression algorithms.
 
    Now lbzip2's build process is managed by the GNU build system.
