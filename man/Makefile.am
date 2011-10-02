@@ -15,5 +15,4 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = yambi lib src man tests
-ACLOCAL_AMFLAGS = -Im4
+man_MANS = lbzip2.1

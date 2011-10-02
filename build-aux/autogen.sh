@@ -31,7 +31,7 @@ if test x"$1" = x-r; then
   for f in config.guess config.sub depcomp install-sh missing
       do rm -f build-aux/$f; done
   rm -f configure aclocal.m4 INSTALL
-  for dir in . src yambi tests; do rm -f $dir/Makefile.in; done
+  for dir in . src yambi man tests; do rm -f $dir/Makefile.in; done
   rm -f yambi/crctab.c
   exit
 fi

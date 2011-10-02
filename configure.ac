@@ -74,7 +74,7 @@ AC_CHECK_FUNCS([bzero strrchr strtol])
 gl_INIT
 
 AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile
-    tests/Makefile])
+    man/Makefile tests/Makefile])
 AC_OUTPUT
 
 
