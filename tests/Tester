@@ -1,6 +1,11 @@
 #! /bin/sh
 set -e
-PATH=.:../src:$PATH
+PATH=.:../src:"$PATH"
+unset LBZIP2
+unset BZIP2
+unset BZIP
+unset rc
+
 test -r "$1"
 r1="$1".minbzcat."$$"
 r2="$1".lbzip2."$$"
