@@ -50,7 +50,7 @@ static const uint64_t
 
 struct s2w_blk                   /* Splitter to workers. */
 {
-  uint64_t id;                   /* Block serial number as read from stdin. */
+  uintmax_t id;                  /* Block serial number as read from stdin. */
   struct s2w_blk *next;          /* First part of next block belongs to us. */
   unsigned refno;                /* Threads not yet done with this block. */
   size_t loaded;                 /* Number of bytes in compr. */
@@ -60,9 +60,9 @@ struct s2w_blk                   /* Splitter to workers. */
 
 struct w2w_blk_id
 {
-  uint64_t s2w_blk_id, /* Stdin block index. */
-      bzip2_blk_id;    /* Bzip2 block index within stdin block. */
-  int last_bzip2;      /* Last bzip2 for stdin block. */
+  uintmax_t s2w_blk_id,     /* Stdin block index. */
+      bzip2_blk_id;         /* Bzip2 block index within stdin block. */
+  int last_bzip2;           /* Last bzip2 for stdin block. */
 };
 
 
@@ -233,16 +233,16 @@ sw2w_q_uninit(struct sw2w_q *sw2w_q)
 struct w2m_blk_id
 {
   struct w2w_blk_id w2w_blk_id; /* Stdin blk idx & bzip2 blk idx in former. */
-  uint64_t decompr_blk_id;      /* Decompressed block for bzip2 block. */
+  uintmax_t decompr_blk_id;     /* Decompressed block for bzip2 block. */
   int last_decompr;             /* Last decompressed for bzip2 block. */
 };
 
 
-struct w2m_blk_nid     /* Block needed for resuming writing. */
+struct w2m_blk_nid      /* Block needed for resuming writing. */
 {
-  uint64_t s2w_blk_id, /* Stdin block index. */
-      bzip2_blk_id,    /* Bzip2 block index within stdin block. */
-      decompr_blk_id;  /* Decompressed block for bzip2 block. */
+  uintmax_t s2w_blk_id, /* Stdin block index. */
+      bzip2_blk_id,     /* Bzip2 block index within stdin block. */
+      decompr_blk_id;   /* Decompressed block for bzip2 block. */
 };
 
 
@@ -359,7 +359,7 @@ static void
 split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
 {
   struct s2w_blk *atch_scan;
-  uint64_t id;
+  uintmax_t id;
   size_t vacant;
 
   atch_scan = 0;
@@ -528,7 +528,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
     struct filespec *ispec)
 {
   int ybret;
-  uint64_t decompr_blk_id;
+  uintmax_t decompr_blk_id;
   void *obuf;
   size_t oleft;
 
@@ -599,8 +599,8 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
 
 
 static void
-work_oflush(struct w2w_blk **p_w2w_blk, uint64_t s2w_blk_id,
-    uint64_t *bzip2_blk_id, int last_bzip2, struct sw2w_q *sw2w_q)
+work_oflush(struct w2w_blk **p_w2w_blk, uintmax_t s2w_blk_id,
+    uintmax_t *bzip2_blk_id, int last_bzip2, struct sw2w_q *sw2w_q)
 {
   struct w2w_blk *w2w_blk;
 
@@ -929,12 +929,12 @@ static void
 work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
 {
   struct s2w_blk *s2w_blk;
-  uint64_t first_s2w_blk_id;
+  uintmax_t first_s2w_blk_id;
   unsigned ibitbuf,
       ibits_left;
   size_t ipos;
 
-  uint64_t bzip2_blk_id;
+  uintmax_t bzip2_blk_id;
 
   struct w2w_blk *w2w_blk;
 
@@ -1037,7 +1037,7 @@ again:
       }
     } while (1);  /* in bzip2 */
 
-    search = (uint64_t)-1;
+    search = -1;
     do {  /* out bzip2 */
       if (0 == ibits_left) {
         if (s2w_blk->loaded / 4u == ipos) {
@@ -1111,7 +1111,7 @@ again:
       }
     } while (1);  /* in bzip2 */
 
-    search = (uint64_t)-1;
+    search = -1;
     do {  /* out bzip2 */
       if (0 == ibits_left) {
         if (s2w_blk->loaded / 4u == ipos) {

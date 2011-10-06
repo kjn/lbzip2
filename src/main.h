@@ -22,7 +22,7 @@
 #  include <limits.h>    /* CHAR_BIT */
 #  include <stddef.h>    /* size_t */
 #  include <pthread.h>   /* pthread_mutex_t */
-#  include <inttypes.h>  /* uint64_t */
+#  include <inttypes.h>  /* intmax_t */
 #  include <sys/types.h> /* off_t */
 
 #  if 8 != CHAR_BIT
@@ -148,7 +148,7 @@ struct filespec
   int fd;           /* the file descriptor; may be -1 if discarding output */
   const char *sep,  /* name separator; either "" or "\"" */
       *fmt;         /* either file name or a special name, like stdin */
-  uint64_t total;   /* total number of bytes transfered from/to this file */
+  uintmax_t total;  /* total number of bytes transfered from/to this file */
   off_t size;       /* file size or 0 if unknown */
 };
 

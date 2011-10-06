@@ -49,7 +49,7 @@
 
 struct s2w_blk            /* Splitter to workers. */
 {
-  uint64_t id;            /* Block serial number as read from infd. */
+  uintmax_t id;           /* Block serial number as read from infd. */
   struct s2w_blk *next;   /* Next in queue. */
   size_t loaded;          /* # of bytes in plain, may be 0 for 1st. */
 #if 0
@@ -89,7 +89,7 @@ s2w_q_uninit(struct s2w_q *s2w_q)
 
 struct w2m_blk            /* Workers to muxer. */
 {
-  uint64_t id;            /* Block index as read from infd. */
+  uintmax_t id;           /* Block index as read from infd. */
   size_t uncompr_size;    /* Plain (uncompressed) data size. */
   struct w2m_blk *next;   /* Next block in list (unordered). */
   size_t n_subblocks;
@@ -104,7 +104,7 @@ struct w2m_blk            /* Workers to muxer. */
 static int
 w2m_blk_cmp(const void *v_a, const void *v_b)
 {
-  uint64_t a,
+  uintmax_t a,
       b;
 
   a = ((const struct w2m_blk *)v_a)->id;
@@ -120,7 +120,7 @@ w2m_blk_cmp(const void *v_a, const void *v_b)
 struct w2m_q
 {
   struct cond av_or_exit; /* New block available or all workers exited. */
-  uint64_t needed;        /* Block needed for resuming writing. */
+  uintmax_t needed;       /* Block needed for resuming writing. */
   struct w2m_blk *head;   /* Block list (unordered). */
   unsigned working;       /* Number of workers still running. */
 };
@@ -174,7 +174,7 @@ static void
 split(struct m2s_q *m2s_q, struct s2w_q *s2w_q, struct filespec *ispec,
     const size_t sizeof_plain)
 {
-  uint64_t id;
+  uintmax_t id;
   int eof;
 
   id = 0u;
@@ -399,7 +399,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
     struct filespec *ospec, int bs100k, int verbose)
 {
   struct pqueue reord;
-  uint64_t reord_needed;
+  uintmax_t reord_needed;
   char unsigned buffer[YB_HEADER_SIZE > YB_TRAILER_SIZE ? YB_HEADER_SIZE
       : YB_TRAILER_SIZE];
   YBobs_t *obs;

@@ -1689,14 +1689,14 @@ main(int argc, char **argv)
             if the user desires so.
           */
           if (opts.verbose && 0u < ispec.total && 0u < ospec.total) {
-            uint64_t plain_size,
+            uintmax_t plain_size,
                 compr_size;
             double ratio,
                 savings,
                 ratio_magnitude;
 
             /*
-              Do the math. Note that converting from uint64_t to double
+              Do the math. Note that converting from uintmax_t to double
               *may* result in precission loss, but that shouldn't matter.
             */
             plain_size = !opts.decompress ? ispec.total : ospec.total;
