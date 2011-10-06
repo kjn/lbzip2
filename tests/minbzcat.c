@@ -15,19 +15,142 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+/* `minbzcat' reads compressed data in bzip2 format, decompresses it and
+   writes the result to stdout. Any command-line options are ignored.
+
+   This program is written for readability, not performance -- simpler but
+   slower algorithms were chosen deliberately.
+
+   This code targets ANSI C systems, but it was tested only very rougly.
+*/
+
+/* The bzip2 compression stack basicly consists of 3 passes:
+
+   1. RLE - the initial run-length encoding
+   2. RT - the Reversible Transformaton, it consists of 3 sub-transformations:
+       a) BWT - Burrows-Wheeler transformation
+       b) MTF - Move-To-Front transformation
+       c) ZRLE - Zero Run-Length Encoding
+   3. entropy coding - prefix coding (aka Huffman coding)
+
+   The initial RLE used to protect sorting algorithms from the worst case
+   behavior, but with introduction of better sorting algorithms it became
+   obsolete. It is kept only for compatibility with older bzip2 versions.
+
+   The Reversible Transformation was invented and descrbed by Burrows and
+   Wheeler in their src124 paper. It takes advantage of the strcture of
+   typical data formats (like text files) to reduce data entropy so it can be
+   compressed more easily by the last pass -- the entropy coding.
+
+   The entropy coding is a traditional mathod of reducing data redundancy.
+   Smbols are divided into groups of max. 50 symbols each. Each group is coded
+   by possibly different coding tree.
+
+   `Retrieving a block' means parsing the internal bit-stream and decoding
+   prefix codes. `Decding a block' means undoing the RT. Finally, `emitting
+   a block' means undoing the initial RLE.
+
+   Bits --(retrieve)--> MTF values --(decode)--> Characters --(emit)--> Bytes
+*/
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
-#include <stdio.h>
-#include <stdlib.h>
 
-int bb, bk;
-unsigned long crctab[256], tt[900000];
-unsigned long crc, mbs, rnd, bs, idx, as, nt, ns, nm;
-unsigned char blk[900000], len[6][259], sel[32767], mtf[256];
-unsigned short count[21], sorted[258], mv[900050];
+/* This code can be easily embedded, just #define EMBEDDED, provide your own
+   read(), write() and bad() functions. Call expand() to perform decompression.
+   Note that this code is NOT meant to be reentrant -- it uses globals to store
+   decompression state. */
+#ifdef EMBEDDED
 
-unsigned short tab[512] = {
+/* Input a single byte. Return -1 on EOF. It shall not return unless a byte is
+   successfully read or EOF is reached, ie. this function does it's own I/O
+   error handling. */
+int read(void);
+
+/* Output a single byte. Like read(), it shall not return unless the byte is
+   written -- it does its own I/O error handling. */
+void write(int c);
+
+/* Called when compressed data format inconsistency is detected. It shall not
+   return (if it does, behavior is undefined). */
+void bad(void);
+
+#else /* !EMBEDDED */
+
+#include <stdio.h>   /* getchar() */
+#include <stdlib.h>  /* exit() */
+
+static void expand(void);
+
+static void err(const char *msg) {
+  fprintf(stderr, "minbzcat: ");
+  if (msg) perror(msg);
+  exit(EXIT_FAILURE);
+}
+
+/* Read a single byte from stdin. */
+static int read(void) {
+  int c;
+  if ((c = getchar()) != EOF) return c;
+  if (!feof(stdin)) err("getchar()");
+  return -1;
+}
+
+/* Write a single byte to stdout. */
+static void write(int c) {
+  if (putchar(c) == EOF)
+    err("putchar()");
+}
+
+/* Print an error message and terminate. */
+static void bad(void) {
+  fprintf(stderr, "minbzcat: data error in bz2 file\n");
+  exit(EXIT_FAILURE);
+}
+
+int main(void) {
+  expand();
+  if (fclose(stdin) == EOF) err("fclose(stdin)");
+  if (fclose(stdout) == EOF) err("fclose(stdout)");
+  return EXIT_SUCCESS;
+}
+
+#endif /* EMBEDDED */
+
+
+static int bb;  /* the bit-buffer (static, right-aligned) */
+static int bk;  /* number of bits remaining in the `bb' bit-buffer */
+
+static unsigned long crctab[256];  /* table for fast CRC32 computation */
+static unsigned long tt[900000];   /* IBWT linked cyclic list */
+
+static unsigned long crc;  /* CRC32 computed so far */
+static unsigned long mbs;  /* maximal block size (100k-900k in 100k steps) */
+static int rnd;            /* is current block randomized? (0 or 1) */
+static unsigned long bs;   /* current block size (1-900000) */
+static unsigned long idx;  /* BWT primary index (0-899999) */
+static unsigned short as;  /* alphabet size (number of distinct prefix codes,
+                              3-258) */
+static unsigned short nt;  /* number of prefix trees used for current block
+                              (2-6) */
+static unsigned short ns;  /* number of selectors (1-32767) */
+static unsigned long nm;   /* number of MTF values */
+
+static unsigned char blk[900000];   /* reconstructed block */
+static unsigned char len[6][259];   /* code lengths for different trees
+                                       (element 258 is a sentinel) */
+static unsigned char sel[32767];    /* selector MTF values */
+static unsigned char mtf[256];      /* IMTF register */
+static unsigned short count[21];    /* number of codes of given length
+                                       (element 0 is a sentinel) */
+static unsigned short sorted[258];  /* symbols sorted by ascend. code length */
+static unsigned short mv[900050];   /* MTF values (elements 900000-900049
+                                       are sentinels) */
+
+/* A table used for derandomizing randomized blocks. It's a sequence
+   of pseudo-random numbers, hardcoded in bzip2 file format. */
+static const unsigned short tab[512] = {
   619,720,127,481,931,816,813,233,566,247,985,724,205,454,863,491,
   741,242,949,214,733,859,335,708,621,574, 73,654,730,472,419,436,
   278,496,867,210,399,680,480, 51,878,465,811,169,869,675,611,697,
@@ -62,25 +185,19 @@ unsigned short tab[512] = {
   203, 50,668,108,645,990,626,197,510,357,358,850,858,364,936,638,
 };
 
-void bad() {
-  fprintf(stderr, "bad bz2 file\n");
-  exit(EXIT_FAILURE);
-}
 
-unsigned long get(int n) {
+/* Read and return `n' bits from the input stream. `n' must be <= 32. */
+static unsigned long get(int n) {
   unsigned long x = 0;
   while (n--) {
-    if (!bk-- && (bb = getchar()) == EOF) {
-      if (ferror(stdin)) perror("read");
-      else fprintf(stderr, "unexpected eof\n");
-      exit(EXIT_FAILURE);
-    }
+    if (!bk-- && (bb = read()) < 0) bad();
     x = 2*x + ((bb >> (bk &= 7)) & 1);
   }
   return x;
 }
 
-void init_crc() {
+/* Initialize crctab[]. */
+static void init_crc(void) {
   int i, k;
   for (i = 0; i < 256; i++) {
     crctab[i] = (unsigned long)i << 24;
@@ -90,7 +207,9 @@ void init_crc() {
   }
 }
 
-void make_tree(int t) {
+/* Create decode tables using code lengths from `lens[t]'.
+   `t' is the tree selector, must be in range [0,nt). */
+static void make_tree(int t) {
   unsigned short u[21], i, s, a;
   for (i = 0; i <= 20; i++)
     count[i] = 0;
@@ -107,7 +226,8 @@ void make_tree(int t) {
     sorted[u[len[t][i]]++] = i;
 }
 
-unsigned get_sym() {
+/* Decode a single prefix code. The algoritm used is naive and slow. */
+static unsigned get_sym(void) {
   int s = 0, x = 0, k = 0;
   do {
     if (k == 20) bad();
@@ -117,7 +237,8 @@ unsigned get_sym() {
   return sorted[s + x];
 }
 
-void bmp() {
+/* Retrieve bitmap. */
+static void bmp(void) {
   unsigned i, j;
   unsigned short b = get(16);
   as = 0;
@@ -135,7 +256,8 @@ void bmp() {
   as += 2;
 }
 
-void smtf() {
+/* Retrieve selector MTF values. */
+static void smtf(void) {
   unsigned g;
   for (g = 0; g < ns; g++) {
     sel[g] = 0;
@@ -147,7 +269,8 @@ void smtf() {
     ns = 18001;
 }
 
-void trees() {
+/* Retrieve code lengths. */
+static void trees(void) {
   unsigned t,s;
   for (t = 0; t < nt; t++) {
     len[t][0] = get(5);
@@ -163,7 +286,8 @@ void trees() {
   }
 }
 
-void data() {
+/* Retrieve block MTF values. */
+static void data(void) {
   unsigned g,i,t;
   unsigned m[6];
   for (i = 0; i < 6; i++)
@@ -183,7 +307,8 @@ void data() {
   bad();
 }
 
-void retr() {
+/* Retrieve block. */
+static void retr(void) {
   rnd = get(1);
   idx = get(24);
   bmp();
@@ -195,7 +320,8 @@ void retr() {
   data();
 }
 
-void imtf() {
+/* Apply IMTF transformation. */
+static void imtf(void) {
   unsigned i,s,t,r,h;
   bs = r = h = 0;
   for (i = 0; i < nm; i++) {
@@ -207,7 +333,7 @@ void imtf() {
       if (bs+r > mbs) bad();
       while (r--)
         tt[bs++] = mtf[0];
-      if (s == as-1)
+      if (s+1 == as)
         break;
       t = mtf[--s];
       while (s-- > 0)
@@ -219,7 +345,8 @@ void imtf() {
   }
 }
 
-void ibwt() {
+/* Apply IBWT transformation. */
+static void ibwt(void) {
   unsigned long i, c, f[256];
   if (idx >= bs) bad();
   for (i = 0; i < 256; i++)
@@ -237,7 +364,8 @@ void ibwt() {
   }
 }
 
-void derand() {
+/* Derandomize block if it's randomized. */
+static void derand(void) {
   unsigned long i = 0, j = 617;
   while (rnd && j < bs) {
     blk[j] ^= 1;
@@ -246,19 +374,15 @@ void derand() {
   }
 }
 
-void write(int c) {
-  crc = ((crc << 8) & 0xFFFFFFFF) ^ crctab[(crc >> 24) ^ c];
-  if (putchar(c) == EOF)
-    perror("write"), exit(EXIT_FAILURE);
-}
-
-void emit() {
+/* Emit block. RLE is undone here. */
+static void emit(void) {
   unsigned long i, r, c, d;
   r = 0;
   c = -1;
   for (i = 0; i < bs; i++) {
     d = c;
     c = blk[i];
+    crc = ((crc << 8) & 0xFFFFFFFF) ^ crctab[(crc >> 24) ^ c];
     write(c);
     if (c != d)
       r = 1;
@@ -267,15 +391,18 @@ void emit() {
       if (r >= 4) {
         unsigned j;
         if (++i == bs) bad();
-        for (j = 0; j < blk[i]; j++)
+        for (j = 0; j < blk[i]; j++) {
+          crc = ((crc << 8) & 0xFFFFFFFF) ^ crctab[(crc >> 24) ^ c];
           write(c);
+        }
         r = 0;
       }
     }
   }
 }
 
-int main() {
+/* Parse stream and bock headers, decompress any blocks found. */
+void expand(void) {
   unsigned long t = 0, c;
   init_crc();
   if (get(24) != 0x425A68) bad();
@@ -300,6 +427,5 @@ int main() {
     if (get(32) != 0x45385090) bad();
     if (get(32) != c) bad();
     bk = 0;
-  } while (getchar() == 0x42 && getchar() == 0x5A && getchar() == 0x68);
-  return EXIT_SUCCESS;
+  } while (read() == 0x42 && read() == 0x5A && read() == 0x68);
 }
