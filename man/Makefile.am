@@ -15,4 +15,4 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-man_MANS = lbzip2.1
+man_MANS = lbzip2.1 lbunzip2.1 lbzcat.1
