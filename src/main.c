@@ -675,33 +675,33 @@ ZIP               : Insert arguments betwen PROG and the rest of the command\n\
                 ", "   escaping.\n\nOptions:\n\n  -n WTHRS           : Set the\
  number of (de)compressor threads to WTHRS, where\n                       WTHR\
 S is a positive integer.\n  -k, --keep         : Don't remove FILE operands. O\
-pen regular input files with\n                       more than one link.\n  -c\
+pen regular input files\n                       with more than one link.\n  -c\
 , --stdout       : Write output to stdout even with FILE operands. Implies\n  \
                      `-k'. Incompatible with `-t'.\n  -t, --test         : Tes\
 t decompression; discard output instead of writing it\n                 ", "  \
-    to files or stdout. Implies `-k'. Incompatible with `-c'.\n  -d, --decompr\
-ess   : Force decompression over the selection by PROG.\n  -z, --compress     \
-: Force compression over the selection by PROG.\n  -1 .. -9           : Set th\
-e compression block size to 100K .. 900K.\n  --fast             : Alias for `-\
-1'.\n  --best             : Alias for `-9'. This is the default.\n  -f, --forc\
-e        : Open non-regular input files. Open input files with more\n         \
-              than one link. Try to remove eac", "h output file before\n      \
-                 opening it.\n  -v, --verbose      : Log each (de)compression \
-start to stderr. Display\n                       compression ratio and space s\
-avings. Display progress\n                       information if stderr is conn\
-ected to a terminal.\n  -S                 : Print condition variable statisti\
-cs to stderr.\n  --exponential      : Use an alternative block-sorting algorit\
-hm.\n  -s, --small, -q,\n  --quiet,\n  --repetitive-fast,\n  --repetitive-best\
-  : Accepted for compat", "ibility, otherwise ignored.\n  -h, --help         :\
- Print this help to stdout and exit.\n  -L, --license, -V,\n  --version       \
-   : Print version information to stdout and exit.\n\nOperands:\n\n  FILE     \
-          : Specify files to compress or decompress. If no FILE is\n          \
-             given, work as a filter. FILEs with `.bz2', `.tbz',\n            \
-           `.tbz2' and `.tz2' name suffixes will be skipped when\n            \
-           compressing. When decompressing, `.bz2' suffixes will be\n         \
- ", "             removed in output filenames; `.tbz', `.tbz2' and `.tz2'\n   \
-                    suffixes will be replaced by `.tar'; other filenames will\
-\n                       be suffixed with `.out'.\n"
+    to files or stdout. Implies `-k'. Incompatible with\n                     \
+  `-c'.\n  -d, --decompress   : Force decompression over the selection by PROG\
+.\n  -z, --compress     : Force compression over the selection by PROG.\n  -1 \
+.. -9           : Set the compression block size to 100K .. 900K.\n  --fast   \
+          : Alias for `-1'.\n  --best             : Alias for `-9'. This is th\
+e default.\n  -f, --force        : Open non-regular input files. Open input fi\
+les with more\n                       than one ", "link. Try to remove each ou\
+tput file before\n                       opening it.\n  -v, --verbose      : L\
+og each (de)compression start to stderr. Display\n                       compr\
+ession ratio and space savings. Display progress\n                       infor\
+mation if stderr is connected to a terminal.\n  -S                 : Print con\
+dition variable statistics to stderr.\n  --exponential      : Use an alternati\
+ve block-sorting algorithm.\n  -s, --small, -q,\n  --quiet,\n  --repetitive-fa\
+st,\n  --repetitive-best", "  : Accepted for compatibility, otherwise ignored.\
+\n  -h, --help         : Print this help to stdout and exit.\n  -L, --license,\
+ -V,\n  --version          : Print version information to stdout and exit.\n\n\
+Operands:\n\n  FILE               : Specify files to compress or decompress. I\
+f no FILE is\n                       given, work as a filter. FILEs with `.bz2\
+', `.tbz',\n                       `.tbz2' and `.tz2' name suffixes will be sk\
+ipped when\n                       compressing. When decompressing, `.bz2' suf\
+f", "ixes will be\n                       removed in output filenames; `.tbz',\
+ `.tbz2' and `.tz2'\n                       suffixes will be replaced by `.tar\
+'; other filenames\n                       will be suffixed with `.out'.\n"
 
 
 static void _Noreturn

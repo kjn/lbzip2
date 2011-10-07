@@ -21,7 +21,7 @@ use Text::Wrap;
 
 $il = 2;   # indentation level
 $lw = 19;  # label width
-$sw = 81;  # screen width
+$sw = 80;  # screen width
 
 $ind = ' 'x$il;
 undef $Text::Wrap::unexpand;
