@@ -21,6 +21,7 @@
 
 #  include <limits.h>    /* CHAR_BIT */
 #  include <stddef.h>    /* size_t */
+#  include <stdlib.h>    /* _Noreturn */
 #  include <pthread.h>   /* pthread_mutex_t */
 #  include <inttypes.h>  /* intmax_t */
 #  include <sys/types.h> /* off_t */
@@ -81,12 +82,8 @@ __attribute__((format(printf, 1, 2)))
 ;
 
 /* Same as log_info(), but always call bailout(). */
-void
-log_fatal(const char *fmt, ...)
-#ifdef __GNUC__
-__attribute__((format(printf, 1, 2), noreturn))
-#endif
-;
+void _Noreturn
+log_fatal(const char *fmt, ...);
 
 
 /* (III) Threading utilities. If they fail, they call log_fatal(). */

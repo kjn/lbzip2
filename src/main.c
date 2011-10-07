@@ -704,7 +704,7 @@ hm.\n  -s, --small, -q,\n  --quiet,\n  --repetitive-fast,\n  --repetitive-best\
 \n                       be suffixed with `.out'.\n"
 
 
-static void
+static void _Noreturn
 usage(void)
 {
   if (0 > printf(USAGE_STRING))
@@ -715,7 +715,7 @@ usage(void)
 }
 
 
-static void
+static void _Noreturn
 version(void)
 {
   if (0 > printf("%s version %s\n\n%s%s", PACKAGE_NAME, PACKAGE_VERSION,
