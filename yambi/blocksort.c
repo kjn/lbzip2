@@ -91,14 +91,6 @@
 #include "encode.h"
 
 
-#if 0
-# include <stdio.h>
-# define Trace(x) fprintf x
-#else
-# define Trace(x)
-#endif
-
-
 struct Work {
   SLong budget;
   jmp_buf jmp_buffer;
@@ -316,7 +308,6 @@ fullGt(
   /* If we got to this point it means that the block consists of a string
      repeated number of times.
   */
-  Trace((stderr, "Very repetetive data; switching to BPR immediately...\n"));
   longjmp(work->jmp_buffer, 1);
 }
 
@@ -377,8 +368,6 @@ shell_sort(
 
       if (unlikely(work->budget <= 0))
       {
-        Trace((stderr, "Block is too repetitive; "
-               "switching to BPR algorithm...\n"));
         longjmp(work->jmp_buffer, 1);
       }
     }
@@ -737,7 +726,6 @@ copy_cache(
 
   if (unlikely(num_big == 1))
   {
-    Trace((stderr, "There is only one bucket!! Sorting skipped.\n"));
     idx = 0;
     return 0;
   }

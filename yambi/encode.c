@@ -21,13 +21,6 @@
 
 #include "encode.h"
 
-#if 0
-# include <stdio.h>
-# define Trace(x) fprintf x
-#else
-# define Trace(x)
-#endif
-
 
 /* return ninuse */
 static SInt
@@ -184,14 +177,6 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   {
     Int v,z,l,h;
 
-    Trace((stderr, "Selector number %5d has value of %d.\n",
-           sp - s->selector, c));
-
-    if (c >= s->num_trees || (size_t)(sp - s->selector) >= s->num_selectors)
-    {
-      Trace((stderr, "c=%d, num_trees=%d, num_selectors=%d, pos=%d\n", c,
-             s->num_trees, s->num_selectors, sp - s->selector));
-    }
     assert(c < s->num_trees);
     assert((size_t)(sp - s->selector) < s->num_selectors);
 
@@ -214,9 +199,6 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
     *smp++ = j;
     cost += j+1;
   }
-
-  Trace((stderr, "Selector number %5d has value of %d (end marker).\n",
-         sp - s->selector, c));
 
   /* Add zero to seven dummy selectors in order to make block size
      multiply of 8 bits. */

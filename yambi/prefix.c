@@ -73,13 +73,6 @@ The Art of Computer Programming, volume 3: Sorting and Searching
 #include "encode.h"
 
 
-#if 0
-# include <stdio.h>
-# define Trace(x) fprintf x
-#else
-# define Trace(x)
-#endif
-
 /*
 
 n - input alphabet size (i.e. number of distinct input symbols)
@@ -692,14 +685,10 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
       assert(t < nGroups);
       increment_freqs(gs, s->rfreq[t]);
       /* tfreq[t]++; */
-      Trace((stderr, "prefix: adding selector number %5d of value %d.\n",
-             sp - s->selector, t));
       *sp++ = t;
     }
 
     assert((size_t)(sp - s->selector) == s->num_selectors);
-    Trace((stderr, "prefix: adding selector number %5d of value %d "
-           "(end marker).\n", sp - s->selector, MAX_TREES));
     *sp = MAX_TREES;
 
     /* TODO: bring this code back to life, may improove compression level */

@@ -26,14 +26,6 @@
 #include "decode.h"
 
 
-#if 0
-# include <stdio.h>
-# define Trace(x) fprintf x
-#else
-# define Trace(x)
-#endif
-
-
 /* Start table width */
 #define SW HUFF_START_WIDTH
 
@@ -277,9 +269,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
   assert(dec != 0);
   assert(buf != 0);
 
-  Trace((stderr, "retrieve called with ipos=%u, w=%u, v=0x%X\n",
-         (unsigned)*ipos_p, *bits_left, *bit_buf));
-
   in = (const Int *)buf + *ipos_p;
   in_avail = ipos_lim - *ipos_p;
   assert(in_avail >= 1);
@@ -298,11 +287,9 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
     w += 32;
     in++;
     in_avail--;
-    Trace((stderr, "retrieve init: w=%u, v=0x%lX\n", w, v));
 
     W_RANGE(32,63);
     GET(dec->expect_crc, 32);
-    Trace((stderr, "retrieve init: CRC is 0x%X\n", dec->expect_crc));
 
     W_RANGE(0,31);
     if (unlikely(in_avail == 0)) {
@@ -310,24 +297,19 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
       *ipos_p = in - (const Int *)buf;
       *bits_left = w;
       *bit_buf = v >> (64-w);
-      Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
       return YB_UNDERFLOW;
     }
   case S_BWT_IDX:
-    Trace((stderr, "v=0x%lX, w=%u\n", v, w));
     v |= (Long)peekl(in) << (32-w);
     w += 32;
-    Trace((stderr, "v=0x%lX, w=%u\n", v, w));
     in++;
     in_avail--;
 
     W_RANGE(32,63);
     GET(dec->rand, 1);
-    Trace((stderr, "rand_bit=%d\n", dec->rand));
 
     W_RANGE(31,62);
     GET(dec->bwt_idx, 24);
-    Trace((stderr, "bwt_idx=%u\n", dec->bwt_idx));
     W_RANGE(7,38);
 
 
@@ -339,7 +321,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
         *ipos_p = in - (const Int *)buf;
         *bits_left = w;
         *bit_buf = v >> (64-w);
-        Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
         return YB_UNDERFLOW;
       }
     case S_BITMAP_BIG:
@@ -366,7 +347,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
             *ipos_p = in - (const Int *)buf;
             *bits_left = w;
             *bit_buf = v >> (64-w);
-            Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
             return YB_UNDERFLOW;
           case S_BITMAP_SMALL:
             j = dec->save_1;
@@ -391,7 +371,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
 
     if (k == 0)
     {
-      Trace((stderr, "empty alphabet\n"));
       return YB_ERR_BITMAP;
     }
 
@@ -402,15 +381,12 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
     GET(dec->num_trees, 3); W_RANGE(29,60);
     if (dec->num_trees < MIN_TREES || dec->num_trees > MAX_TREES)
     {
-      Trace((stderr, "bad number of trees (%d, should be from 2 to 6)\n",
-             dec->num_trees));
       return YB_ERR_TREES;
     }
 
     GET(dec->num_selectors, 15); W_RANGE(14,45);
     if (dec->num_selectors == 0)
     {
-      Trace((stderr, "no selectors\n"));
       return YB_ERR_GROUPS;
     }
 
@@ -441,7 +417,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
 
       if (unlikely(k > dec->num_trees))
       {
-        Trace((stderr, "bad selector mtfv\n"));
         return YB_ERR_SELECTOR;
       }
 
@@ -457,7 +432,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
           *ipos_p = in - (const Int *)buf;
           *bits_left = w;
           *bit_buf = v >> (64-w);
-          Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
           return YB_UNDERFLOW;
         case S_SELECTOR_MTF:
           i = dec->save_1;
@@ -513,7 +487,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
           x += R[k];
           if (unlikely(x < 3+MIN_CODE_LENGTH || x > 3+MAX_CODE_LENGTH))
           {
-            Trace((stderr, "bad code length\n"));
             return YB_ERR_DELTA;
           }
           x -= 3;
@@ -532,7 +505,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
               *ipos_p = in - (const Int *)buf;
               *bits_left = w;
               *bit_buf = v >> (64-w);
-              Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
               return YB_UNDERFLOW;
             case S_DELTA_TAG:
               x = dec->save_1;
@@ -591,11 +563,9 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
       if (unlikely(t >= 6))
       {
         if (t == 6) {
-          Trace((stderr, "oversubscribed prefix code\n"));
           return YB_ERR_PREFIX;
         }
         else {
-          Trace((stderr, "incomplete prefix code\n"));
           return YB_ERR_INCOMPLT;
         }
       }
@@ -626,7 +596,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
             *ipos_p = in - (const Int *)buf;
             *bits_left = w;
             *bit_buf = v >> (64-w);
-            Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
             return YB_UNDERFLOW;
           case S_PREFIX:
             g = dec->save_1;
@@ -675,7 +644,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
 
           if (j == 0)
           {
-            Trace((stderr, "empty block\n"));
             return YB_ERR_EMPTY;
           }
 
@@ -693,7 +661,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
                 *ipos_p = in - (const Int *)buf;
                 *bits_left = w;
                 *bit_buf = v >> (64-w);
-                Trace((stderr, "retrieve: return YB_UNDERFLOW\n"));
                 return YB_UNDERFLOW;
               case S_TRAILER:
                 j = dec->save_1;
@@ -713,7 +680,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
           if ((k != 0x314159 || i != 0x265359) &&
               (k != 0x177245 || i != 0x385090))
           {
-            Trace((stderr, "retrieve: return YB_ERR_HEADER\n"));
             return YB_ERR_HEADER;
           }
 
@@ -722,7 +688,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
           *bits_left = w;
           *bit_buf = v >> (64-w);
           dec->state = 0;
-          Trace((stderr, "@return: bwt_idx=%d\n", dec->bwt_idx));
           return (k == 0x314159) ? YB_OK : YB_DONE;
         }
 
@@ -730,7 +695,6 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
       }
     }
 
-    Trace((stderr, "no EOB in the last group\n"));
     return YB_ERR_UNTERM;
 
   default:

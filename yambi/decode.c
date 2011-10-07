@@ -25,14 +25,6 @@
 
 #include "decode.h"
 
-#if 0
-# include <stdio.h>
-# define Trace(x) fprintf x
-#else
-# define Trace(x)
-#endif
-
-
 /* Block size theshold above which block randomization has any effect.
    Randomizing blocks of size <= RAND_THRESH is a no-op.
 */
@@ -249,8 +241,6 @@ YBdec_work(YBdec_t *state)
   /* Sanity-check the BWT primary index. */
   if (state->bwt_idx >= state->block_size)
   {
-    Trace((stderr, "primary index %u too large, should be %u max.\n",
-           (unsigned)state->bwt_idx, (unsigned)state->block_size));
     return YB_ERR_BWTIDX;
   }
 
@@ -294,9 +284,6 @@ YBdec_work(YBdec_t *state)
   if (unlikely(state->rand && state->block_size > RAND_THRESH))
   {
     Byte *block;
-
-    Trace((stderr, "A randomized block of size %u was found.\n",
-           state->block_size));
 
     /* Allocate a temporary array to hold the block. */
     block = xmalloc(state->block_size);
