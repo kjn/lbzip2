@@ -48,6 +48,7 @@ AC_ARG_ENABLE([warnings],
         sync-nand, attributes, coverage-mismatch, unused-macros, extra-tokens],
         [m4_set_add([kjn_warn_set], warn)])
 
+    gl_WARN_ADD([-Wno-unknown-warning-option])
     for kjn_warn in '' all extra m4_set_dump([kjn_warn_set], [ ])
     do :
       gl_WARN_ADD([-W$kjn_warn])
