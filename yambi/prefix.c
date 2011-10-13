@@ -52,22 +52,6 @@
 # include <config.h>
 #endif
 
-/*
-
-Alistair Moffat, Jyrki Katajainen
-In-Place Calculation of Minimum-Redundancy Codes
-http://www.diku.dk/~jyrki/Paper/WADS95.pdf
-
-Lawrence Larmore, Daniel Hirschberg
-A Fast Algorithm for Optimal Length-Limited Huffman Codes
-www.cs.unlv.edu/~larmore/Research/larHir90.pdf
-(package-merge algorithm)
-
-Donald Knuth
-The Art of Computer Programming, volume 3: Sorting and Searching
-
-*/
-
 #include <strings.h>  /* bzero() */
 
 #include "encode.h"
@@ -223,8 +207,7 @@ compute_depths(
 
 
 /* The following is an implementation of the Package-Merge algorithm for
-   finding an optimal length-limited prefix-free codeset, as described in [1].
-
+   finding an optimal length-limited prefix-free codeset.
 */
 
 /* This structure holds packages of coins.  Single coins are treated as

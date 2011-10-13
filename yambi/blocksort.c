@@ -55,22 +55,19 @@
 
    I. The Cache-Copy Algorithm
 
-   Implementation adopted from bzip2-1.0.5.
+   average-case time complexity - O(n log n)
+   worst-case time complexity - O(n^3)
 
-   A Block-sorting Lossless Data Compression Algorithm
-   Algorithm Q: Fast quicksorting on suffixes
-   SRC-124, Digital Equipment Corporation
-   ftp://gatekeeper.dec.com/pub/DEC/SRC/research-reports/SRC-124.pdf
+   Implementation adopted from bzip2-1.0.5.
 
 
    II. The Bucket-Pointer-Refinement (BPR) algorithm
 
-   An Incomplex Algorithm for Fast Suffix Array Construction
-   Klaus-Bernd Schuermann, Jens Stoye
-   http://techfak.uni-bielefeld.de/~stoye/cpublications/alenex2005final.pdf
+   average-case time complexity - O(n log n)
+   worst-case time complexity - O(n^2 log n)
 
 
-   III. The LSB radix sort algotim - O(n^2)
+   III. The LSD radix sort algotim - O(n^2)
 
    It consists of n passes of counting sort, each pass is O(n).  First sort
    all rotations according to their n-th character, then (n-1)-th and so on.
@@ -98,16 +95,15 @@ struct Work {
 
 
 /*=========================================================================
-  (I) THE LSB RADIX SORT ALGORITHM
+  (I) THE LSD RADIX SORT ALGORITHM
   ========================================================================= */
 
-/* If a block size is less or equal to this value, the LSB radix sort
+/* If a block size is less or equal to this value, the LSD radix sort
    will be used to compute BWT for that particular block. */
 #define RADIX_SORT_THRESH 512
 
-/* The naive, O(n^2) algorithm, which uses counting sort.
-   It works in all cases, but it should be used for small
-   blocks only because it is very slow in practice. */
+/* The naive, O(n^2) algorithm, which uses counting sort.  It is used for
+   small blocks only because it is very slow in practice. */
 static void
 radix_sort_bwt(
   Byte *D,
@@ -186,7 +182,7 @@ radix_sort_bwt(
     assert(C[255] == n);
   }
 
-  /* Compute the BWT transformation from sorted order. */
+  /* Compute BWT transform from sorted order. */
   *bwt_idx = n;
   for (i = 0; i < n; i++)
   {
@@ -279,8 +275,7 @@ nblock - N
 #define FULLGT_GRANULARITY 256
 
 /* Compare two different rotations of the block.
-   Return 1 if j-th rotation preceeds i-th one.
-   Otherwise return 0 (even in case both rotations are equal).
+   Return 1 if j-th rotation preceeds i-th one. Otherwise return 0.
    (The name of this routine stands for Full Greater-Than).
 */
 static int
@@ -306,7 +301,8 @@ fullGt(
   while (k-- > 0);
 
   /* If we got to this point it means that the block consists of a string
-     repeated number of times.
+     repeated number of times.  In this case we simply abandon quicksorting
+     and switch to BPR.
   */
   longjmp(work->jmp_buffer, 1);
 }
@@ -375,13 +371,6 @@ shell_sort(
 }
 
 /*---------------------------------------------*/
-/*--
-   The following is an implementation of
-   an elegant 3-way quicksort for strings,
-   described in a paper "Fast Algorithms for
-   Sorting and Searching Strings", by Robert
-   Sedgewick and Jon L. Bentley.
---*/
 
 #define mswap(zzt, zz1, zz2)                    \
   zzt = zz1; zz1 = zz2; zz2 = zzt;
@@ -420,7 +409,7 @@ med5(
   CAS(3,4,1,2); CAS(3,4,3,4); PHI(3,4,5);
   CAS(4,5,2,3); CAS(4,5,4,5); PHI(4,5,1);
   CAS(5,6,3,4); PHI(5,6,1); PHI(5,6,2); PHI(5,6,5);
-  (void)(r61 + r62 + r64 + r65);
+  (void)(r61 + r62 + r64 + r65);  /* Avoid warnings about unused variables. */
   return r63;
 }
 
@@ -490,10 +479,6 @@ quick_sort(
     unHi = gtHi = hi;
 
     /* Perform a fast, three-way partitioning.
-
-       This code is based on the following descriptions:
-       "QuickSort is Optimal" by Robert Sedgewick and Jon Bentley
-       "Engineering a Sort Function" by Jon Bentley and Douglas McIlroy
 
        Pass 1: partition
        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -1070,10 +1055,6 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
     --*/
   eclass = xmalloc(nblock * sizeof(Int));
 
-  /* This is an implementation of Bucket-Pointer Refinement algorithm
-     as described in a paper "An Incomplex Algorithm for Fast Suffix
-     Array Construction" by Klaus-Bernd Schuermann and Jens Stoye. */
-
   /*-- the log(N) loop --*/
   while (1) {
 
@@ -1159,7 +1140,6 @@ YBpriv_block_sort(YBenc_t *s)
   Int *ftab;
   Int *ptr;
 
-
   /* For small blocks the 16-bit bucket sort would be an overkill.
      We can't use Shell sort because it requires quadrant, which isn't
      initialised yet, so we just use a naive counting sort in this case. */
@@ -1169,7 +1149,6 @@ YBpriv_block_sort(YBenc_t *s)
     return;
   }
 
-
   /* Sort buckets.  After the sort ftab contains the first location
      of every small bucket. */
   ptr = xmalloc(nblock * sizeof(Int));
@@ -1177,14 +1156,12 @@ YBpriv_block_sort(YBenc_t *s)
   bucket_sort(ptr, block, ftab, nblock);
   bzero(bigDone, 256);
 
-
   /* Step Q2. */
   for (i = 0; i < nblock-1; i++)
     pokes(quadrant + i, (block[i] << 8) | block[i+1]);
   pokes(quadrant + nblock-1, (block[nblock-1] << 8) | block[0]);
   for (i = 0; i < BZ_N_OVERSHOOT; i++)
     quadrant[nblock+i] = quadrant[i];
-
 
   if (s->shallow_factor > 0)
   {

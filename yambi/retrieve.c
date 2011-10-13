@@ -53,10 +53,6 @@
    of codes.  Return zero on success (the tables are built only in this
    case), 7 if the given code set is incomplete, 6 if the input is invalid
    (an oversubscribed set of lengths).
-
-   The algorithm implemented here was inspired by "On the implementation of
-   minimum-redundancy prefix codes" by Alistair Moffat and Andrew Turpin,
-   but the code below doesn't diectly follow the description in the paper.
 */
 static int
 make_tree(YBdec_t *dec,   /* where to store created tables */
@@ -239,14 +235,15 @@ YBdec_destroy(YBdec_t *dec)
 }
 
 
-/* TODO: add optimization similar to inflate_fast from gzip. */
+/* TODO: add optimization similar to zlib's inflate_fast(). */
 /* TODO: add prefetchnta to avoid lookup tables pollution. */
+/* XXX this function needs to be cleaned up. */
 int
 YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
     unsigned *bit_buf, unsigned *bits_left)
 {
   const Int *in;  /* pointer to the next input byte */
-  Int in_avail;    /* number of input bytes available */
+  Int in_avail;   /* number of input bytes available */
 
   Long v;  /* next 0-63 bits of input stream, left-aligned, zero-padded */
   Int w;   /* available bits in v */
