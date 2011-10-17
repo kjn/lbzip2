@@ -48,32 +48,6 @@
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-/* This file implements three algorithms for sorting rotations of a string.
-   All of them have space complexity of O(n), they differ in time complexity.
-
-
-   I. The Cache-Copy Algorithm
-
-   average-case time complexity - O(n log n)
-   worst-case time complexity - O(n^3)
-
-   Implementation adopted from bzip2-1.0.5.
-
-
-   II. The Bucket-Pointer-Refinement (BPR) algorithm
-
-   average-case time complexity - O(n log n)
-   worst-case time complexity - O(n^2 log n)
-
-
-   III. The LSD radix sort algotim - O(n^2)
-
-   It consists of n passes of counting sort, each pass is O(n).  First sort
-   all rotations according to their n-th character, then (n-1)-th and so on.
-   Finally sort them according to the 1st character.
-*/
-
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -100,10 +74,16 @@ struct Work {
 
 /* If a block size is less or equal to this value, the LSD radix sort
    will be used to compute BWT for that particular block. */
-#define RADIX_SORT_THRESH 512
+#define RS_MBS 512
 
-/* The naive, O(n^2) algorithm, which uses counting sort.  It is used for
-   small blocks only because it is very slow in practice. */
+/* ============================================================================
+   Compute BWT using the naive, O(n^2) algorithm, which uses counting sort.
+   This function is used for small blocks only because it is slow in practice.
+
+   The algorithm consists of `n' passes of counting sort, each pass is O(n).
+   First all rotations are sorted according to their n-th character, then
+   (n-1)-th character and so on, down to the 1st character.
+*/
 static void
 radix_sort_bwt(
   Byte *D,
@@ -115,11 +95,11 @@ radix_sort_bwt(
   Int d;  /* distance */
   Int t;  /* temp */
   Int C[256];
-  Int P[RADIX_SORT_THRESH];
-  Int U[RADIX_SORT_THRESH];
-  Byte B[RADIX_SORT_THRESH];
+  Int P[RS_MBS];
+  Int U[RS_MBS];
+  Byte B[RS_MBS];
 
-  assert(n <= RADIX_SORT_THRESH);
+  assert(n <= RS_MBS);
 
   /* Zero counts. */
   d = 0;
@@ -130,10 +110,8 @@ radix_sort_bwt(
      back from U to P.  We need to distinguish between odd and even block
      sizes because after final step we need to have indices placed in P.
      For even n, start in P, for odd n start in U. */
-  if (n & 1)
-  {
-    for (i = 0; i < n; i++)
-    {
+  if (n & 1) {
+    for (i = 0; i < n; i++) {
       U[i] = i;
       C[B[i] = D[i]]++;
     }
@@ -146,8 +124,7 @@ radix_sort_bwt(
     goto inner;
   }
 
-  for (i = 0; i < n; i++)
-  {
+  for (i = 0; i < n; i++) {
     P[i] = i;
     C[B[i] = D[i]]++;
   }
@@ -156,12 +133,10 @@ radix_sort_bwt(
     C[i] += C[i-1];
   assert(C[255] == n);
 
-  while (d < n)
-  {
+  while (d < n) {
     /* Sort from P to U, indices descending. */
     d++;
-    for (i = n; i > 0; i--)
-    {
+    for (i = n; i > 0; i--) {
       j = P[i-1];
       t = j + n - d;
       if (t >= n) t -= n;
@@ -171,8 +146,7 @@ radix_sort_bwt(
   inner:
     /* Sort from U to P, indices ascending. */
     d++;
-    for (i = 0; i < n; i++)
-    {
+    for (i = 0; i < n; i++) {
       j = U[i];
       t = j + n - d;
       if (t >= n) t -= n;
@@ -184,11 +158,9 @@ radix_sort_bwt(
 
   /* Compute BWT transform from sorted order. */
   *bwt_idx = n;
-  for (i = 0; i < n; i++)
-  {
+  for (i = 0; i < n; i++) {
     j = P[i];
-    if (j == 0)
-    {
+    if (j == 0) {
       assert(*bwt_idx == n);
       *bwt_idx = i;
       j = n;
@@ -211,8 +183,7 @@ radix_sort_bwt(
     i = 0;                                      \
     u = block[nblock - 1];                      \
                                                 \
-    while (i+4 <= i_lim)                        \
-    {                                           \
+    while (i+4 <= i_lim) {                      \
       v = peekl(block + i);                     \
       u = (u << 8) | (v >> 24); op; i++;        \
       u = v >> 16; op; i++;                     \
@@ -220,8 +191,7 @@ radix_sort_bwt(
       u = v; op; i++;                           \
     }                                           \
                                                 \
-    while (i < nblock)                          \
-    {                                           \
+    while (i < nblock) {                        \
       u = (u << 8) | block[i]; op; i++;         \
     }                                           \
                                                 \
@@ -265,38 +235,31 @@ bucket_sort(
   (III) THE MAIN SORTING ALGORITHM
   ========================================================================= */
 
-/*
-block - S
-quadrant - W
-ptr - V
-nblock - N
-*/
-
 #define FULLGT_GRANULARITY 256
 
-/* Compare two different rotations of the block.
-   Return 1 if j-th rotation preceeds i-th one. Otherwise return 0.
-   (The name of this routine stands for Full Greater-Than).
+/* ============================================================================
+   Compare lexicographically two rotations, R_i and R_j. Return a positive
+   integer if R_i > R_j, a negative integer if R_i < R_j. If both rotations are
+   equal, this function does not return; longjmp() is called instead.
 */
 static int
-fullGt(
-  Int i,
-  Int j,
-  const Short *qptr,
-  Int nblock,
-  struct Work *work)
+rot_cmp(
+  Int i,             /* Index of the first rotation to compare. */
+  Int j,             /* Index of the second rotation to compare. */
+  const Short *qptr, /* Pointer to quadrant table, aligned by current depth. */
+  Int n,             /* Block size. */
+  struct Work *work) /*  */
 {
-  Int k = nblock / FULLGT_GRANULARITY;
+  Int k = n / FULLGT_GRANULARITY;
 
-  do
-  {
+  do {
     int rv;
     if ((rv = memcmp(qptr+i, qptr+j, 2 * FULLGT_GRANULARITY)) != 0)
       return rv > 0;
 
     work->budget--;
-    i += FULLGT_GRANULARITY; if (i >= nblock) i -= nblock;
-    j += FULLGT_GRANULARITY; if (j >= nblock) j -= nblock;
+    i += FULLGT_GRANULARITY; if (i >= n) i -= n;
+    j += FULLGT_GRANULARITY; if (j >= n) j -= n;
   }
   while (k-- > 0);
 
@@ -309,16 +272,6 @@ fullGt(
 
 
 /*---------------------------------------------*/
-/*--
-   Knuth's increments seem to work better
-   than Incerpi-Sedgewick here.  Possibly
-   because the number of elems to sort is
-   usually small, typically <= 20.
---*/
-static
-Int incs[] = { 1, 4, 13, 40, 121, 364, 1093, 3280,
-               9841, 29524, 88573, 265720,
-               797161, 900000 };  /* 900000 is a sentinel */
 
 static void
 shell_sort(
@@ -329,9 +282,21 @@ shell_sort(
   Int hi,
   struct Work *work)
 {
+  /*--
+    Knuth's increments seem to work better
+    than Incerpi-Sedgewick here.  Possibly
+    because the number of elems to sort is
+    usually small, typically <= 20.
+    --*/
+  static const Int incs[] = { 1, 4, 13, 40, 121, 364, 1093, 3280,
+                              9841, 29524, 88573, 265720,
+                              797161, 900000 };  /* 900000 is a sentinel */
+
   Int i, j, h, hp;
 
-  if (hi - lo < 2) return;
+  /* Less than 2 elements -- the range is already sorted. */
+  if (hi - lo < 2)
+    return;
 
   hp = 0;
   while (incs[hp] < hi - lo) hp++;
@@ -340,7 +305,7 @@ shell_sort(
     h = incs[--hp];
 
     i = lo + h;
-    while (1) {
+    for (;;) {
 
 #define ITER                                                    \
       {                                                         \
@@ -349,7 +314,7 @@ shell_sort(
         v = ptr[i];                                             \
         j = i;                                                  \
         u = j-h;                                                \
-        while (fullGt((t = ptr[u]), v, qptr, nblock, work))     \
+        while (rot_cmp((t = ptr[u]), v, qptr, nblock, work) > 0)     \
         {                                                       \
           ptr[j] = t;                                           \
           j = u;                                                \
@@ -363,26 +328,24 @@ shell_sort(
       ITER; ITER; ITER;
 
       if (unlikely(work->budget <= 0))
-      {
         longjmp(work->jmp_buffer, 1);
-      }
     }
   }
 }
 
 /*---------------------------------------------*/
 
-#define mswap(zzt, zz1, zz2)                    \
+#define swap(zzt, zz1, zz2)                    \
   zzt = zz1; zz1 = zz2; zz2 = zzt;
 
-#define mvswap(zzp1, zzp2, zzn)                 \
+#define vswap(zzp1, zzp2, zzn)                  \
   {                                             \
     Int yyp1 = (zzp1);                          \
     Int yyp2 = (zzp2);                          \
     Int yyn  = (zzn);                           \
     Int yyt;                                    \
     while (yyn > 0) {                           \
-      mswap(yyt, ptr[yyp1], ptr[yyp2]);         \
+      swap(yyt, ptr[yyp1], ptr[yyp2]);          \
       yyp1++; yyp2++; yyn--;                    \
     }                                           \
   }
@@ -455,10 +418,8 @@ quick_sort(
 
   sp = 0;
 
-  while (1)
-  {
-    while (hi-lo <= QSORT_SMALL_THRESH || qptr > qptr_max)
-    {
+  for (;;) {
+    while (hi-lo <= QSORT_SMALL_THRESH || qptr > qptr_max) {
       shell_sort ( ptr, qptr, nblock, lo, hi, work );
       if (sp == 0)
         return;
@@ -469,11 +430,11 @@ quick_sort(
       hi = vec + (vec >> 32);
     }
 
-    pivot = med5(peeks(qptr + ptr[ lo         ]),
-                 peeks(qptr + ptr[ lo+(hi-lo)/4 ]),
-                 peeks(qptr + ptr[ (lo+hi)>>1 ]),
+    pivot = med5(peeks(qptr + ptr[ lo             ]),
+                 peeks(qptr + ptr[ lo+(hi-lo)/4   ]),
+                 peeks(qptr + ptr[ (lo+hi)>>1     ]),
                  peeks(qptr + ptr[ lo+3*(hi-lo)/4 ]),
-                 peeks(qptr + ptr[ hi-1       ]));
+                 peeks(qptr + ptr[ hi-1           ]));
 
     unLo = ltLo = lo;
     unHi = gtHi = hi;
@@ -493,13 +454,13 @@ quick_sort(
        One additional exchange per equal key.
        Invariant: lo <= ltLo <= unLo <= unHi <= gtHi <= hi
     */
-    while (1) {
+    for (;;) {
       assert(unLo < unHi);
       /* Move from left to find an element that is not less. */
       while ((n = peeks(qptr + ptr[unLo])) <= pivot) {
         /* If the element is equal, move it to the left. */
         if (n == pivot) {
-          mswap(t, ptr[unLo], ptr[ltLo]);
+          swap(t, ptr[unLo], ptr[ltLo]);
           ltLo++;
         }
 
@@ -512,7 +473,7 @@ quick_sort(
       while ((n = peeks(qptr + ptr[unHi-1])) >= pivot) {
         /* If the element is equal, move it to the right. */
         if (n == pivot) {
-          mswap(t, ptr[unHi-1], ptr[gtHi-1]);
+          swap(t, ptr[unHi-1], ptr[gtHi-1]);
           gtHi--;
         }
         unHi--;
@@ -520,25 +481,28 @@ quick_sort(
         if (unLo >= unHi) goto qs_done;
       }
       /* Exchange. */
-      mswap(t, ptr[unLo], ptr[unHi-1]); unLo++; unHi--;
+      swap(t, ptr[unLo], ptr[unHi-1]); unLo++; unHi--;
       if (unLo >= unHi) goto qs_done;
     }
 
   qs_done:
     assert ( unHi == unLo);
 
-    n = min(ltLo-lo, unLo-ltLo); mvswap(lo, unLo-n, n);
-    m = min(hi-gtHi, gtHi-unHi); mvswap(unLo, hi-m, m);
+    n = min(ltLo-lo, unLo-ltLo); vswap(lo, unLo-n, n);
+    m = min(hi-gtHi, gtHi-unHi); vswap(unLo, hi-m, m);
 
     n = lo + unLo - ltLo;
     m = hi - gtHi + unHi;
 
     {
+      /* Pack quicksort parameters into single words so they can be sorted
+         easier. */
       Byte d = qptr - quadrant;
       Long v1 = ((Long)(n - lo) << 40) | (lo << 8) | d;
       Long v2 = ((Long)(m -  n) << 40) | (n  << 8) | (d + 1);
       Long v3 = ((Long)(hi - m) << 40) | (m  << 8) | d;
 
+      /* Sort 3 integers, without branching. */
       Long min123 = min(min(v1, v2), v3);
       Long max123 = max(max(v1, v2), v3);
       Long median = v1 ^ v2 ^ v3 ^ max123 ^ min123;
@@ -554,22 +518,6 @@ quick_sort(
     }
   }
 }
-
-
-/*---------------------------------------------*/
-/* Pre:
-      nblock > N_OVERSHOOT
-      block32 exists for [0 .. nblock-1 +N_OVERSHOOT]
-      ((Byte*)block32) [0 .. nblock-1] holds block
-      ptr exists for [0 .. nblock-1]
-
-   Post:
-      ((Byte*)block32) [0 .. nblock-1] holds block
-      All other areas of block32 destroyed
-      ftab [0 .. 65536 ] destroyed
-      ptr [0 .. nblock-1] holds sorted order
-      if (*budget <= 0), sorting was abandoned
-*/
 
 
 #define BIG_START(bb) ftab[(bb) << 8]
@@ -597,8 +545,7 @@ induce_orderings(
   /* Step Q6b. */
   for (i = 0; i < 256; i++)
     copy[i] = SMALL_START(i,ss);
-  for (i = BIG_START(ss); i < copy[ss]; i++)
-  {
+  for (i = BIG_START(ss); i < copy[ss]; i++) {
     k = ptr[i];
     if (k == 0) k = nblock;
     k--;
@@ -616,8 +563,7 @@ induce_orderings(
   /* Step Q6c. */
   for (i = 0; i < 256; i++)
     copy[i] = SMALL_END(i,ss);
-  for (i = BIG_END(ss); i > copy[ss]; i--)
-  {
+  for (i = BIG_END(ss); i > copy[ss]; i--) {
     k = ptr[i-1];
     if (k == 0) k = nblock;
     k--;
@@ -669,14 +615,13 @@ update_quadrants(
       *((Byte *)&quadrant[k + nblock] + 1) = qVal;
 
     k = ptr[j];
-    if (k == 0) { *prim_idx = j; k = nblock; }
+    if (unlikely(k == 0)) { *prim_idx = j; k = nblock; }
     k--;
     bwt[j] = *(Byte *)&quadrant[k];
   }
 }
 
 
-/* XXX bigDone is redundant - qqBigSize[i]==0 implies bigDine[i] */
 /* Algorithm Q. */
 static Int
 copy_cache(
@@ -692,25 +637,23 @@ copy_cache(
   Byte bigOrder[256];
   Byte smallOrder[255];
   Int idx = 900000;
-  Int qqBigSize[256];  /* XXX rename this */
+  Int bigSize[256];
   Int num_big = 0;
 
   /* Calculate the running order, from smallest to largest big bucket.
      We want to sort smaller buckets first because sorting them will
      populate some of quadrant descriptors, which can help a lot sorting
      bigger buckets. */
-  for (i = 0; i < 256; i++)
-  {
-    qqBigSize[i] = BIG_SIZE(i);
-    if (qqBigSize[i] > 0)
+  for (i = 0; i < 256; i++) {
+    bigSize[i] = BIG_SIZE(i);
+    if (bigSize[i] > 0)
       bigOrder[num_big++] = i;
     else
       bigDone[i] = 1;
   }
   assert(num_big > 0);
 
-  if (unlikely(num_big == 1))
-  {
+  if (unlikely(num_big == 1)) {
     idx = 0;
     return 0;
   }
@@ -730,16 +673,16 @@ copy_cache(
 
       best_idx = i;
       best_bucket = bigOrder[i];
-      best_size = qqBigSize[bigOrder[i]];
+      best_size = bigSize[bigOrder[i]];
 
       for (j = i+1; j < num_big; j++)
       {
         ss = bigOrder[j];
-        if (qqBigSize[ss] < best_size)
+        if (bigSize[ss] < best_size)
         {
           best_idx = j;
           best_bucket = ss;
-          best_size = qqBigSize[ss];
+          best_size = bigSize[ss];
         }
       }
       ss = best_bucket;
@@ -765,8 +708,7 @@ copy_cache(
         for (j = h; j < num_small; j++) {
           vv = smallOrder[j];
           k = j;
-          while ( SMALL_SIZE(ss,smallOrder[k-h]) > SMALL_SIZE(ss,vv) )
-          {
+          while ( SMALL_SIZE(ss,smallOrder[k-h]) > SMALL_SIZE(ss,vv) ) {
             smallOrder[k] = smallOrder[k-h];
             k = k - h;
             if (k < h) break;
@@ -783,7 +725,7 @@ copy_cache(
       sb = smallOrder[j];
       quick_sort(ptr, quadrant, nblock, SMALL_START(ss,sb),
                  SMALL_END(ss,sb), work);
-      qqBigSize[ss] -= SMALL_SIZE(ss,sb);
+      bigSize[ss] -= SMALL_SIZE(ss,sb);
       update_quadrants(quadrant, ptr, ftab, ss, sb, nblock, block, &idx);
     }
 
@@ -792,27 +734,26 @@ copy_cache(
 
     for (j = 0; j < 256; j++)
     {
-      if (!bigDone[j])
-      {
-        qqBigSize[j] -= SMALL_SIZE(j,ss);
+      if (!bigDone[j]) {
+        bigSize[j] -= SMALL_SIZE(j,ss);
         update_quadrants(quadrant, ptr, ftab, j, ss, nblock, block, &idx);
       }
     }
 
-    assert(qqBigSize[ss] == 0);
+    assert(bigSize[ss] == 0);
     bigDone[ss] = 1;
   }
 
   for (j = 0; j < 256; j++) {
     assert(bigDone[j]);
-    assert(qqBigSize[j] == 0);
+    assert(bigSize[j] == 0);
   }
 
   assert(idx < nblock);
   return idx;
 }
 
-static void
+static int
 copy_cache_wrap(
   Int *ptr,
   Int *ftab,
@@ -821,20 +762,16 @@ copy_cache_wrap(
   Byte *bigDone,
   Int nblock,
   Int shallow_factor,
-  Int *bwt_idx,
-  int *failed)
+  Int *bwt_idx)
 {
   struct Work work;
   work.budget = (SLong)nblock * shallow_factor / FULLGT_GRANULARITY;
 
-  if (!setjmp(work.jmp_buffer))
-  {
-    *bwt_idx = copy_cache(ptr, ftab, quadrant, block, bigDone, nblock, &work);
-    *failed = 0;
-    return;
-  }
+  if (setjmp(work.jmp_buffer))
+    return 0;
 
-  *failed = 1;
+  *bwt_idx = copy_cache(ptr, ftab, quadrant, block, bigDone, nblock, &work);
+  return 1;
 }
 
 
@@ -843,172 +780,7 @@ copy_cache_wrap(
   ========================================================================= */
 
 
-/*---------------------------------------------*/
-static
-void fallbackSimpleSort ( Int* fmap,
-                          Int* eclass,
-                          SInt   lo,
-                          SInt   hi )
-{
-   SInt i, j, tmp;
-   Int ec_tmp;
-
-   if (lo == hi) return;
-
-   if (hi - lo > 3) {
-      for ( i = hi-4; i >= lo; i-- ) {
-         tmp = fmap[i];
-         ec_tmp = eclass[tmp];
-         for ( j = i+4; j <= hi && ec_tmp > eclass[fmap[j]]; j += 4 )
-            fmap[j-4] = fmap[j];
-         fmap[j-4] = tmp;
-      }
-   }
-
-   for ( i = hi-1; i >= lo; i-- ) {
-      tmp = fmap[i];
-      ec_tmp = eclass[tmp];
-      for ( j = i+1; j <= hi && ec_tmp > eclass[fmap[j]]; j++ )
-         fmap[j-1] = fmap[j];
-      fmap[j-1] = tmp;
-   }
-}
-
-
-/*---------------------------------------------*/
-#define fswap(zz1, zz2) \
-  { SInt zztmp = zz1; zz1 = zz2; zz2 = zztmp; }
-
-#define fvswap(zzp1, zzp2, zzn)       \
-{                                     \
-  SInt yyp1 = (zzp1);                 \
-  SInt yyp2 = (zzp2);                 \
-  SInt yyn  = (zzn);                  \
-  while (yyn > 0) {                   \
-    fswap(fmap[yyp1], fmap[yyp2]);    \
-    yyp1++; yyp2++; yyn--;            \
-  }                                   \
-}
-
-
-#define fmin(a,b) ((a) < (b)) ? (a) : (b)
-
-#define fpush(lz,hz) { stackLo[sp] = lz; \
-                       stackHi[sp] = hz; \
-                       sp++; }
-
-#define fpop(lz,hz) { sp--;              \
-                      lz = stackLo[sp];  \
-                      hz = stackHi[sp]; }
-
-#define FALLBACK_QSORT_SMALL_THRESH 10
-#define FALLBACK_QSORT_STACK_SIZE   100
-
-
-static
-void fallbackQSort3 ( Int* fmap,
-                      Int* eclass,
-                      SInt   loSt,
-                      SInt   hiSt )
-{
-   SInt unLo, unHi, ltLo, gtHi, n, m;
-   SInt sp, lo, hi;
-   Int med, r, r3;
-   SInt stackLo[FALLBACK_QSORT_STACK_SIZE];
-   SInt stackHi[FALLBACK_QSORT_STACK_SIZE];
-
-   r = 0;
-
-   sp = 0;
-   fpush ( loSt, hiSt );
-
-   while (sp > 0) {
-
-      assert(sp < FALLBACK_QSORT_STACK_SIZE - 1);
-
-      fpop ( lo, hi );
-      if (hi - lo < FALLBACK_QSORT_SMALL_THRESH) {
-         fallbackSimpleSort ( fmap, eclass, lo, hi );
-         continue;
-      }
-
-      /* Random partitioning.  Median of 3 sometimes fails to
-         avoid bad cases.  Median of 9 seems to help but
-         looks rather expensive.  This too seems to work but
-         is cheaper.  Guidance for the magic constants
-         7621 and 32768 is taken from Sedgewick's algorithms
-         book, chapter 35.
-      */
-      r = ((r * 7621) + 1) % 32768;
-      r3 = r % 3;
-      if (r3 == 0) med = eclass[fmap[lo]]; else
-      if (r3 == 1) med = eclass[fmap[(lo+hi)>>1]]; else
-                   med = eclass[fmap[hi]];
-
-      unLo = ltLo = lo;
-      unHi = gtHi = hi;
-
-      while (1) {
-         while (1) {
-            if (unLo > unHi) break;
-            n = (SInt)eclass[fmap[unLo]] - (SInt)med;
-            if (n == 0) {
-               fswap(fmap[unLo], fmap[ltLo]);
-               ltLo++; unLo++;
-               continue;
-            }
-            if (n > 0) break;
-            unLo++;
-         }
-         while (1) {
-            if (unLo > unHi) break;
-            n = (SInt)eclass[fmap[unHi]] - (SInt)med;
-            if (n == 0) {
-               fswap(fmap[unHi], fmap[gtHi]);
-               gtHi--; unHi--;
-               continue;
-            }
-            if (n < 0) break;
-            unHi--;
-         }
-         if (unLo > unHi) break;
-         fswap(fmap[unLo], fmap[unHi]); unLo++; unHi--;
-      }
-
-      assert(unHi == unLo-1);
-
-      if (gtHi < ltLo) continue;
-
-      n = fmin(ltLo-lo, unLo-ltLo); fvswap(lo, unLo-n, n);
-      m = fmin(hi-gtHi, gtHi-unHi); fvswap(unLo, hi-m+1, m);
-
-      n = lo + unLo - ltLo - 1;
-      m = hi - (gtHi - unHi) + 1;
-
-      if (n - lo > hi - m) {
-         fpush ( lo, n );
-         fpush ( m, hi );
-      } else {
-         fpush ( m, hi );
-         fpush ( lo, n );
-      }
-   }
-}
-
-
-/*---------------------------------------------*/
-/* Pre:
-      nblock > 0
-      eclass exists for [0 .. nblock-1]
-      ((Byte*)eclass) [0 .. nblock-1] holds block
-      ptr exists for [0 .. nblock-1]
-
-   Post:
-      ((Byte*)eclass) [0 .. nblock-1] holds block
-      All other areas of eclass destroyed
-      fmap [0 .. nblock-1] holds sorted order
-      bhtab [ 0 .. 2+(nblock/64) ] destroyed
-*/
+#define BPR_K 2
 
 /* Here BH stands for `bucket header'. */
 #define       SET_BH(zz)  bhtab[(zz) >> 6] |= ((Long)1 << ((zz) & 63))
@@ -1017,62 +789,316 @@ void fallbackQSort3 ( Int* fmap,
 #define UNALIGNED_BH(zz)  ((zz) & 63)
 
 
-static void
-bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
+static int
+bpr_cmp(
+  const Int *E,  /* equivalence classes */
+  Int i,         /* first rotation to compare */
+  Int j,         /* second rotation to compare */
+  Int h0,        /* order magnitude */
+  Int d,         /* depth */
+  Int n)         /* block size */
 {
-  SInt d, i, j, k, l, r, cc, cc1;
-  SInt nNotDone;
-  SInt nBhtab;
+  /* Initially align the pointers so they reflect current depth. */
+  i += d * h0;
+  j += d * h0;
+
+  /* Compare equivalence classes lexicographically. Substrings of width h0 are
+     compared at time. */
+  while (d < BPR_K) {
+    /* Wrap pointers around if they cross block boundrary. */
+    if (i >= n) i -= n;
+    if (j >= n) j -= n;
+
+    /* If substrings at depth d belong to different equivalence classes,
+       return the order immediately. */
+    if (E[i] > E[j]) return 1;
+    if (E[i] < E[j]) return -1;
+
+    /* So far everything is equal, go one level deeper.  Remember to update the
+       pointers too.*/
+    d++;
+    i += h0;
+    j += h0;
+  }
+
+  return 0;
+}
+
+
+/* ============================================================================
+   Sort range of rotations using a simple comparison sort and then partition it
+   into standalone buckets.  Used as a subroutine in bpr_quick_sort().
+ */
+static void
+bpr_simple_sort(
+  Int *ptr,          /* sorted order */
+  const Int *eclass, /* equivalence clsses */
+  Long *bhtab,       /* bit heaer table */
+  Int lo,            /* low end of the range to sort (inclusive) */
+  Int hi,            /* high end of the range to sort (inclusive) */
+  Int h0,            /* order magnitude */
+  Int d,             /* depth */
+  Int nblock)        /* block size */
+{
+  Int i, j;
+  Int t, u, v;
+
+  /* Less than 2 elements -- the range is already sorted and there is nothing
+     to partition. */
+  if (hi - lo < 2)
+    return;
+
+  /* One iteration of Shell sort with increment equal to 4. */
+  i = lo + 4;
+  while (i < hi) {
+    v = ptr[i];
+    j = i;
+    u = j - 4;
+    while (bpr_cmp(eclass, (t = ptr[u]), v, h0, d, nblock) > 0) {
+      ptr[j] = t;
+      j = u;
+      if (u < lo + 4) break;
+      u -= 4;
+    }
+    ptr[j] = v;
+    i++;
+  }
+
+  /* One iteration of Shell sort with increment equal to 1 (ie. plain
+     insertion sort). */
+  i = lo + 1;
+  while (i < hi) {
+    v = ptr[i];
+    j = i;
+    u = j - 1;
+    while (bpr_cmp(eclass, (t = ptr[u]), v, h0, d, nblock) > 0) {
+      ptr[j] = t;
+      j = u;
+      if (u < lo + 1) break;
+      u -= 1;
+    }
+    ptr[j] = v;
+    i++;
+  }
+
+  /* The sorted order is already established. Now update bucket headers to
+     reflect the bucket partition. We don't need to set BH(lo), because it was
+     already set in bpr_quick_sort(). */
+  t = ptr[lo];
+  i = lo + 1;
+  while (i < hi) {
+    if (bpr_cmp(eclass, ptr[i], t, h0, d, nblock) != 0) {
+      SET_BH(i);
+      t = ptr[i];
+    }
+    i++;
+  }
+}
+
+
+/* ============================================================================
+   Sort and partition a single bucket.
+*/
+static void
+bpr_quick_sort(
+  Int *ptr,
+  const Int *eclass,
+  Long *bhtab,
+  Int lo,
+  Int hi,
+  Int h0,
+  Int nblock)
+{
+  /* All pointers are assumed to point between elements,
+     i.e. *Lo pointers are inclusive, *Hi are exclusive.
+  */
+  Int unLo;  /* unprocessed low */
+  Int unHi;  /* unprocessed high */
+  Int ltLo;  /* less-than high */
+  Int gtHi;  /* greater-than high */
+  Int n, m;
+  Int pivot;
+  Int sp;    /* stack pointer */
+  Int t;
+  Int d;
+
+  Long vec;
+  Long stack[QSORT_STACK_SIZE];
+
+  d = 1;
+  sp = 0;
+
+  for (;;) {
+    while (hi-lo <= 10 || d >= BPR_K) {
+      SET_BH(lo);
+      if (d < BPR_K)
+        bpr_simple_sort(ptr, eclass, bhtab, lo, hi, h0, d, nblock);
+      if (sp == 0)
+        return;
+      vec = stack[--sp];
+      d = (Byte)vec;
+      vec >>= 8;
+      lo = vec;
+      hi = vec + (vec >> 32);
+    }
+
+    pivot = med5(eclass[(ptr[ lo             ] + d*h0) % nblock],
+                 eclass[(ptr[ lo+(hi-lo)/4   ] + d*h0) % nblock],
+                 eclass[(ptr[ (lo+hi)>>1     ] + d*h0) % nblock],
+                 eclass[(ptr[ lo+3*(hi-lo)/4 ] + d*h0) % nblock],
+                 eclass[(ptr[ hi-1           ] + d*h0) % nblock]);
+
+    unLo = ltLo = lo;
+    unHi = gtHi = hi;
+
+    /* Perform a fast, three-way partitioning.
+
+       Pass 1: partition
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       | elements  | elements  | elements  | elements      | elements  |
+       | equal to  | less than |  not yet  | greater than  | equal to  |
+       | the pivot | the pivot | processed | the pivot     | the pivot |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       ^           ^           ^           ^               ^           ^
+       lo          ltLo        unLo       unHi            gtHi        hi
+
+       Always uses N-1 comparisions.
+       One additional exchange per equal key.
+       Invariant: lo <= ltLo <= unLo <= unHi <= gtHi <= hi
+    */
+    for (;;) {
+      assert(unLo < unHi);
+      /* Move from left to find an element that is not less. */
+      while ((n = eclass[(ptr[unLo] + d*h0) % nblock]) <= pivot) {
+        /* If the element is equal, move it to the left. */
+        if (n == pivot) {
+          swap(t, ptr[unLo], ptr[ltLo]);
+          ltLo++;
+        }
+
+        unLo++;
+        /* Stop if pointers have crossed */
+        if (unLo >= unHi) goto qs_done;
+      }
+      assert(unLo < unHi);
+      /* Move from left to find an element that is not greater. */
+      while ((n = eclass[(ptr[unHi-1] + d*h0) % nblock]) >= pivot) {
+        /* If the element is equal, move it to the right. */
+        if (n == pivot) {
+          swap(t, ptr[unHi-1], ptr[gtHi-1]);
+          gtHi--;
+        }
+        unHi--;
+        /* Stop if pointers have crossed */
+        if (unLo >= unHi) goto qs_done;
+      }
+      /* Exchange. */
+      swap(t, ptr[unLo], ptr[unHi-1]); unLo++; unHi--;
+      if (unLo >= unHi) goto qs_done;
+    }
+
+  qs_done:
+    assert(unHi == unLo);
+
+    n = min(ltLo-lo, unLo-ltLo); vswap(lo, unLo-n, n);
+    m = min(hi-gtHi, gtHi-unHi); vswap(unLo, hi-m, m);
+
+    n = lo + unLo - ltLo;
+    m = hi - gtHi + unHi;
+
+    {
+      /* Pack quicksort parameters into single words so they can be sorted
+         easier. */
+      Long v1 = ((Long)(n - lo) << 40) | (lo << 8) | d;
+      Long v2 = ((Long)(m -  n) << 40) | (n  << 8) | (d + 1);
+      Long v3 = ((Long)(hi - m) << 40) | (m  << 8) | d;
+
+      /* Sort 3 integers without branching, doing only 3 comparisons (yes,
+         three; min(v1,v2) and max(v1,v2) do *one* comparison together). */
+      Long min123 = min(min(v1, v2), v3);
+      Long max123 = max(max(v1, v2), v3);
+      Long median = v1 ^ v2 ^ v3 ^ max123 ^ min123;
+
+      assert(sp <= QSORT_STACK_SIZE-2);
+      stack[sp++] = max123;
+      stack[sp++] = median;
+
+      d = (Byte)min123;
+      min123 >>= 8;
+      lo = min123;
+      hi = min123 + (min123 >> 32);
+    }
+  }
+}
+
+
+static void
+bpr_sort(
+  Int *ptr,
+  Int *ftab,
+  Byte *bigDone,
+  Int nblock)
+{
+  Int d, i, k, r, j;
+  Int nBhtab;
   Long *bhtab;
   Int *eclass;
 
-
+  /* Allocate memory. */
   nBhtab = (nblock + 2*64 + 63) / 64;
   bhtab = xmalloc(nBhtab * sizeof(Long));
   bzero(bhtab, nBhtab * sizeof(Long));
+  eclass = xmalloc(nblock * sizeof(Int));
 
-  /*-- set sentinel bits for block-end detection --*/
+  /* Set sentinel bits for block-end detection. */
   for (i = 0; i < 2*64; i += 2)
     SET_BH(nblock+i);
 
+  /* The initial depth is always 2 because the initial bucket sort considers
+     only first 2 characters. */
   d = 2;
 
-  for (i = 0; i < 65536; i++)
-  {
-    j = ftab[i];
+  /* Scan initial buckets; set buket headers and create initial equivalence
+     classes */
+  for (i = 0; i < 65536; i++) {
+    k = ftab[i];
     r = ftab[i+1];
-    SET_BH(j);
+    if (k == r)
+      continue;
+    SET_BH(k);
+    eclass[ptr[k]] = k;
+
+    /* Check whether the small bucket [i/256, i%256] is already ordered.
+       If the big bucket [i/256] is done, then obviously so is [i/256, i%256].
+       Otherwise if the big bucket [i%256] is done, then [i/256, i%256] must
+       be done too because it was ordered with Seward's Copy algorithm.
+
+       If the small bucket is done, we place all strings it contains in their
+       own singleton buckets, and we assign them unique equivalence classes.
+       Otherwise we create one bucket that and one common equivalenc class. */
     if (bigDone[i >> 8] | bigDone[i & 0xff]) {
-      for (k = j+1; k < r; k++)
+      while (++k < r) {
         SET_BH(k);
+        eclass[ptr[k]] = k;
+      }
+    }
+    else {
+      j = k;
+      while (++k < r)
+        eclass[ptr[k]] = j;
     }
   }
 
-  /*--
-    Inductively refine the buckets.  Kind-of an
-    "exponential radix sort" (!), inspired by the
-    Manber-Myers suffix array construction algorithm.
-    --*/
-  eclass = xmalloc(nblock * sizeof(Int));
+  /* The log(n) loop. */
+  for (;;) {
+    /* Assume we're done unltil we find out we're not. */
+    int done = 1;
 
-  /*-- the log(N) loop --*/
-  while (1) {
-
-    for (i = 0; i < nblock; i++) {
-      if (ISSET_BH(i)) j = i;
-      k = fmap[i] - d; if (k < 0) k += nblock;
-      eclass[k] = j;
-    }
-
-    nNotDone = 0;
-    r = 0;
-    while (1)
-    {
-      /*-- find the next non-singleton bucket --*/
-      k = r + 1;
+    k = 1;
+    for (;;) {
+      /* Find the next non-singleton bucket. */
       while (ISSET_BH(k) && UNALIGNED_BH(k)) k++;
-      if (ISSET_BH(k))
-      {
+      if (ISSET_BH(k)) {
         while (WORD_BH(k) == ~(Long)0) k += 64;
 #if GNUC_VERSION >= 30406
         /* We use ctzll() instead of ctzl() for compatibility with 32-bit
@@ -1085,37 +1111,36 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
         while (ISSET_BH(k)) k++;
 #endif
       }
-      l = k - 1;
-      if (l >= nblock) break;
-      while (!ISSET_BH(k) && UNALIGNED_BH(k)) k++;
-      if (!ISSET_BH(k))
-      {
-        while (WORD_BH(k) == 0) k += 64;
+      if (unlikely(k > nblock)) break;
+      r = k;
+      k -= 1;
+      while (!ISSET_BH(r) && UNALIGNED_BH(r)) r++;
+      if (!ISSET_BH(r)) {
+        while (WORD_BH(r) == 0) r += 64;
 #if GNUC_VERSION >= 30406
-        k += __builtin_ctzll(WORD_BH(k));
+        r += __builtin_ctzll(WORD_BH(r));
 #else
-        while (!ISSET_BH(k)) k++;
+        while (!ISSET_BH(r)) r++;
 #endif
       }
-      r = k - 1;
-      if (unlikely(r >= nblock)) break;
+      if (unlikely(r > nblock)) break;
 
-      /*-- now [l, r] bracket current bucket --*/
-      if (r > l) {
-        nNotDone += (r - l + 1);
-        fallbackQSort3 ( fmap, eclass, l, r );
+      /* Sort the current bucket -- [k,r). */
+      assert(k < r-1);
+      bpr_quick_sort(ptr, eclass, bhtab, k, r, d, nblock);
 
-        /*-- scan bucket and generate header bits --*/
-        cc = -1;
-        for (i = l; i <= r; i++) {
-          cc1 = eclass[fmap[i]];
-          if (cc != cc1) { SET_BH(i); cc = cc1; };
-        }
+      /* Bucket refinement caused current equivalence class to be divided into
+         disjoint classes. Scan bucket header and update classes. */
+      j = k;
+      while (++k < r) {
+        if (ISSET_BH(k)) j = k;
+        else done = 0;
+        eclass[ptr[k]] = j;
       }
     }
 
-    d *= 2;
-    if (d >= nblock || nNotDone == 0) break;
+    d *= BPR_K;
+    if (done || d >= nblock) break;
   }
 
   free(eclass);
@@ -1127,47 +1152,87 @@ bpr_sort(Int *fmap, Int *ftab, Byte *bigDone, SInt nblock)
   (IV) MASTER ALGORITHM
   ========================================================================= */
 
+/* ============================================================================
+   Compute the BWT (Burrows-Wheeler Transform) of the input string.
+
+   This method uses three different algorithms for BWT computation. All of them
+   have space complexity of O(n), but they differ in time complexity.
+   The algorithms are:
+     1) The Cache-Copy Algorithm
+          average-case time complexity - O(n log n)
+          worst-case time complexity - O(n^3)
+          implementation adopted from bzip2-1.0.5.
+     2) The Bucket-Pointer-Refinement (BPR) algorithm
+          average-case time complexity - O(n log n)
+          worst-case time complexity - O(n^2 log n)
+     3) The LSD radix sort algotim - O(n^2)
+
+   For very short strings (<= 512 characters) the naive LSD radix sort is used.
+
+   Longer strings are attempted to be sorted using a highly optimized variation
+   of Bentley-McIlroy three-way quicksort (the Cache-Copy algorithm; Cache and
+   Copy are one of the improvements to the basic quicksort for strings).
+
+   If quicksort runs into difficulties (or if the user gives `--exponential' on
+   the command line), then BPR is used.
+*/
 void
 YBpriv_block_sort(YBenc_t *s)
 {
   Int i;
   Int nblock = s->nblock;
   Byte *block = s->block;
+
+  /* Quadrants are 16-bit unsigned integers stored in *network* (big-endian)
+     order so they can be easily (and efficiently) compared with memcmp().
+
+     Quadrants are in 1-to-1 relation with input string rotations. The higher
+     byte of each quadrant is simply the first character of the corresponding
+     rotation.  The lower byte of i-th quadrant is the position of (i-1)-th
+     rotation within the small bucket it belongs to, or, if the bucket holds
+     more than 256 rotations, the most significant 8 bits of the position.
+
+     Comparing quadrants of two rotations is a fast way of comparing the
+     rotations, even if they have long common prefix.  If two rotations belong
+     to the same small bucket but they have different quadrants, then the
+     lexicographical order of the rotations is the same as order of their
+     quadrants.
+
+     Quadrants are stored in mtfv[], but they have nothing to do with MTF
+     values -- they just share the same storage. */
   Short *quadrant = s->mtfv;
-  Byte  bigDone[256];
-  int sort_failed;
 
-  Int *ftab;
-  Int *ptr;
+  Byte  bigDone[256];         /* One for big buckets that are done. */
 
-  /* For small blocks the 16-bit bucket sort would be an overkill.
-     We can't use Shell sort because it requires quadrant, which isn't
-     initialised yet, so we just use a naive counting sort in this case. */
-  if (nblock <= RADIX_SORT_THRESH)
-  {
+  Int *ftab; /* Cumulative frequencies of 2-character pairs. (freq. table) */
+  Int *ptr;  /* Pointers to rotations as they are being ordered. (pointrers) */
+
+  /* For small blocks the 16-bit bucket sort would be an overkill.  We can't
+     use Shell sort because it requires quadrant, which isn't initialised yet,
+     so we just use a naive counting sort in this case. */
+  if (nblock <= RS_MBS) {
     radix_sort_bwt(block, nblock, &s->bwt_idx);
     return;
   }
 
-  /* Sort buckets.  After the sort ftab contains the first location
-     of every small bucket. */
+  /* Sort buckets.  After the sort ftab contains the first location of every
+     small bucket. */
   ptr = xmalloc(nblock * sizeof(Int));
   ftab = xmalloc(65537 * sizeof(Int));
   bucket_sort(ptr, block, ftab, nblock);
   bzero(bigDone, 256);
 
-  /* Step Q2. */
+  /* Step Q2. Create quadrants. */
   for (i = 0; i < nblock-1; i++)
     pokes(quadrant + i, (block[i] << 8) | block[i+1]);
   pokes(quadrant + nblock-1, (block[nblock-1] << 8) | block[0]);
   for (i = 0; i < BZ_N_OVERSHOOT; i++)
     quadrant[nblock+i] = quadrant[i];
 
-  if (s->shallow_factor > 0)
-  {
-    copy_cache_wrap(ptr, ftab, quadrant, block, bigDone, nblock,
-                    s->shallow_factor, &s->bwt_idx, &sort_failed);
-    if (!sort_failed)
+  /* Shallow factor is equal to 0 when the user specifies `--exponential'. */
+  if (s->shallow_factor > 0) {
+    if (copy_cache_wrap(ptr, ftab, quadrant, block, bigDone, nblock,
+        s->shallow_factor, &s->bwt_idx))
       goto ok;
   }
 
