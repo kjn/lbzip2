@@ -21,7 +21,7 @@ IFS=' ''	''
 '
 
 if ! test -r build-aux/autogen.sh || ! test -r yambi/yambi.h; then
-  echo autogen.sh: need to be called from top source directory 2>&1
+  echo autogen.sh: need to be called from top source directory >&2
   exit 1
 fi
 
