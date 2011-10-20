@@ -16,3 +16,4 @@
 #
 
 man_MANS = lbzip2.1 lbunzip2.1 lbzcat.1
+EXTRA_DIST = $(man_MANS)
