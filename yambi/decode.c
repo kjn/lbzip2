@@ -162,7 +162,7 @@ mtf_one(YBdec_t *state, Byte c)
 
 
 int
-YBdec_work(YBdec_t *state)
+YBdec_work(YBdec_t *state, unsigned *bs100k)
 {
   Short s;
   Int i, j = 0;
@@ -237,12 +237,11 @@ YBdec_work(YBdec_t *state)
 
   assert(j >= state->num_mtfv);
   state->block_size = j;
+  *bs100k = (j + 100000 - 1) / 100000;
 
   /* Sanity-check the BWT primary index. */
   if (state->bwt_idx >= state->block_size)
-  {
     return YB_ERR_BWTIDX;
-  }
 
   /* Transform counts into indices (cumulative counts). */
   cum = 0;

@@ -181,7 +181,7 @@ emit_data(YBdec_t *state, Byte *b, Int m)
 
 /* This function is basicly a wrapper around emit_data().  */
 int
-YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz)
+YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz, YBcrc_t *crc)
 {
   Int rv;
 
@@ -190,6 +190,7 @@ YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz)
   assert(buf_sz && *buf_sz > 0);
 
   rv = emit_data(dec, buf, *buf_sz);
+  *crc = dec->rle_crc;
 
   if (rv == M1)
   {

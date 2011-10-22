@@ -82,7 +82,7 @@ int YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p,
 /* Decode the block.  If everything goes OK, return YB_OK.
    Any other return value indicated a decode error.
 */
-int YBdec_work(YBdec_t *d);
+int YBdec_work(YBdec_t *d, unsigned *bs100k);
 
 
 /* Write decompressed data into the memory buffer.
@@ -96,7 +96,7 @@ int YBdec_work(YBdec_t *d);
                    decoding current block
      otherwise   - data format error
 */
-int YBdec_emit(YBdec_t *d, void *buf, size_t *buf_sz);
+int YBdec_emit(YBdec_t *d, void *buf, size_t *buf_sz, YBcrc_t *crc);
 
 
 /* Destroy the YBdec_t structure and release any resources associated to it.

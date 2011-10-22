@@ -1,12 +1,19 @@
 NEWS for lbzip2                                                 -*- outline -*-
 
 
-* What's new in lbzip2
+* What's new in lbzip2 2.0
 
 ** Bug fixes
 
    Now lbzip2 creates one compressed stream per bzip2 file instead of multiple
    concatenated streams.
+
+   lbzip2 now doesn't decompress streams embedded within trailing garbage after
+   initial sequence of streams.
+
+   Now lbzip2 detects and rejects more kinds of invalid bzip2 files (files with
+   invalid stream CRCs, files with blocks larger than stated in stream headers
+   and some others).
 
 ** New features
 
@@ -24,6 +31,11 @@ NEWS for lbzip2                                                 -*- outline -*-
    bzip2's one.  More information in the manual.
 
    Now lbzip2 displays more detailed messages on decompression failure.
+
+** Changed features
+
+   Help and version information is now printed to standard output instead of
+   standard error stream.
 
 ** Abandoned features
 
