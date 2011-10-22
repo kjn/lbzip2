@@ -935,13 +935,12 @@ work_get_second(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q,
 
 
 static void
-work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
+work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
+    unsigned ibits_left, struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
+    struct filespec *ispec)
 {
-  struct s2w_blk *s2w_blk;
   uintmax_t first_s2w_blk_id;
-  unsigned ibitbuf,
-      ibits_left;
-  size_t ipos;
+  int first;
 
   uintmax_t bzip2_blk_id;
 
@@ -951,30 +950,152 @@ work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
   uint64_t search;
   int ybret;
 
-again:
-  xlock_pred(&sw2w_q->proceed);
-  s2w_blk = work_get_first(sw2w_q, w2m_q, ispec);
-  if (0 == s2w_blk) {
-    xunlock(&sw2w_q->proceed);
-
-    /* Notify muxer when last worker exits. */
-    xlock(&w2m_q->av_or_ex_or_rel);
-    if (0u == --w2m_q->working && 0u == w2m_q->num_rel && 0 == w2m_q->head) {
-      xsignal(&w2m_q->av_or_ex_or_rel);
-    }
-    xunlock(&w2m_q->av_or_ex_or_rel);
-    return;
-  }
-  sw2w_q->next_scan = s2w_blk->next;
-  xunlock(&sw2w_q->proceed);
-
   first_s2w_blk_id = s2w_blk->id;
+  first = 1;
+  bzip2_blk_id = 0u;
+
+  w2w_blk = xmalloc(sizeof *w2w_blk);
+  w2w_blk->ybdec = YBdec_init();
+
+  for (;;) {  /* outer */
+    while (YB_UNDERFLOW != (ybret = YBdec_retrieve(w2w_blk->ybdec,
+        s2w_blk->compr, &ipos, s2w_blk->loaded, &ibitbuf, &ibits_left))) {
+      if (YB_DONE == ybret)
+        goto out;
+      if (YB_OK != ybret)
+        log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
+            pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+      work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
+      w2w_blk = xmalloc(sizeof *w2w_blk);
+      w2w_blk->ybdec = YBdec_init();
+    }
+
+    if (MX_SPLIT > s2w_blk->loaded)
+      log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
+            " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+    assert(MX_SPLIT == s2w_blk->loaded);
+
+    s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
+
+    if (0 == s2w_blk)
+      log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
+          " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+
+    ipos = 0u;
+    first = 0;
+    assert(0u < s2w_blk->loaded);
+
+    do {  /* inner */
+      while (YB_DONE != (ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr,
+          &ipos, s2w_blk->loaded, &ibitbuf, &ibits_left))) {
+
+        if (YB_UNDERFLOW == ybret)
+          log_fatal("%s: %s%s%s: %s second input block\n", pname, ispec->sep,
+              ispec->fmt, ispec->sep, MX_SPLIT == s2w_blk->loaded ?
+              "missing bzip2 block header in full" :
+              "unterminated bzip2 block in short");
+
+        if (YB_OK != ybret)
+          log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
+              pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+
+        if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
+          xlock(&sw2w_q->proceed);
+          work_release(s2w_blk, sw2w_q, w2m_q);
+          work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
+          return;
+        }
+
+        work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
+        w2w_blk = xmalloc(sizeof *w2w_blk);
+        w2w_blk->ybdec = YBdec_init();
+      }
+
+    out:
+      search = -1;
+      do {  /* out bzip2 */
+        if (0 == ibits_left) {
+          if (s2w_blk->loaded == ipos) {
+            if (first) {
+              if (MX_SPLIT > s2w_blk->loaded) {
+                xlock(&sw2w_q->proceed);
+                assert(0 == s2w_blk->next);
+                assert(sw2w_q->eof);
+                work_release(s2w_blk, sw2w_q, w2m_q);
+                s2w_blk = 0;
+              }
+              else {
+                assert(MX_SPLIT == s2w_blk->loaded);
+                s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
+              }
+
+              if (0 == s2w_blk) {
+                work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
+                    sw2w_q);
+                return;
+              }
+
+              ipos = 0u;
+              first = 0;
+              assert(0u < s2w_blk->loaded);
+            }
+            else {
+              if (MX_SPLIT == s2w_blk->loaded) {
+                log_fatal("%s: %s%s%s: missing bzip2 block header in full"
+                    " second input block\n", pname, ispec->sep, ispec->fmt,
+                    ispec->sep);
+              }
+
+              /* Terminated bzip2 block at end of short second input block. */
+              xlock(&sw2w_q->proceed);
+              assert(0 == s2w_blk->next);
+              assert(sw2w_q->eof);
+              work_release(s2w_blk, sw2w_q, w2m_q);
+
+              work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
+                  sw2w_q);
+              return;
+            }
+          }
+
+          ibitbuf = ntohl(s2w_blk->compr[ipos]);
+          ibits_left = 32u;
+          ipos++;
+        }
+
+        bit = ibitbuf >> --ibits_left & 1u;
+        search = (search << 1 | bit) & magic_mask;
+      } while (magic_hdr != search);  /* out bzip2 */
+
+      if (!first && (size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
+        xlock(&sw2w_q->proceed);
+        work_release(s2w_blk, sw2w_q, w2m_q);
+        work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
+        return;
+      }
+
+      work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
+
+      w2w_blk = xmalloc(sizeof *w2w_blk);
+      w2w_blk->ybdec = YBdec_init();
+    } while (!first);  /* inner */
+  }  /* outer */
+}
+
+
+static void
+work_scan(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
+    struct filespec *ispec)
+{
+  unsigned ibitbuf,
+      ibits_left;
+  unsigned bit;
+  uint64_t search;
+  size_t ipos;
+
   ibits_left = 0u;
   ipos = 0u;
   assert(0u < s2w_blk->loaded);
-
-  bzip2_blk_id = 0u;
-  w2w_blk = 0;
   search = -1;
 
   do {  /* never seen magic */
@@ -992,9 +1113,7 @@ again:
         assert(0 == s2w_blk->next);
         assert(sw2w_q->eof);
         work_release(s2w_blk, sw2w_q, w2m_q);
-
-        assert(0 == w2w_blk);
-        goto again;
+        return;
       }
 
       ibitbuf = ntohl(s2w_blk->compr[ipos]);
@@ -1006,163 +1125,32 @@ again:
     search = (search << 1 | bit) & magic_mask;
   } while (magic_hdr != search);  /* never seen magic */
 
-  w2w_blk = xmalloc(sizeof *w2w_blk);
-  w2w_blk->ybdec = YBdec_init();
+  work_retrieve(s2w_blk, ipos, ibitbuf, ibits_left, sw2w_q, w2m_q, ispec);
+}
 
-  for (;;) {  /* first block */
-    do {  /* in bzip2 */
-      ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
-          s2w_blk->loaded, &ibitbuf, &ibits_left);
-      if (YB_UNDERFLOW == ybret) {
-        if (MX_SPLIT > s2w_blk->loaded) {
-          log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
-              " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-        }
-        assert(MX_SPLIT == s2w_blk->loaded);
 
-        s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
+static void
+work(struct sw2w_q *sw2w_q, struct w2m_q *w2m_q, struct filespec *ispec)
+{
+  struct s2w_blk *s2w_blk;
 
-        if (0 == s2w_blk) {
-          log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
-              " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-        }
+  xlock_pred(&sw2w_q->proceed);
 
-        ipos = 0u;
-        assert(0u < s2w_blk->loaded);
-        goto in_second;
-      }
-      else if (YB_OK == ybret) {
-        work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
+  while (0 != (s2w_blk = work_get_first(sw2w_q, w2m_q, ispec))) {
+    sw2w_q->next_scan = s2w_blk->next;
+    xunlock(&sw2w_q->proceed);
+    work_scan(s2w_blk, sw2w_q, w2m_q, ispec);
+    xlock_pred(&sw2w_q->proceed);
+  }
 
-        w2w_blk = xmalloc(sizeof *w2w_blk);
-        w2w_blk->ybdec = YBdec_init();
-      }
-      else if (YB_DONE == ybret) {
-        break;
-      }
-      else {
-        log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
-            pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
-      }
-    } while (1);  /* in bzip2 */
+  xunlock(&sw2w_q->proceed);
 
-    search = -1;
-    do {  /* out bzip2 */
-      if (0 == ibits_left) {
-        if (s2w_blk->loaded == ipos) {
-          if (MX_SPLIT > s2w_blk->loaded) {
-            xlock(&sw2w_q->proceed);
-            assert(0 == s2w_blk->next);
-            assert(sw2w_q->eof);
-            work_release(s2w_blk, sw2w_q, w2m_q);
-            s2w_blk = 0;
-          }
-          else {
-            assert(MX_SPLIT == s2w_blk->loaded);
-            s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
-          }
-
-          if (0 == s2w_blk) {
-            work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
-            goto again;
-          }
-
-          ipos = 0u;
-          assert(0u < s2w_blk->loaded);
-          goto out_second;
-        }
-
-        ibitbuf = ntohl(s2w_blk->compr[ipos]);
-        ibits_left = 32u;
-        ipos++;
-      }
-
-      bit = ibitbuf >> --ibits_left & 1u;
-      search = (search << 1 | bit) & magic_mask;
-    } while (magic_hdr != search);  /* out bzip2 */
-
-    work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
-
-    w2w_blk = xmalloc(sizeof *w2w_blk);
-    w2w_blk->ybdec = YBdec_init();
-  }  /* first block */
-
-  for (;;) {  /* second block */
-    do {  /* in bzip2 */
-    in_second:
-      ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
-          s2w_blk->loaded, &ibitbuf, &ibits_left);
-      if (YB_UNDERFLOW == ybret) {
-        log_fatal("%s: %s%s%s: %s second input block\n", pname, ispec->sep,
-            ispec->fmt, ispec->sep, MX_SPLIT == s2w_blk->loaded ?
-            "missing bzip2 block header in full" :
-            "unterminated bzip2 block in short");
-      }
-      else if (YB_OK == ybret) {
-        if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
-          xlock(&sw2w_q->proceed);
-          work_release(s2w_blk, sw2w_q, w2m_q);
-          work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
-          goto again;
-        }
-
-        work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
-
-        w2w_blk = xmalloc(sizeof *w2w_blk);
-        w2w_blk->ybdec = YBdec_init();
-      }
-      else if (YB_DONE == ybret) {
-        break;
-      }
-      else {
-        log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
-            pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
-      }
-    } while (1);  /* in bzip2 */
-
-    search = -1;
-    do {  /* out bzip2 */
-      if (0 == ibits_left) {
-        if (s2w_blk->loaded == ipos) {
-          if (MX_SPLIT == s2w_blk->loaded) {
-            log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                " second input block\n", pname, ispec->sep, ispec->fmt,
-                ispec->sep);
-          }
-
-          /* Terminated bzip2 block at end of short second input block. */
-          xlock(&sw2w_q->proceed);
-          assert(0 == s2w_blk->next);
-          assert(sw2w_q->eof);
-          work_release(s2w_blk, sw2w_q, w2m_q);
-
-          work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
-          goto again;
-        }
-
-      out_second:
-        ibitbuf = ntohl(s2w_blk->compr[ipos]);
-        ibits_left = 32u;
-        ipos++;
-      }
-
-      bit = ibitbuf >> --ibits_left & 1u;
-      search = (search << 1 | bit) & magic_mask;
-
-    } while (magic_hdr != search);  /* out bzip2 */
-
-    if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
-      xlock(&sw2w_q->proceed);
-      work_release(s2w_blk, sw2w_q, w2m_q);
-      work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
-      goto again;
-    }
-
-    work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
-
-    w2w_blk = xmalloc(sizeof *w2w_blk);
-    w2w_blk->ybdec = YBdec_init();
-  }  /* second block */
+  /* Notify muxer when last worker exits. */
+  xlock(&w2m_q->av_or_ex_or_rel);
+  if (0u == --w2m_q->working && 0u == w2m_q->num_rel && 0 == w2m_q->head) {
+    xsignal(&w2m_q->av_or_ex_or_rel);
+  }
+  xunlock(&w2m_q->av_or_ex_or_rel);
 }
 
 
