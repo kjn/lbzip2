@@ -46,15 +46,15 @@ static const uint64_t
   We assume that there exists an upper bound on the size of any bzip2 block,
   i.e. we don't try to support arbitarly large blocks.
 */
-#define MX_SPLIT ((size_t)(1024u * 1024u))
+#define MX_SPLIT ((size_t)(1024u * 1024u / 4u))
 
 struct s2w_blk                   /* Splitter to workers. */
 {
   uintmax_t id;                  /* Block serial number as read from stdin. */
   struct s2w_blk *next;          /* First part of next block belongs to us. */
   unsigned refno;                /* Threads not yet done with this block. */
-  size_t loaded;                 /* Number of bytes in compr. */
-  uint32_t compr[MX_SPLIT / 4u]; /* Data read from stdin. */
+  size_t loaded;                 /* Number of 32-bit words in compr. */
+  uint32_t compr[MX_SPLIT];      /* Data read from stdin. */
 };
 
 
@@ -378,10 +378,19 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
     s2w_blk = xmalloc(sizeof *s2w_blk);
 
     /* Fill block. */
-    vacant = sizeof s2w_blk->compr;
+    vacant = 4u * MX_SPLIT;
     xread(ispec, (void *)s2w_blk->compr, &vacant);
 
-    if (sizeof s2w_blk->compr == vacant) {
+    /*
+      Convert vacant from bytes to 32-bit words, rounding down.  The last word
+      of s2w_blk->compr is padded with zeroes if necessary.  Padding is allowed
+      because garbage trailing bzip2 files is ignored anyways.
+    */
+    while (0u < (vacant & 3u))
+      ((char unsigned *)s2w_blk->compr)[4u * MX_SPLIT - vacant--] = 0;
+    vacant >>= 2;
+
+    if (MX_SPLIT == vacant) {
       /* Empty input block. */
       free(s2w_blk);
       s2w_blk = 0;
@@ -395,7 +404,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
           - current tail -> new next if not first.
       */
       s2w_blk->refno = 1u + (unsigned)(0 != atch_scan);
-      s2w_blk->loaded = sizeof s2w_blk->compr - vacant;
+      s2w_blk->loaded = MX_SPLIT - vacant;
     }
 
     xlock(&sw2w_q->proceed);
@@ -495,7 +504,7 @@ split(struct m2s_q *m2s_q, struct sw2w_q *sw2w_q, struct filespec *ispec)
     }
   } while (0u == vacant);
 
-  if (sizeof atch_scan->compr == vacant) {
+  if (MX_SPLIT == vacant) {
     xlock(&m2s_q->av);
     ++m2s_q->num_free;
     xunlock(&m2s_q->av);
@@ -970,14 +979,14 @@ again:
 
   do {  /* never seen magic */
     if (0 == ibits_left) {
-      if (s2w_blk->loaded / 4u == ipos) {
-        if (sizeof s2w_blk->compr == s2w_blk->loaded) {
+      if (s2w_blk->loaded == ipos) {
+        if (MX_SPLIT == s2w_blk->loaded) {
           log_fatal("%s: %s%s%s: missing bzip2 block header in full first"
               " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
         }
 
         /* Short first input block without a bzip2 block header. */
-        assert(sizeof s2w_blk->compr > s2w_blk->loaded);
+        assert(MX_SPLIT > s2w_blk->loaded);
 
         xlock(&sw2w_q->proceed);
         assert(0 == s2w_blk->next);
@@ -1003,13 +1012,13 @@ again:
   for (;;) {  /* first block */
     do {  /* in bzip2 */
       ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
-          s2w_blk->loaded / 4u, &ibitbuf, &ibits_left);
+          s2w_blk->loaded, &ibitbuf, &ibits_left);
       if (YB_UNDERFLOW == ybret) {
-        if (sizeof s2w_blk->compr > s2w_blk->loaded) {
+        if (MX_SPLIT > s2w_blk->loaded) {
           log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
               " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
         }
-        assert(sizeof s2w_blk->compr == s2w_blk->loaded);
+        assert(MX_SPLIT == s2w_blk->loaded);
 
         s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
 
@@ -1040,8 +1049,8 @@ again:
     search = -1;
     do {  /* out bzip2 */
       if (0 == ibits_left) {
-        if (s2w_blk->loaded / 4u == ipos) {
-          if (sizeof s2w_blk->compr > s2w_blk->loaded) {
+        if (s2w_blk->loaded == ipos) {
+          if (MX_SPLIT > s2w_blk->loaded) {
             xlock(&sw2w_q->proceed);
             assert(0 == s2w_blk->next);
             assert(sw2w_q->eof);
@@ -1049,7 +1058,7 @@ again:
             s2w_blk = 0;
           }
           else {
-            assert(sizeof s2w_blk->compr == s2w_blk->loaded);
+            assert(MX_SPLIT == s2w_blk->loaded);
             s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
           }
 
@@ -1082,10 +1091,10 @@ again:
     do {  /* in bzip2 */
     in_second:
       ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr, &ipos,
-          s2w_blk->loaded / 4u, &ibitbuf, &ibits_left);
+          s2w_blk->loaded, &ibitbuf, &ibits_left);
       if (YB_UNDERFLOW == ybret) {
         log_fatal("%s: %s%s%s: %s second input block\n", pname, ispec->sep,
-            ispec->fmt, ispec->sep, sizeof s2w_blk->compr == s2w_blk->loaded ?
+            ispec->fmt, ispec->sep, MX_SPLIT == s2w_blk->loaded ?
             "missing bzip2 block header in full" :
             "unterminated bzip2 block in short");
       }
@@ -1114,8 +1123,8 @@ again:
     search = -1;
     do {  /* out bzip2 */
       if (0 == ibits_left) {
-        if (s2w_blk->loaded / 4u == ipos) {
-          if (sizeof s2w_blk->compr == s2w_blk->loaded) {
+        if (s2w_blk->loaded == ipos) {
+          if (MX_SPLIT == s2w_blk->loaded) {
             log_fatal("%s: %s%s%s: missing bzip2 block header in full"
                 " second input block\n", pname, ispec->sep, ispec->fmt,
                 ispec->sep);
