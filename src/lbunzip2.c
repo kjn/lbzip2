@@ -946,8 +946,7 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
 
   struct w2w_blk *w2w_blk;
 
-  unsigned bit;
-  uint64_t search;
+  unsigned word;
   int ybret;
 
   first_s2w_blk_id = s2w_blk->id;
@@ -1012,11 +1011,39 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
       }
 
     out:
-      search = -1;
-      do {  /* out bzip2 */
-        if (0 == ibits_left) {
-          if (s2w_blk->loaded == ipos) {
-            if (first) {
+      {
+        enum state {
+          CRC1, CRC2, STREAM_MAGIC_1, STREAM_MAGIC_2, BLOCK_MAGIC_1,
+          BLOCK_MAGIC_2, BLOCK_MAGIC_3, EOS_2, EOS_3, EOS_CRC_1, EOS_CRC_2,
+          ACCEPT,
+        };
+        uint64_t qq_buff = ibitbuf;
+        enum state state = CRC1;
+        unsigned crc, bs100k;
+
+        do {
+          if (16u > ibits_left) {
+            if (s2w_blk->loaded == ipos) {
+              if (!first) {
+                if (MX_SPLIT == s2w_blk->loaded) {
+                  log_fatal("%s: %s%s%s: missing bzip2 block header in full"
+                      " second input block\n", pname, ispec->sep, ispec->fmt,
+                      ispec->sep);
+                }
+
+                /*
+                  Terminated bzip2 block at end of short second input block.
+                */
+                xlock(&sw2w_q->proceed);
+                assert(0 == s2w_blk->next);
+                assert(sw2w_q->eof);
+                work_release(s2w_blk, sw2w_q, w2m_q);
+
+                work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
+                  sw2w_q);
+                return;
+              }
+
               if (MX_SPLIT > s2w_blk->loaded) {
                 xlock(&sw2w_q->proceed);
                 assert(0 == s2w_blk->next);
@@ -1039,33 +1066,96 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
               first = 0;
               assert(0u < s2w_blk->loaded);
             }
-            else {
-              if (MX_SPLIT == s2w_blk->loaded) {
-                log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                    " second input block\n", pname, ispec->sep, ispec->fmt,
-                    ispec->sep);
-              }
 
-              /* Terminated bzip2 block at end of short second input block. */
-              xlock(&sw2w_q->proceed);
-              assert(0 == s2w_blk->next);
-              assert(sw2w_q->eof);
-              work_release(s2w_blk, sw2w_q, w2m_q);
+            qq_buff = (qq_buff << 32) | ntohl(s2w_blk->compr[ipos]);
+            ibits_left += 32u;
+            ipos++;
+          }
+ 
+          ibits_left -= 16u;
+          word = qq_buff >> ibits_left & 0xFFFFu;
 
-              work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
-                  sw2w_q);
-              return;
+          switch (state) {
+
+          case CRC1:
+            crc = word << 16u;
+            state = CRC2;
+            continue;
+
+          case CRC2:
+            crc |= word;
+            ibits_left &= 0x18u;  /* align to byte boundrary */
+            state = STREAM_MAGIC_1;
+            continue;
+
+          case STREAM_MAGIC_1:
+            if (0x425Au != word)
+              break;
+            state = STREAM_MAGIC_2;
+            continue;
+
+          case STREAM_MAGIC_2:
+            if (0x6839u < word || 0x6831 > word)
+              break;
+            bs100k = word & 7u;
+            state = BLOCK_MAGIC_1;
+            continue;
+
+          case BLOCK_MAGIC_1:
+            if (0x1772u == word) {
+              state = EOS_2;
+              continue;
             }
+            if (0x3141u != word)
+              break;
+            state = BLOCK_MAGIC_2;
+            continue;
+
+          case BLOCK_MAGIC_2:
+            if (0x5926u != word)
+              break;
+            state = BLOCK_MAGIC_3;
+            continue;
+
+          case BLOCK_MAGIC_3:
+            if (0x5359u != word)
+              break;
+            state = ACCEPT;
+            continue;
+
+          case EOS_2:
+            if (0x4538u != word)
+              break;
+            state = EOS_3;
+            continue;
+
+          case EOS_3:
+            if (0x5090u != word)
+              break;
+            state = EOS_CRC_1;
+            continue;
+
+          case EOS_CRC_1:
+            if (0u != word)
+              break;
+            state = EOS_CRC_2;
+            continue;
+
+          case EOS_CRC_2:
+            if (0u != word)
+              break;
+            state = STREAM_MAGIC_1;
+            continue;
+
+          default:
+            assert(0);
           }
 
-          ibitbuf = ntohl(s2w_blk->compr[ipos]);
-          ibits_left = 32u;
-          ipos++;
-        }
+          ipos = s2w_blk->loaded;  /* ignore garbage */
+        } while (ACCEPT != state);
 
-        bit = ibitbuf >> --ibits_left & 1u;
-        search = (search << 1 | bit) & magic_mask;
-      } while (magic_hdr != search);  /* out bzip2 */
+        ibitbuf = qq_buff;
+      }
 
       if (!first && (size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
         xlock(&sw2w_q->proceed);
@@ -1075,7 +1165,6 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
       }
 
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
-
       w2w_blk = xmalloc(sizeof *w2w_blk);
       w2w_blk->ybdec = YBdec_init();
     } while (!first);  /* inner */
