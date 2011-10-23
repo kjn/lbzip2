@@ -1136,7 +1136,7 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
           switch (state) {
 
           case CRC1:
-            w2w_blk->crc = word << 16u;
+            w2w_blk->crc = word << 16;
             state = CRC2;
             continue;
 
@@ -1237,48 +1237,50 @@ work_scan(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
 {
   unsigned ibitbuf,
       ibits_left;
-  unsigned bit;
-  uint64_t search;
   size_t ipos;
 
+  ibitbuf = 0;
   ibits_left = 0u;
   ipos = 0u;
   assert(0u < s2w_blk->loaded);
 
-  if (1u == s2w_blk->id) {
-    ibitbuf = 0;
-    work_retrieve(s2w_blk, ipos, ibitbuf, ibits_left, sw2w_q, w2m_q, ispec);
-    return;
-  }
+  if (1u < s2w_blk->id) {
 
-  search = -1;
+#include "scantab.h"
 
-  do {  /* never seen magic */
-    if (0 == ibits_left) {
-      if (s2w_blk->loaded == ipos) {
-        if (MX_SPLIT == s2w_blk->loaded) {
-          log_fatal("%s: %s%s%s: missing bzip2 block header in full first"
-              " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
-        }
+    unsigned state = 0u;
+    unsigned backtrack_state;
 
-        /* Short first input block without a bzip2 block header. */
-        assert(MX_SPLIT > s2w_blk->loaded);
-
-        xlock(&sw2w_q->proceed);
-        assert(0 == s2w_blk->next);
-        assert(sw2w_q->eof);
-        work_release(s2w_blk, sw2w_q, w2m_q);
-        return;
-      }
-
+    do {
+      backtrack_state = state;
       ibitbuf = ntohl(s2w_blk->compr[ipos]);
-      ibits_left = 32u;
+      state = big_dfa[state][ibitbuf >> 24];
+      state = big_dfa[state][ibitbuf >> 16 & 0xFF];
+      state = big_dfa[state][ibitbuf >> 8 & 0xFF];
+      state = big_dfa[state][ibitbuf & 0xFF];
       ipos++;
-    }
+    } while (ACCEPT != state && s2w_blk->loaded > ipos);
 
-    bit = ibitbuf >> --ibits_left & 1u;
-    search = (search << 1 | bit) & magic_mask;
-  } while (magic_hdr != search);  /* never seen magic */
+    ibits_left = 32u;
+    state = backtrack_state;
+    while (ACCEPT != state && 0u < ibits_left)
+      state = mini_dfa[state][ibitbuf >> --ibits_left & 1u];
+
+    if (ACCEPT != state) {
+      assert(s2w_blk->loaded == ipos);
+      if (MX_SPLIT == s2w_blk->loaded)
+        log_fatal("%s: %s%s%s: missing bzip2 block header in full first"
+            " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+
+      /* Short first input block without a bzip2 block header. */
+      assert(MX_SPLIT > s2w_blk->loaded);
+      xlock(&sw2w_q->proceed);
+      assert(0 == s2w_blk->next);
+      assert(sw2w_q->eof);
+      work_release(s2w_blk, sw2w_q, w2m_q);
+      return;
+    }
+  }
 
   work_retrieve(s2w_blk, ipos, ibitbuf, ibits_left, sw2w_q, w2m_q, ispec);
 }

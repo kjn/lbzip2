@@ -19,7 +19,7 @@
 use Text::Wrap;
 open F, ">yambi/crctab.c" or die;
 printf F q(/* This file was generated automaticly by make-crctab.pl.
-   It's not subject to copyright -- it's in public domain. */
+   For comments refer to the generator script -- make-crctab.pl. */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
