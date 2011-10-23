@@ -1,17 +1,32 @@
 #! /bin/sh
-set -e
+# Copyright (C) 2011 Mikolaj Izdebski
+
+set -e -C
 PATH=.:../src:"$PATH"
+IFS=' ''	''
+'
+
+test -r "$1"
+
+# Unset variables that may affect behavior of lbzip2.
 unset LBZIP2
 unset BZIP2
 unset BZIP
-unset rc
 
-test -r "$1"
-r1="$1".minbzcat."$$"
-r2="$1".lbzip2."$$"
-minbzcat <"$1" >"$r1" 2>/dev/null || xbad=1
-lbzip2 -dcq <"$1" 2>/dev/null >"$r2" || bad=1
-((test "$xbad" && test "$bad") || (test ! "$xbad" && test ! "$bad" &&
-    cmp "$r1" "$r2" 2>/dev/null)) || rc=1
-rm -f "$r1" "$r2"
+# Create temp files in current working directory.
+bn=$(echo "$1" | sed '/^.*\/\([^/][^/]*\)$/s//\1/')
+r1=$bn.minbzcat.$$
+r2=$bn.lbzip2.$$
+
+# bad - bad bz2 file according to lbzip2
+# xbad - bad bz2 file according to minbzcat (expected bad)
+minbzcat <"$1" >$r1 2>/dev/null && xbad= || xbad=1
+lbzip2 -dcq <"$1" >$r2 2>/dev/null && bad= || bad=1
+
+# dash's builtin test needs this redundand quoting before $bad and $xbad,
+# see: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=598238
+((test $xbad && test $bad) || (test ! ''$xbad && test ! ''$bad &&
+    cmp $r1 $r2 2>/dev/null)) && rc= || rc=1
+
+rm -f $r1 $r2
 exit $rc
