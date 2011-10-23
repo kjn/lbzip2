@@ -26,6 +26,7 @@ struct lbunzip2_arg
   int print_cctrs;
   struct filespec *ispec,
       *ospec;
+  int verbose;
 };
 
 void *

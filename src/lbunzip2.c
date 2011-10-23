@@ -71,7 +71,8 @@ struct w2w_blk              /* Worker to workers. */
   struct w2w_blk_id id;     /* Stdin blk idx & bzip2 blk idx in former. */
   YBdec_t *ybdec;           /* Partly decompressed block. */
   unsigned bs100k;          /* New bs100k, 0 if unchanged. */
-  uint32_t crc;             /* Stored stream CRC (valid only if bs100k == 0) */
+  uint32_t crc;             /* Stored stream CRC (valid only if bs100k != 0) */
+  off_t end_offs;           /* File offset of the end of the block. */
 };
 
 
@@ -270,6 +271,7 @@ struct w2m_blk                       /* Workers to muxer. */
   unsigned bs100k1;         /* This block's bs100k. */
   uint32_t crc;             /* Stored stream CRC (valid only if bs100k == 0) */
   uint32_t crc1;            /* Computed block CRC */
+  off_t end_offs;           /* File offset of the end of the block. */
   char unsigned decompr[MX_DECOMPR]; /* Data to write to stdout. */
 };
 
@@ -550,6 +552,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
 
   if (!w2w_blk->ybdec) {
     struct w2m_blk *w2m_blk = xmalloc(sizeof *w2m_blk);
+
     w2m_blk->id.w2w_blk_id = w2w_blk->id;
     w2m_blk->id.decompr_blk_id = 0u;
     w2m_blk->id.last_decompr = 1;
@@ -558,6 +561,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
     w2m_blk->crc = 0u;
     w2m_blk->crc1 = 0u;
     w2m_blk->bs100k1 = 0u;
+    w2m_blk->end_offs = 0u;
 
     /* XXX extract this as a subprocedure */
     xlock(&w2m_q->av_or_ex_or_rel);
@@ -600,6 +604,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
     w2m_blk->crc = w2w_blk->crc;
     w2m_blk->crc1 = crc;
     w2m_blk->bs100k1 = bs100k;
+    w2m_blk->end_offs = w2w_blk->end_offs;
 
     /*
       Push decompressed sub-block to muxer.
@@ -983,6 +988,7 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
   int first;
 
   uintmax_t bzip2_blk_id;
+#define SETX assert(w2w_blk != 0); w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT + ipos : 0u
 
   struct w2w_blk *w2w_blk;
 
@@ -1013,6 +1019,7 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
       if (YB_OK != ybret)
         log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
             pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+      SETX;
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
       w2w_blk = xmalloc(sizeof *w2w_blk);
       w2w_blk->ybdec = YBdec_init();
@@ -1051,11 +1058,13 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
 
         if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
           xlock(&sw2w_q->proceed);
+          SETX;
           work_release(s2w_blk, sw2w_q, w2m_q);
           work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
           return;
         }
 
+        SETX;
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
         w2w_blk = xmalloc(sizeof *w2w_blk);
         w2w_blk->ybdec = YBdec_init();
@@ -1096,11 +1105,13 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
                 assert(sw2w_q->eof);
                 work_release(s2w_blk, sw2w_q, w2m_q);
 
+                SETX;
                 work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
                   sw2w_q);
                 return;
               }
 
+              SETX;
               if (MX_SPLIT > s2w_blk->loaded) {
                 xlock(&sw2w_q->proceed);
                 assert(0 == s2w_blk->next);
@@ -1216,11 +1227,13 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
 
       if (!first && (size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
         xlock(&sw2w_q->proceed);
+        SETX;
         work_release(s2w_blk, sw2w_q, w2m_q);
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
         return;
       }
 
+      SETX;
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
       w2w_blk = xmalloc(sizeof *w2w_blk);
       w2w_blk->ybdec = YBdec_init();
@@ -1332,7 +1345,7 @@ work_wrap(void *v_work_arg)
 
 static void
 mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
-    struct filespec *ospec)
+    struct filespec *ospec, int verbose)
 {
   struct pqueue reord;
   struct w2m_blk_nid reord_needed;
@@ -1341,6 +1354,16 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   uint32_t crc;
   int any;
   int finished;
+  struct progress progr;
+  off_t last_offs;
+  off_t input_size;
+
+  /*
+    Initialize progress info.  We need to align input file size to 32-bit word
+    boundrary because splitter did that too.  If an overflow occurs then it
+    will be overflow to zero and progress info will be disabled.  That's fine.
+  */
+  progress_init(&progr, verbose, (ispec->size + 3u) / 4u);
 
   reord_needed.s2w_blk_id = 0u;
   reord_needed.bzip2_blk_id = 0u;
@@ -1351,6 +1374,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   crc = 0u;
   any = 0;
   finished = 0;
+  last_offs = 0u;
 
   xlock_pred(&w2m_q->av_or_ex_or_rel);
   do {
@@ -1374,9 +1398,8 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
 
     if (0u < num_rel) {
       xlock(&m2s_q->av);
-      if (0u == m2s_q->num_free) {
+      if (0u == m2s_q->num_free)
         xsignal(&m2s_q->av);
-      }
       m2s_q->num_free += num_rel;
       xunlock(&m2s_q->av);
     }
@@ -1398,38 +1421,42 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
       missing.
     */
     while (!pqueue_empty(&reord)) {
-      struct w2m_blk *reord_w2m_blk;
-
-      reord_w2m_blk = pqueue_peek(&reord);
-      if (!w2m_blk_id_eq(&reord_w2m_blk->id, &reord_needed)) {
+      w2m_blk = pqueue_peek(&reord);
+      if (!w2m_blk_id_eq(&w2m_blk->id, &reord_needed))
         break;
-      }
 
       if (!finished) {
-        if (reord_w2m_blk->id.last_decompr) {
-          crc = (crc << 1) ^ (crc >> 31) ^ reord_w2m_blk->crc1;
-          if (bs100k < reord_w2m_blk->bs100k1)
+        if (w2m_blk->id.last_decompr) {
+          crc = (crc << 1) ^ (crc >> 31) ^ w2m_blk->crc1;
+          if (bs100k < w2m_blk->bs100k1)
             log_fatal("%s: %s%s%s: block overrun\n", pname, ispec->sep,
                 ispec->fmt, ispec->sep);
         }
 
-        if (reord_w2m_blk->bs100k) {
-          bs100k = reord_w2m_blk->bs100k;
+        if (w2m_blk->bs100k) {
+          bs100k = w2m_blk->bs100k;
           any |= (9u >= bs100k);
-          if (crc != reord_w2m_blk->crc)
+          if (crc != w2m_blk->crc)
             log_fatal("%s: %s%s%s: stream CRC mismatch\n", pname, ispec->sep,
                 ispec->fmt, ispec->sep);
           crc = 0u;
           finished = (9u < bs100k);
         }
 
-        /* Write out "reord_w2m_blk". */
-        if (0u < reord_w2m_blk->produced)
-          xwrite(ospec, reord_w2m_blk->decompr, reord_w2m_blk->produced);
+        /* Write out "w2m_blk". */
+        if (0u < w2m_blk->produced)
+          xwrite(ospec, w2m_blk->decompr, w2m_blk->produced);
+
+        if (finished)
+          progress_update(&progr, (ispec->size + 3u) / 4u - last_offs);
+        else if (w2m_blk->id.last_decompr && w2m_blk->end_offs > last_offs) {
+          progress_update(&progr, w2m_blk->end_offs - last_offs);
+          last_offs = w2m_blk->end_offs;
+        }
       }
 
-      if (reord_w2m_blk->id.last_decompr) {
-        if (reord_w2m_blk->id.w2w_blk_id.last_bzip2) {
+      if (w2m_blk->id.last_decompr) {
+        if (w2m_blk->id.w2w_blk_id.last_bzip2) {
           ++reord_needed.s2w_blk_id;
           reord_needed.bzip2_blk_id = 0u;
         }
@@ -1443,9 +1470,9 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
         ++reord_needed.decompr_blk_id;
       }
 
-      /* Release "reord_w2m_blk". */
+      /* Release "w2m_blk". */
       pqueue_pop(&reord);
-      free(reord_w2m_blk);
+      free(w2m_blk);
     }
 
     if (0u == working) {
@@ -1463,6 +1490,10 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
     log_fatal("%s: %s%s%s: not a valid bzip2 file\n", pname, ispec->sep,
         ispec->fmt, ispec->sep);
 
+  if (!finished)
+    progress_update(&progr, (ispec->size + 3u) / 4u - last_offs);
+  progress_finish(&progr);
+
   assert(0u == reord_needed.decompr_blk_id);
   assert(0u == reord_needed.bzip2_blk_id);
   pqueue_uninit(&reord);
@@ -1471,7 +1502,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
 
 static void
 lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
-    struct filespec *ispec, struct filespec *ospec)
+    struct filespec *ispec, struct filespec *ospec, int verbose)
 {
   struct sw2w_q sw2w_q;
   struct w2m_q w2m_q;
@@ -1502,7 +1533,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
     xcreate(&worker[i], work_wrap, &work_arg);
   }
 
-  mux(&w2m_q, &m2s_q, ispec, ospec);
+  mux(&w2m_q, &m2s_q, ispec, ospec, verbose);
 
   i = num_worker;
   do {
@@ -1550,7 +1581,8 @@ lbunzip2_wrap(void *v_lbunzip2_arg)
       lbunzip2_arg->num_slot,
       lbunzip2_arg->print_cctrs,
       lbunzip2_arg->ispec,
-      lbunzip2_arg->ospec
+      lbunzip2_arg->ospec,
+      lbunzip2_arg->verbose
   );
 
   xraise(SIGUSR2);

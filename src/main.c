@@ -1577,6 +1577,7 @@ process(const struct opts *opts, unsigned num_slot, struct filespec *ispec,
     muxer_arg.lbunzip2.print_cctrs = opts->print_cctrs;
     muxer_arg.lbunzip2.ispec = ispec;
     muxer_arg.lbunzip2.ospec = ospec;
+    muxer_arg.lbunzip2.verbose = opts->verbose;
     xcreate(&muxer, lbunzip2_wrap, &muxer_arg.lbunzip2);
   }
   else {
