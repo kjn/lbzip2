@@ -25,7 +25,6 @@
 #include <stdlib.h>       /* free() */
 #include <unistd.h>       /* isatty() */
 
-#include "timespec.h"     /* gettime() */
 #include "xalloc.h"       /* xmalloc() */
 #include "yambi.h"        /* YBenc_t */
 
@@ -403,30 +402,15 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   char unsigned buffer[YB_HEADER_SIZE > YB_TRAILER_SIZE ? YB_HEADER_SIZE
       : YB_TRAILER_SIZE];
   YBobs_t *obs;
-  off_t uncompr_total;
-  struct timespec start_time,
-      next_time;
-  int progress;
+  struct progress progr;
 
-  /*
-    Progress info is displayed only if all the following conditions are met:
-     1) the user has specified -v or --verbose option
-     2) stderr is connected to a terminal device
-     3) the input file is a regular file
-     4) the input file is nonempty
-  */
-  if ((progress = verbose && (0 < ispec->size) && isatty(STDERR_FILENO))) {
-    gettime(&start_time);
-    next_time = start_time;
-    log_info("%s: progress: %.2f%%\r", pname, 0.0);
-  }
+  progress_init(&progr, verbose, ispec->size);
 
   /* Init obs and write out stream header. */
   obs = YBobs_init(100000 * bs100k, buffer);
   xwrite(ospec, buffer, YB_HEADER_SIZE);
 
   reord_needed = 0u;
-  uncompr_total = 0;
   pqueue_init(&reord, w2m_blk_cmp);
 
   xlock_pred(&w2m_q->av_or_exit);
@@ -489,26 +473,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
       }
       xunlock(&m2s_q->av);
 
-      uncompr_total += reord_w2m_blk->uncompr_size;
-      if (progress) {
-        struct timespec time_now;
-
-        gettime(&time_now);
-        if (timespec_cmp(next_time, time_now) <= 0) {
-          double completed,
-              elapsed;
-
-          next_time = timespec_add(time_now, dtotimespec(0.1));
-          elapsed = timespectod(timespec_sub(time_now, start_time));
-          completed = (double)uncompr_total / ispec->size;
-
-          if (elapsed < 5)
-            log_info("%s: progress: %.2f%%\r", pname, 100 * completed);
-          else
-            log_info("%s: progress: %.2f%%, ETA: %.0f s    \r",
-                pname, 100 * completed, elapsed * (1 / completed - 1));
-        }
-      }
+      progress_update(&progr, reord_w2m_blk->uncompr_size);
 
       /* Release "reord_w2m_blk". */
       pqueue_pop(&reord);
@@ -523,6 +488,8 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   /* Write out stream trailer. */
   YBobs_finish(obs, buffer);
   xwrite(ospec, buffer, YB_TRAILER_SIZE);
+
+  progress_finish(&progr);
 
   YBobs_destroy(obs);
   pqueue_uninit(&reord);

@@ -17,18 +17,20 @@
 */
 
 #ifndef MAIN_H
-#  define MAIN_H
+#define MAIN_H
 
-#  include <limits.h>    /* CHAR_BIT */
-#  include <stddef.h>    /* size_t */
-#  include <stdlib.h>    /* _Noreturn */
-#  include <pthread.h>   /* pthread_mutex_t */
-#  include <inttypes.h>  /* intmax_t */
-#  include <sys/types.h> /* off_t */
+#include <limits.h>    /* CHAR_BIT */
+#include <stddef.h>    /* size_t */
+#include <stdlib.h>    /* _Noreturn */
+#include <pthread.h>   /* pthread_mutex_t */
+#include <inttypes.h>  /* intmax_t */
+#include <sys/types.h> /* off_t */
 
-#  if 8 != CHAR_BIT
-#    error "Environments where 8 != CHAR_BIT are not supported."
-#  endif
+#include "timespec.h"  /* gettime() */
+
+#if 8 != CHAR_BIT
+# error "Environments where 8 != CHAR_BIT are not supported."
+#endif
 
 
 /* Utilities that can be called/accessed from multiple threads. */
@@ -84,6 +86,23 @@ __attribute__((format(printf, 1, 2)))
 /* Same as log_info(), but always call bailout(). */
 void _Noreturn
 log_fatal(const char *fmt, ...);
+
+struct progress {
+  int enabled;
+  off_t size;
+  off_t processed;
+  struct timespec start_time,
+      next_time;
+};
+
+void
+progress_init(struct progress *p, int verbose, off_t file_size);
+
+void
+progress_update(struct progress *p, off_t chunk_size);
+
+void
+progress_finish(struct progress *p);
 
 
 /* (III) Threading utilities. If they fail, they call log_fatal(). */

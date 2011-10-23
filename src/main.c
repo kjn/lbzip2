@@ -386,6 +386,75 @@ log_fatal(const char *fmt, ...)
 }
 
 
+/* Called when one of xalloc functions fails. */
+void
+xalloc_die(void)
+{
+  log_fatal("%s: xalloc: %s\n", pname, err2str(errno));
+}
+
+
+void
+progress_init(struct progress *p, int verbose, off_t file_size)
+{
+  /*
+    Progress info is displayed only if all the following conditions are met:
+     1) the user has specified -v or --verbose option
+     2) stderr is connected to a terminal device
+     3) the input file is a regular file
+     4) the input file is nonempty
+  */
+  p->enabled = (verbose && 0u < file_size && isatty(STDERR_FILENO));
+  if (p->enabled) {
+    p->size = file_size;
+    p->processed = 0u;
+    gettime(&p->start_time);
+    p->next_time = p->start_time;
+    log_info("%s: progress: %.2f%%\r", pname, 0.0);
+  }
+}
+
+
+void
+progress_update(struct progress *p, off_t chunk_size)
+{
+  struct timespec time_now;
+  double completed,
+      elapsed;
+  static const double UPDATE_INTERVAL = 0.1;
+
+  if (!p->enabled)
+    return;
+
+  p->processed += chunk_size;
+  assert(p->size >= p->processed);
+
+  gettime(&time_now);
+  if (0 < timespec_cmp(p->next_time, time_now))
+    return;
+
+  p->next_time = timespec_add(time_now, dtotimespec(UPDATE_INTERVAL));
+  elapsed = timespectod(timespec_sub(time_now, p->start_time));
+  completed = (double)p->processed / p->size;
+
+  if (elapsed < 5)
+    log_info("%s: progress: %.2f%%\r", pname, 100 * completed);
+  else
+    log_info("%s: progress: %.2f%%, ETA: %.0f s    \r", pname,
+        100 * completed, elapsed * (1 / completed - 1));
+}
+
+
+void
+progress_finish(struct progress *p)
+{
+  if (!p->enabled)
+    return;
+
+  assert(p->size == p->processed);
+}
+
+
 /* (III) Threading utilities. */
 
 void
@@ -597,14 +666,6 @@ xwrite(struct filespec *ospec, const char unsigned *buffer, size_t size)
       buffer += (size_t)wr;
     } while (0 < size);
   }
-}
-
-
-/* Called when one of xalloc functions fails. */
-void
-xalloc_die(void)
-{
-  log_fatal("%s: xalloc: %s\n", pname, err2str(errno));
 }
 
 
