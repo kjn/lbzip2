@@ -1331,7 +1331,8 @@ work_wrap(void *v_work_arg)
 
 
 static void
-mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec)
+mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
+    struct filespec *ospec)
 {
   struct pqueue reord;
   struct w2m_blk_nid reord_needed;
@@ -1407,21 +1408,17 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec)
       if (!finished) {
         if (reord_w2m_blk->id.last_decompr) {
           crc = (crc << 1) ^ (crc >> 31) ^ reord_w2m_blk->crc1;
-          /* XXX print ispec instead of ospec info */
           if (bs100k < reord_w2m_blk->bs100k1)
-            log_fatal("%s: %s%s%s: block overrun\n", pname, ospec->sep,
-                ospec->fmt, ospec->sep);
+            log_fatal("%s: %s%s%s: block overrun\n", pname, ispec->sep,
+                ispec->fmt, ispec->sep);
         }
 
         if (reord_w2m_blk->bs100k) {
           bs100k = reord_w2m_blk->bs100k;
           any |= (9u >= bs100k);
-          /* XXX print ispec instead of ospec info */
-          if (crc != reord_w2m_blk->crc) {
-            /* log_info("is: %08lX, should be: %08lX\n", (unsigned long)); */
-            log_fatal("%s: %s%s%s: stream CRC mismatch\n", pname, ospec->sep,
-                ospec->fmt, ospec->sep);
-          }
+          if (crc != reord_w2m_blk->crc)
+            log_fatal("%s: %s%s%s: stream CRC mismatch\n", pname, ispec->sep,
+                ispec->fmt, ispec->sep);
           crc = 0u;
           finished = (9u < bs100k);
         }
@@ -1462,10 +1459,9 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ospec)
   } while (0u < working);
   xunlock(&w2m_q->av_or_ex_or_rel);
 
-  /* XXX print ispec instead of ospec info */
   if (!any)
-    log_fatal("%s: %s%s%s: not a valid bzip2 file\n", pname, ospec->sep,
-        ospec->fmt, ospec->sep);
+    log_fatal("%s: %s%s%s: not a valid bzip2 file\n", pname, ispec->sep,
+        ispec->fmt, ispec->sep);
 
   assert(0u == reord_needed.decompr_blk_id);
   assert(0u == reord_needed.bzip2_blk_id);
@@ -1506,7 +1502,7 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
     xcreate(&worker[i], work_wrap, &work_arg);
   }
 
-  mux(&w2m_q, &m2s_q, ospec);
+  mux(&w2m_q, &m2s_q, ispec, ospec);
 
   i = num_worker;
   do {
