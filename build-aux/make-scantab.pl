@@ -74,25 +74,24 @@ for $c (0..255) {
 
 # Dump the mini DFA.
 @mini=();
-for $sh (0..5) {
-  for $sl (0..7) {
-    $s = 8*$sh+$sl;
-    for $c (0..1) {
-      $y = $d[$s][$c];
-      push @mini,"$y,";
-    }
+for $s (0..47) {
+  @vec = ();
+  for $c (0..1) {
+    $y = $d[$s][$c];
+    push @vec,"$y,";
   }
+  push @mini, '{' . join(' ',@vec) . '},'
 }
 
 # Dump the big DFA.
 @big=();
 for $s (0..48) {
-  for $ch (0..15) {
-    for $cl (0..15) {
-      $y = $t[$s][16*$ch+$cl];
-      push @big,"$y,";
-    }
+  @vec = ();
+  for $c (0..255) {
+    $y = $t[$s][$c];
+    push @vec,"$y,";
   }
+  push @big, '{' . join(' ',@vec) . '},'
 }
 
 

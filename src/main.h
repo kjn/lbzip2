@@ -84,7 +84,11 @@ __attribute__((format(printf, 1, 2)))
 
 /* Same as log_info(), but always call bailout(). */
 void _Noreturn
-log_fatal(const char *fmt, ...);
+log_fatal(const char *fmt, ...)
+#ifdef __GNUC__
+__attribute__((format(printf, 1, 2)))
+#endif
+;
 
 struct progress {
   int enabled;

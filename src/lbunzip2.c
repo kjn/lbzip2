@@ -1226,6 +1226,7 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
             state = STREAM_MAGIC_1;
             continue;
 
+          case ACCEPT:
           default:
             assert(0);
           }
