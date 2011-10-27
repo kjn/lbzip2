@@ -988,7 +988,6 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
   int first;
 
   uintmax_t bzip2_blk_id;
-#define SETX assert(w2w_blk != 0); w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT + ipos : 0u
 
   struct w2w_blk *w2w_blk;
 
@@ -1019,7 +1018,9 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
       if (YB_OK != ybret)
         log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
             pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
-      SETX;
+      assert(w2w_blk != 0);
+      w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT +
+          ipos : 0u;
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
       w2w_blk = xmalloc(sizeof *w2w_blk);
       w2w_blk->ybdec = YBdec_init();
@@ -1058,13 +1059,17 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
 
         if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
           xlock(&sw2w_q->proceed);
-          SETX;
+          assert(w2w_blk != 0);
+          w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) *
+              MX_SPLIT + ipos : 0u;
           work_release(s2w_blk, sw2w_q, w2m_q);
           work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
           return;
         }
 
-        SETX;
+        assert(w2w_blk != 0);
+        w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT +
+            ipos : 0u;
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
         w2w_blk = xmalloc(sizeof *w2w_blk);
         w2w_blk->ybdec = YBdec_init();
@@ -1105,13 +1110,17 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
                 assert(sw2w_q->eof);
                 work_release(s2w_blk, sw2w_q, w2m_q);
 
-                SETX;
+                assert(w2w_blk != 0);
+                w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) *
+                    MX_SPLIT + ipos : 0u;
                 work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
                   sw2w_q);
                 return;
               }
 
-              SETX;
+              assert(w2w_blk != 0);
+              w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) *
+                  MX_SPLIT + ipos : 0u;
               if (MX_SPLIT > s2w_blk->loaded) {
                 xlock(&sw2w_q->proceed);
                 assert(0 == s2w_blk->next);
@@ -1227,13 +1236,17 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
 
       if (!first && (size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
         xlock(&sw2w_q->proceed);
-        SETX;
+        assert(w2w_blk != 0);
+        w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT +
+            ipos : 0u;
         work_release(s2w_blk, sw2w_q, w2m_q);
         work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1, sw2w_q);
         return;
       }
 
-      SETX;
+      assert(w2w_blk != 0);
+      w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT +
+          ipos : 0u;
       work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 0, sw2w_q);
       w2w_blk = xmalloc(sizeof *w2w_blk);
       w2w_blk->ybdec = YBdec_init();
