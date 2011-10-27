@@ -24,7 +24,6 @@
 #include <stdlib.h>    /* _Noreturn */
 #include <pthread.h>   /* pthread_mutex_t */
 #include <inttypes.h>  /* intmax_t */
-#include <sys/types.h> /* off_t */
 
 #include "timespec.h"  /* gettime() */
 
@@ -89,17 +88,17 @@ log_fatal(const char *fmt, ...);
 
 struct progress {
   int enabled;
-  off_t size;
-  off_t processed;
+  uintmax_t size;
+  uintmax_t processed;
   struct timespec start_time,
       next_time;
 };
 
 void
-progress_init(struct progress *p, int verbose, off_t file_size);
+progress_init(struct progress *p, int verbose, uintmax_t file_size);
 
 void
-progress_update(struct progress *p, off_t chunk_size);
+progress_update(struct progress *p, uintmax_t chunk_size);
 
 void
 progress_finish(struct progress *p);
@@ -165,7 +164,7 @@ struct filespec
   const char *sep,  /* name separator; either "" or "\"" */
       *fmt;         /* either file name or a special name, like stdin */
   uintmax_t total;  /* total number of bytes transfered from/to this file */
-  off_t size;       /* file size or 0 if unknown */
+  uintmax_t size;   /* file size or 0 if unknown */
 };
 
 void

@@ -72,7 +72,7 @@ struct w2w_blk              /* Worker to workers. */
   YBdec_t *ybdec;           /* Partly decompressed block. */
   unsigned bs100k;          /* New bs100k, 0 if unchanged. */
   uint32_t crc;             /* Stored stream CRC (valid only if bs100k != 0) */
-  off_t end_offs;           /* File offset of the end of the block. */
+  uintmax_t end_offs;       /* File offset of the end of the block. */
 };
 
 
@@ -271,7 +271,7 @@ struct w2m_blk                       /* Workers to muxer. */
   unsigned bs100k1;         /* This block's bs100k. */
   uint32_t crc;             /* Stored stream CRC (valid only if bs100k == 0) */
   uint32_t crc1;            /* Computed block CRC */
-  off_t end_offs;           /* File offset of the end of the block. */
+  uintmax_t end_offs;       /* File offset of the end of the block. */
   char unsigned decompr[MX_DECOMPR]; /* Data to write to stdout. */
 };
 
@@ -1368,8 +1368,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   int any;
   int finished;
   struct progress progr;
-  off_t last_offs;
-  off_t input_size;
+  uintmax_t last_offs;
 
   /*
     Initialize progress info.  We need to align input file size to 32-bit word

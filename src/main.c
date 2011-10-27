@@ -395,7 +395,7 @@ xalloc_die(void)
 
 
 void
-progress_init(struct progress *p, int verbose, off_t file_size)
+progress_init(struct progress *p, int verbose, uintmax_t file_size)
 {
   /*
     Progress info is displayed only if all the following conditions are met:
@@ -416,7 +416,7 @@ progress_init(struct progress *p, int verbose, off_t file_size)
 
 
 void
-progress_update(struct progress *p, off_t chunk_size)
+progress_update(struct progress *p, uintmax_t chunk_size)
 {
   struct timespec time_now;
   double completed,
@@ -1325,7 +1325,7 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
     ispec->fd  = STDIN_FILENO;
     ispec->sep = "";
     ispec->fmt = "stdin";
-    ispec->size = 0;
+    ispec->size = 0u;
     return 0;
   }
 
@@ -1366,6 +1366,7 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
         ispec->fd  = infd;
         ispec->sep = "\"";
         ispec->fmt = operand->val;
+        assert(0 <= sbuf->st_size);
         ispec->size = sbuf->st_size;
         return 0;
       }
