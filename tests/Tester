@@ -2,30 +2,31 @@
 # Copyright (C) 2011 Mikolaj Izdebski
 
 set -e -C
-PATH=.:../src:"$PATH"
 IFS=' ''	''
 '
 
 test -r "$1"
 
 # Unset variables that may affect behavior of lbzip2.
-unset LBZIP2
-unset BZIP2
-unset BZIP
+# (Some shells don't like unsetting variables that are not set.)
+LBZIP2= unset LBZIP2
+BZIP2=  unset BZIP2
+BZIP=   unset BZIP
 
 # Create temp files in current working directory.
-bn=$(echo "$1" | sed '/^.*\/\([^/][^/]*\)$/s//\1/')
-r1=$bn.minbzcat.$$
-r2=$bn.lbzip2.$$
+bn=$(echo "$1" | sed 's@^\(.*/\)*\([^/.][^/.]*\)\.[^/]*$@\2@')
+r1=tmp.$bn.1.$$
+r2=tmp.$bn.2.$$
 
 # bad - bad bz2 file according to lbzip2
 # xbad - bad bz2 file according to minbzcat (expected bad)
-minbzcat <"$1" >$r1 2>/dev/null && xbad= || xbad=1
-lbzip2 -dcq <"$1" >$r2 2>/dev/null && bad= || bad=1
+./minbzcat <"$1" >$r1 2>/dev/null && xbad= || xbad=1
+../src/lbzip2 -dcq <"$1" >$r2 2>/dev/null && bad= || bad=1
 
-# dash's builtin test needs this redundand quoting before $bad and $xbad,
+# pdksh needs whitespace between the two left parentheses.
+# dash builtin test needs this redundand quoting before $bad and $xbad,
 # see: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=598238
-((test $xbad && test $bad) || (test ! ''$xbad && test ! ''$bad &&
+( (test $xbad && test $bad) || (test ! ''$xbad && test ! ''$bad &&
     cmp $r1 $r2 2>/dev/null)) && rc= || rc=1
 
 rm -f $r1 $r2
