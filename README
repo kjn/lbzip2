@@ -21,3 +21,14 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 A copy of the GNU General Public License is contained in the COPYING file.
+
+
+The following is a list of subdirectories with explaination of their purpose:
+
+build-aux - different auxiliary build scripts
+lib       - Gnulib C files
+m4        - M4 macros for Autoconf (part of Gnulib)
+man       - manual pages
+src       - C source code of higher-level part of lbzip2
+tests     - regression tests
+yambi     - C source code of lower-level part of lbzip2
