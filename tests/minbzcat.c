@@ -47,7 +47,7 @@
    by possibly different coding tree.
 
    `Retrieving a block' means parsing the internal bit-stream and decoding
-   prefix codes. `Decding a block' means undoing the RT. Finally, `emitting
+   prefix codes. `Decoding a block' means undoing the RT. Finally, `emitting
    a block' means undoing the initial RLE.
 
    Bits --(retrieve)--> MTF values --(decode)--> Characters --(emit)--> Bytes

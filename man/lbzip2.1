@@ -23,24 +23,18 @@ lbzip2 \- parallel bzip2 utility
 .SH SYNOPSIS
 .BR lbzip2 "|" bzip2 " [" \-n
 .IR WTHRS ]
-.RB [ \-m
-.IR MXMEM ]
 .RB [ \-k "|" \-c "|" \-t "] [" \-d "] [" \-1 " .. " \-9 "] [" \-f "] [" \-v ]
 .RB [ \-S "] ["
 .IR "FILE ... " ]
 
 .BR lbunzip2 "|" bunzip2 " [" \-n
 .IR WTHRS ]
-.RB [ \-m
-.IR MXMEM ]
 .RB [ \-k "|" \-c "|" \-t "] [" \-z "] [" \-f "] [" \-v ]
 .RB [ \-S "] ["
 .IR "FILE ... " ]
 
 .BR lbzcat "|" bzcat " [" \-n
 .IR WTHRS ]
-.RB [ \-m
-.IR MXMEM ]
 .RB [ \-z "] [" \-f "] [" \-v ]
 .RB [ \-S "] ["
 .IR "FILE ... " ]
@@ -95,11 +89,6 @@ If this option is not specified,
 tries to query the system for the number of online processors (if both the
 compilation environment and the execution environment support that), or exits
 with an error (if it's unable to determine the number of processors online).
-
-.TP
-.BI "\-m " MXMEM
-Set max memory. XXX
-
 
 .TP
 .BR \-k ", " \-\-keep
@@ -388,8 +377,6 @@ or to move on to subsequent files in the hope that some might need less
 resources, but the complications for doing this seem more trouble than they are
 worth.
 
-XXX describe memory limit option
-
 
 .SH "DAMAGED FILES"
 
@@ -420,14 +407,16 @@ you that that something is wrong.
 CRCs can only detect corrupted files, they can't help you recover the original,
 uncompressed data. However, because of the block nature of the compression
 algorithm, it may be possible to recover some parts of the damaged file, even
-if some blocks are destroyed. The program
-.BR lbzip2recover " accompanying " lbzip2
-can help you with that. XXX
+if some blocks are destroyed.
 
 
 .SH BUGS
 Separate input files don't share worker threads; at most one input file is
 worked on at any moment.
+
+During decompression and testing highly compressed files large amounts of
+memory may be allocated; currently there is no way of limiting memory
+allocation other than limiting number of worker threads.
 
 
 .SH AUTHORS
