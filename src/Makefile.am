@@ -23,3 +23,11 @@ noinst_HEADERS = main.h lbzip2.h lbunzip2.h pqueue.h scantab.h
 lbzip2_SOURCES = main.c lbzip2.c lbunzip2.c pqueue.c
 lbzip2_LDADD = $(top_builddir)/lib/libgnu.a $(top_builddir)/yambi/libyambi.a \
     $(LIB_CLOCK_GETTIME) $(LIB_PTHREAD)
+
+install-exec-hook:
+	@cd '$(DESTDIR)$(bindir)' && for prog in lbunzip2 lbzcat; do \
+    rm -f $$prog$(EXEEXT) && $(LN_S) lbzip2$(EXEEXT) $$prog$(EXEEXT); done
+
+uninstall-hook:
+	@cd '$(DESTDIR)$(bindir)' && for prog in lbunzip2 lbzcat; do \
+    rm -f $$prog$(EXEEXT); done

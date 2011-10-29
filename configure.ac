@@ -26,6 +26,7 @@ AC_CONFIG_HEADERS([lib/config.h])
 AM_INIT_AUTOMAKE([1.11 color-tests])
 AM_SILENT_RULES([yes])
 
+AC_PROG_LN_S
 AC_PROG_RANLIB
 AC_PROG_CC_C89
 gl_EARLY
@@ -59,20 +60,6 @@ AC_ARG_ENABLE([warnings],
     AC_SUBST([WARN_CFLAGS])
   ])
 ])
-
-dnl Headers
-AC_HEADER_STDC
-AC_HEADER_ASSERT
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h])
-
-dnl Types
-AC_TYPE_PID_T
-AC_TYPE_OFF_T
-AC_TYPE_SIZE_T
-AC_TYPE_SSIZE_T
-
-dnl Functions
-AC_CHECK_FUNCS([bzero strrchr strtol])
 
 gl_INIT
 
