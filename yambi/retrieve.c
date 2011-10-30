@@ -1,18 +1,22 @@
 /*-
+  retrieve.c -- bitstream decoder
+
   Copyright (C) 2011 Mikolaj Izdebski
 
-  This program is free software: you can redistribute it and/or modify
+  This file is part of lbzip2.
+
+  lbzip2 is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  This program is distributed in the hope that it will be useful,
+  lbzip2 is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #ifdef HAVE_CONFIG_H
@@ -467,6 +471,8 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
            11110x   5  -2
            111110   6  -1
            111111   6  -3
+
+           The ancual R[] entries are biased (3 is added).
         */
         static const Byte L[64] = { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                                     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
