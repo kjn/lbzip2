@@ -2,9 +2,9 @@ Copyright (C) 2011 Mikolaj Izdebski
 
 This README file is part of lbzip2 version 2.0.
 
-lbzip2 is a parallel, bzip2-compatible compression utility.
+lbzip2 is a parallel, SMP-based, bzip2-compatible compression utility.
 
-lbzip2 compressed and decompressed files using a variation of BWT compression
+lbzip2 compresses and decompresses files using a variation of BWT compression
 stack. More information on this topic can be found in the ALGORITHM file.
 
 lbzip2 uses Gnulib and its building and testing process is managed by the GNU

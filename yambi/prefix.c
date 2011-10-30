@@ -61,16 +61,6 @@
 #include "encode.h"
 
 
-/*
-
-n - input alphabet size (i.e. number of distinct input symbols)
-    2+1 <= n <= 2+255+1
-
-P - sorted order permutation
-
-*/
-
-
 /* Sort array of unsigned long integers in descending order.
    This is an implementation of diminishing increment sort (aka Shell sort)
    from The Art of Computer Programming by D. Knuth (vol. 3, chap. 5).
@@ -78,7 +68,7 @@ P - sorted order permutation
 static void
 shell_sort(
   Long P[],  /* sorted order */
-  Int n)     /* input alphabet size */
+  Int n)     /* input alphabet size (i.e. number of distinct input symbols) */
 {
   static const SInt H[] = { 1, 4, 10, 23, 57, 132 };
 
@@ -370,6 +360,7 @@ package_merge(Int *C, Long *Pr, Int n)
 
   /* We have found an optimal solution, it's packed in s_c vector.
      Now we need to unpack it. */
+  /* XXX this should probably be simplified */
   u = (s_c2 >> 5*9) & 0x1FF; C[20] = u;
   v = (s_c2 >> 4*9) & 0x1FF; C[19] = v - u;
   u = (s_c2 >> 3*9) & 0x1FF; C[18] = u - v;
