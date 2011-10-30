@@ -211,7 +211,7 @@ compute_depths(
 */
 
 /* This structure holds packages of coins.  Single coins are treated as
-   singleton packages, so they can be held in this structure aswell. */
+   singleton packages, so they can be held in this structure as well. */
 struct Pkg {
   Long weight;
   Long pack[3];
@@ -257,7 +257,7 @@ package_merge(Int *C, Long *Pr, Int n)
      have 256 entries each?
 
      The maximum amount memory that   ___ inf         -k
-     package merge algoirithm may     \       floor( 2   * max_alpha_size )
+     package merge algorithm may      \       floor( 2   * max_alpha_size )
      require is expressed by a sum:   /__ k=1
   */
   struct Pkg arr1[256];
@@ -409,14 +409,14 @@ make_code_lengths(
   assert(n <= MAX_ALPHA_SIZE);
 
   /* Label weights with sequence numbers.
-     Labelling has two main purposes: firstly it allows to sort pairs of
-     weight and sequence number more easily; secondly: the package-merge
-     algorithm requires strict monotonicity of weights and putting
-     an uniquie value in lower bits provides that. */
+     Labelling has two main purposes: firstly it allows to sort pairs of weight
+     and sequence number more easily; secondly: the package-merge algorithm
+     requires weights to be strictly monotonous and putting unique values in
+     lower bits assures that. */
   for (i = 0; i < n; i++)
   {
     /*
-      FFFFFFFF00000000 - symbol ferequencuy
+      FFFFFFFF00000000 - symbol frequency
       00000000FF000000 - node depth
       0000000000FF0000 - initially one
       000000000000FFFF - symbol
@@ -427,7 +427,7 @@ make_code_lengths(
       P[i] = ((Long)P0[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE-i);
   }
 
-  /* Sort weights and sequence numbers toogether. */
+  /* Sort weights and sequence numbers together. */
   shell_sort(P, n);
 
 #ifdef PACKAGE_MERGE
@@ -538,7 +538,7 @@ generate_initial_trees(YBenc_t *s, int nmtf, int alphaSize, Int nGroups)
 }
 
 /* Find the tree which takes the least number of bits to encode current group.
-   Returns number from 0 to nGroups-1 identifing the selected tree.
+   Returns number from 0 to nGroups-1 identifying the selected tree.
 */
 static int
 find_best_tree(
@@ -551,7 +551,7 @@ find_best_tree(
   Long cp;      /* cost packed */
 
   /* Compute how many bits it takes to encode current group by each of trees.
-     Utilise vector operations and full loop unrolling for best performance.
+     Utilize vector operations and full loop unrolling for best performance.
   */
   cp  = len[gs[ 0]] + len[gs[ 1]] + len[gs[ 2]] + len[gs[ 3]] + len[gs[ 4]];
   cp += len[gs[ 5]] + len[gs[ 6]] + len[gs[ 7]] + len[gs[ 8]] + len[gs[ 9]];
@@ -642,7 +642,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
     /* int tfreq[MAX_TREES]; */
 
     /* Pack code lengths of all trees into 64-bit integers in order to take
-       advantage of 64-bit vector arithmetics.  Each group holds at most
+       advantage of 64-bit vector arithmetic.  Each group holds at most
        50 codes, each code is at most 20 bit long, so each group is coded
        by at most 1000 bits.  We can store that in 10 bits. */
     for (v = 0; v < alphaSize; v++)
@@ -674,7 +674,7 @@ YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf)
     assert((size_t)(sp - s->selector) == s->num_selectors);
     *sp = MAX_TREES;
 
-    /* TODO: bring this code back to life, may improove compression level */
+    /* TODO: bring this code back to life, may improve compression level */
     /* Remove unused trees. */
     /* WARNING: removing a tree will most likely invalidate selectors!!
        If this code is to be brought back to life, all selectors

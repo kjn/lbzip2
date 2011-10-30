@@ -23,7 +23,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 A copy of the GNU General Public License is contained in the COPYING file.
 
 
-The following is a list of subdirectories with explaination of their purpose:
+The following is a list of subdirectories with explanation of their purpose:
 
 build-aux - different auxiliary build scripts
 lib       - Gnulib C files

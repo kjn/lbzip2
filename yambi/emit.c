@@ -179,7 +179,7 @@ emit_data(YBdec_t *state, Byte *b, Int m)
 }
 
 
-/* This function is basicly a wrapper around emit_data().  */
+/* This function is basically a wrapper around emit_data().  */
 int
 YBdec_emit(YBdec_t *dec, void *buf, size_t *buf_sz, YBcrc_t *crc)
 {

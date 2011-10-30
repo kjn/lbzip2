@@ -21,13 +21,13 @@
    This program is written for readability, not performance -- simpler but
    slower algorithms were chosen deliberately.
 
-   This code targets ANSI C systems, but it was tested only very rougly.
+   This code targets ANSI C systems, but it was tested only very roughly.
 */
 
-/* The bzip2 compression stack basicly consists of 3 passes:
+/* The bzip2 compression stack basically consists of 3 passes:
 
    1. RLE - the initial run-length encoding
-   2. RT - the Reversible Transformaton, it consists of 3 sub-transformations:
+   2. RT - the Reversible Transformation, it consists of 3 sub-transformations:
        a) BWT - Burrows-Wheeler transformation
        b) MTF - Move-To-Front transformation
        c) ZRLE - Zero Run-Length Encoding
@@ -37,13 +37,13 @@
    behavior, but with introduction of better sorting algorithms it became
    obsolete. It is kept only for compatibility with older bzip2 versions.
 
-   The Reversible Transformation was invented and descrbed by Burrows and
-   Wheeler in their src124 paper. It takes advantage of the strcture of
+   The Reversible Transformation was invented and described by Burrows and
+   Wheeler in their src124 paper. It takes advantage of the structure of
    typical data formats (like text files) to reduce data entropy so it can be
    compressed more easily by the last pass -- the entropy coding.
 
-   The entropy coding is a traditional mathod of reducing data redundancy.
-   Smbols are divided into groups of max. 50 symbols each. Each group is coded
+   The entropy coding is a traditional method of reducing data redundancy.
+   Symbols are divided into groups of max. 50 symbols each. Each group is coded
    by possibly different coding tree.
 
    `Retrieving a block' means parsing the internal bit-stream and decoding
@@ -64,7 +64,7 @@
 #ifdef EMBEDDED
 
 /* Input a single byte. Return -1 on EOF. It shall not return unless a byte is
-   successfully read or EOF is reached, ie. this function does it's own I/O
+   successfully read or EOF is reached, i.e. this function does it's own I/O
    error handling. */
 int read(void);
 
@@ -226,7 +226,7 @@ static void make_tree(int t) {
     sorted[u[len[t][i]]++] = i;
 }
 
-/* Decode a single prefix code. The algoritm used is naive and slow. */
+/* Decode a single prefix code. The algorithm used is naive and slow. */
 static unsigned get_sym(void) {
   int s = 0, x = 0, k = 0;
   do {

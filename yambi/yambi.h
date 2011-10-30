@@ -57,7 +57,7 @@ typedef unsigned long  YBcrc_t;  /* CRC32 */
 #define YB_ERR_BWTIDX   (-116)  /* primary index too large */
 
 
-/* Allocate and initialise an YBdec_t structure, and return a pointer to it.
+/* Allocate and initialize an YBdec_t structure, and return a pointer to it.
 */
 YBdec_t *YBdec_init(void);
 
@@ -88,7 +88,7 @@ int YBdec_work(YBdec_t *d, unsigned *bs100k);
 /* Write decompressed data into the memory buffer.
 
    buf points to the output buffer.  Available space in the buffer
-   is determined by *buf_sz, which is uodated on return.
+   is determined by *buf_sz, which is updated on return.
 
    Return values:
      YB_OK       - if the block was successfully emitted
@@ -117,7 +117,7 @@ YBenc_t *YBenc_init(unsigned long max_block_size,
                     unsigned shallow_factor,
                     unsigned prefix_factor);
 
-/* Returns YB_OK on successfull collect, YB_OVERFLOW on overflow. */
+/* Returns YB_OK on successful collect, YB_OVERFLOW on overflow. */
 int YBenc_collect(YBenc_t *e, const void *buf, size_t *buf_sz);
 
 /* return compressed size */

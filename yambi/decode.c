@@ -25,7 +25,7 @@
 
 #include "decode.h"
 
-/* Block size theshold above which block randomization has any effect.
+/* Block size threshold above which block randomization has any effect.
    Randomizing blocks of size <= RAND_THRESH is a no-op.
 */
 #define RAND_THRESH 617
@@ -71,7 +71,7 @@ static const Short rand_table[512] = {
 
 
 /* Implementation of Sliding Lists algorithm for doing Inverse Move-To-Front
-   (IMTF) transformation in O(n) space and amortised O(sqrt(n)) time.
+   (IMTF) transformation in O(n) space and amortized O(sqrt(n)) time.
    The naive IMTF algorithm does the same in both O(n) space and time.
    Generally IMTF can be done in O(log(n)) time, but a quite big constant
    factor makes such algorithms impractical for MTF of 256 items.
@@ -91,7 +91,7 @@ mtf_one(YBdec_t *state, Byte c)
     c = pp[nn];
 
     /* Forgive me the ugliness of this code, but mtf_one() is executed
-       frequently and needs to be fast.  An eqivalent (simpler and slower)
+       frequently and needs to be fast.  An equivalent (simpler and slower)
        version is given in #else clause.
     */
 #if IMTF_ROW_WIDTH == 16
@@ -180,11 +180,11 @@ YBdec_work(YBdec_t *state, unsigned *bs100k)
 
   assert(state->state == 0);
 
-  /* Initialise IBWT frequency table. */
+  /* Initialize IBWT frequency table. */
   for (s = 0; s < 256; s++)
     ftab[s] = 0;
 
-  /* Initialise IMTF decoding structure. */
+  /* Initialize IMTF decoding structure. */
   for (i = 0; i < IMTF_NUM_ROWS; i++)
     state->imtf_row[i] = state->imtf_slide + IMTF_SLIDE_LENGTH - 256
       + i * IMTF_ROW_WIDTH;
@@ -199,7 +199,7 @@ YBdec_work(YBdec_t *state, unsigned *bs100k)
 
     /* If we decoded a RLE symbol, increase run length and keep going.
        However, we need to stop accepting RLE symbols if the run gets
-       too long.  Note that rejcting further RLE symbols after the run
+       too long.  Note that rejecting further RLE symbols after the run
        has reached the length of 900k bytes is perfectly correct because
        runs longer than 900k bytes will cause block overflow anyways
        and hence stop decoding with an error. */
@@ -211,7 +211,7 @@ YBdec_work(YBdec_t *state, unsigned *bs100k)
 
     /* At this point we most likely have a run of one or more bytes.
        Zero-length run is possible only at the beginning, once per block,
-       so any optimizations inolving zero-length runs are pointless. */
+       so any optimization involving zero-length runs are pointless. */
     if (unlikely(j + r > 900000))
       return YB_ERR_OVERFLOW;
     ftab[runChar] += r;
@@ -260,7 +260,7 @@ YBdec_work(YBdec_t *state, unsigned *bs100k)
 
      Note: Iff the source string consists of a string repeated k times
      (eg. ABABAB - the string AB is repeated k=3 times) then this algorithm
-     will construct k independant (not connected), isomorphic lists.
+     will construct k independent (not connected), isomorphic lists.
   */
   for (i = 0; i < state->block_size; i++)
   {
@@ -287,7 +287,7 @@ YBdec_work(YBdec_t *state, unsigned *bs100k)
     /* Allocate a temporary array to hold the block. */
     block = xmalloc(state->block_size);
 
-    /* Copy the IBWT linked list into the termporary array. */
+    /* Copy the IBWT linked list into the temporary array. */
     j = state->rle_index;
     for (i = 0; i < state->block_size; i++) {
       j = state->tt[j >> 8];
@@ -307,7 +307,7 @@ YBdec_work(YBdec_t *state, unsigned *bs100k)
       state->tt[i] = ((i+1) << 8) | block[i];
     state->rle_index = 0;
 
-    /* Release the temoprary array. */
+    /* Release the temporary array. */
     free(block);
   }
 

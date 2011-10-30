@@ -88,7 +88,7 @@ YBenc_init(unsigned long max_block_size,
   YBenc_t *s = xmalloc(sizeof(YBenc_t));
 
   /* Using assertions to guard parameters is fine because the documentation
-     states explictly states that passing illegal agruments causes undefined
+     states explicitly states that passing illegal arguments causes undefined
      behaviour. */
   assert(s != 0);
   assert(max_block_size > 0 && max_block_size <= 900000);
@@ -294,7 +294,7 @@ finish_run:
   if (p == pLim)
     goto done;
 
-  /* If the run is at least 4 characters long, treat it specificly. */
+  /* If the run is at least 4 characters long, treat it specifically. */
   if (s->rle_state >= 4)
   {
     /* Make sure we really have a long run. */
@@ -319,7 +319,7 @@ finish_run:
       s->rle_state++;
 
       /* If the run has reached length of MAX_RUN_LENGTH,
-         we have to terminate it prematurely (ie. now). */
+         we have to terminate it prematurely (i.e. now). */
       if (s->rle_state == MAX_RUN_LENGTH)
       {
         *q++ = MAX_RUN_LENGTH-4;

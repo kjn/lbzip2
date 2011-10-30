@@ -89,7 +89,7 @@ Compress. Forceable with `-z'.
 Environment variables:
 
 @LBZIP2, BZIP2, BZIP
-Insert arguments betwen PROG and the rest of the command line. Tokens are
+Insert arguments between PROG and the rest of the command line. Tokens are
 separated by spaces and tabs; no escaping.
 
 

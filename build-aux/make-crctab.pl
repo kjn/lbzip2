@@ -18,7 +18,7 @@
 
 use Text::Wrap;
 open F, ">yambi/crctab.c" or die;
-printf F q(/* This file was generated automaticly by make-crctab.pl.
+printf F q(/* This file was generated automatically by make-crctab.pl.
    For comments refer to the generator script -- make-crctab.pl. */
 
 #ifdef HAVE_CONFIG_H

@@ -98,7 +98,7 @@ for $s (0..48) {
 use Text::Wrap;
 $Text::Wrap::columns = 80;
 open F, ">src/scantab.h" or die;
-printf F q(/* This file was generated automaticly by make-scantab.pl.
+printf F q(/* This file was generated automatically by make-scantab.pl.
    For comments refer to the generator script -- make-scantab.pl. */
 
 static const unsigned char ACCEPT = 48;

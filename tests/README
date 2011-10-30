@@ -60,7 +60,7 @@ Test cases for lbzip2.                                          -*- outline -*-
 
 ** overrun
 
-   Check if decompressor correctly rejecs blocks that overrun maximal block
+   Check if decompressor correctly rejects blocks that overrun maximal block
    size declared in bzip2 header. Pre-2.0 lbzip2 bounded block sizes on a flat
    value of 900000, ignoring the information in stream header.
 
@@ -72,7 +72,7 @@ Test cases for lbzip2.                                          -*- outline -*-
 
 ** trash
 
-   Check if decompressor ignores thailing garbage after bzip2 stream.
+   Check if decompressor ignores trailing garbage after bzip2 stream.
 
 ** void
 

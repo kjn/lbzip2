@@ -1162,7 +1162,7 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
 
           case CRC2:
             w2w_blk->crc |= word;
-            ibits_left &= 0x18u;  /* align to byte boundrary */
+            ibits_left &= 0x18u;  /* align to byte boundary */
           first_block:
             state = STREAM_MAGIC_1;
             continue;
@@ -1373,7 +1373,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
 
   /*
     Initialize progress info.  We need to align input file size to 32-bit word
-    boundrary because splitter did that too.  If an overflow occurs then it
+    boundary because splitter did that too.  If an overflow occurs then it
     will be overflow to zero and progress info will be disabled.  That's fine.
   */
   progress_init(&progr, verbose, (ispec->size + 3u) / 4u);

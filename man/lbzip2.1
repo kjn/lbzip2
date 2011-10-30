@@ -124,7 +124,7 @@ Force compression over the mode of operation selected by the invocation name.
 .TP
 .BR \-1 " .. " \-9
 Set the compression block size to 100K .. 900K, in 100K increments.
-Ignored during decompreession. See also the BLOCK SIZE section below.
+Ignored during decompression. See also the BLOCK SIZE section below.
 
 .TP
 .B \-\-fast
@@ -155,7 +155,7 @@ Be more verbose. Print more detailed information about (de)compression progress
 to standard error: before processing each file, print a message stating the
 names of input and output files; during (de)compression, print a rough
 percentage of completeness and estimated time of arrival (only if standard
-error is connexcted to a terminal); after processing each file print a message
+error is connected to a terminal); after processing each file print a message
 showing compression ratio, space savings, total compression time (wall time)
 and average (de)compression speed (bytes of plain data processed per second).
 
@@ -256,7 +256,7 @@ signals, after cleaning up any interrupted output file.
 
 .TP
 .B SIGABRT
-if a runtime assertion fails (ie.
+if a runtime assertion fails (i.e.
 .B lbzip2
 detects a bug in itself). Hopefully whoever compiled your binary wasn't bold
 enough to
@@ -320,7 +320,7 @@ The primary sorting algorithm of
 is a highly optimized variation of Bentley-McIlroy three-way quicksort, which
 behaves well in the average case, but in the worst case it can run very slowly.
 .B lbzip2
-also implements an alternative block-sorting algotirhm -- the bucket-pointer
+also implements an alternative block-sorting algorithm -- the bucket-pointer
 refinement (BPR in short).
 
 Quicksort is usually faster than BPR, but sometimes, for very repetitive input
@@ -337,7 +337,7 @@ With the
 .B \-\-exponential
 option given,
 .B lbzip2
-will skip quicksorting and use BPR stright away. This option doesn't affect
+will skip quicksorting and use BPR straight away. This option doesn't affect
 neither compression ratio nor decompression speed. Use of
 .B \-\-exponential
 makes sense if you know the input data is repetitive. Otherwise it's just waste

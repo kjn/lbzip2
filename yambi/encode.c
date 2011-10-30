@@ -129,7 +129,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   Byte cmap[256];
 
 
-  /* Finalise initial RLE. */
+  /* Finalize initial RLE. */
   if (s->rle_state >= 4)
   {
     assert(s->nblock < s->max_block_size);
@@ -213,7 +213,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   while (j--)
     *smp++ = 0;
 
-  /* Calculate the cost of transmiting character map. */
+  /* Calculate the cost of transmitting character map. */
   for (i = 0; i < 16; i++)
   {
     pk = 0;

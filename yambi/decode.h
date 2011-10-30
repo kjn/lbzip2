@@ -64,7 +64,7 @@ struct YBdec_s
   Byte rle_prev;  /* byte associated to the current FSA state */
 
   /* General "high-level" stuff. */
-  Int rand;            /* rand flag (1 if block is randomised, 0 otherwise) */
+  Int rand;            /* rand flag (1 if block is randomized, 0 otherwise) */
   Int bwt_idx;         /* BWT primary index */
   Int block_size;      /* compressed block size */
   Int max_block_size;  /* max allowed compr. block size */

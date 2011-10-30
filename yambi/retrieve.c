@@ -41,7 +41,7 @@
   2) In this implementation, malformed trees (oversubscribed or incomplete)
   aren't rejected directly at creation (that's the moment when both bad cases
   are detected).  Instead, invalid trees cause decode error only when they are
-  actually used to decode a group.  This is noncomforming behavior -- the
+  actually used to decode a group.  This is nonconforming behavior -- the
   original bzip2, which serves as a reference implementation, accepts
   malformed trees as long as nonexistent codes don't appear in compressed
   stream.  Neither bzip2 nor any alternative implementation I know produces
@@ -136,7 +136,7 @@ make_tree(YBdec_t *dec,   /* where to store created tables */
   assert(cum == n);
 
   /* Perform counting sort.
-     Note: Internal symbol values differ from that used in BZip2!
+     Note: Internal symbol values differ from that used in bzip2!
      Here 0 denotes EOB, 1-255 are MTF values, 256 is unused and 257-258
      are ZRLE symbols (RUN-A and RUN-B).
   */
@@ -524,7 +524,7 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
                     dec->alpha_size);
       if (!r)
         r = t;
-      dec->mtf[t] = r;  /* Initialise MTF state. */
+      dec->mtf[t] = r;  /* Initialize MTF state. */
     }
 
 
@@ -609,7 +609,7 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
         W_RANGE(20,51);
 
         /* Use a table lookup to determine minimal code length quickly.
-           For lengths <= SW, this table always gives precise reults.
+           For lengths <= SW, this table always gives precise results.
            For lengths > SW, some additional iterations must be performed
            to determine the exact code length. */
         x = T->start[v >> (64 - SW)];
@@ -618,19 +618,19 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
         /* Distinguish between complete and incomplete lookup table entries.
            If an entry is complete, we have the symbol immediately -- it's
            stored in higher bits of the entry.  Otherwise we need to use
-           so called "cannonical decoding" algorithm to decode the symbol. */
+           so called "canonical decoding" algorithm to decode the symbol. */
         if (likely(k <= SW))
           s = x >> 5;
         else
         {
           while (v >= T->base[k+1])
             k++;  /* iterate to determine the exact code length */
-          /* cannonical decode */
+          /* Canonical decode */
           s = T->perm[T->count[k] + ((v - T->base[k]) >> (64-k))];
         }
 
         /* At this point we know the prefix code is exactly k-bit long,
-           so we can consume (ie. shift out from lookahead buffer)
+           so we can consume (i.e. shift out from lookahead buffer)
            bits occupied by the code. */
         v <<= k;
         w -= k;
