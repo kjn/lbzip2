@@ -17,7 +17,7 @@
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
 AC_PREREQ([2.67])
-AC_INIT([lbzip2], [current])
+AC_INIT([lbzip2], [2.0])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -52,8 +52,7 @@ AC_ARG_ENABLE([warnings],
     AC_TRY_COMPILE([#ifndef __clang__
                       not clang
                     #endif], [], [gl_WARN_ADD([-Wno-unknown-warning-option])])
-    for kjn_warn in '' all extra m4_set_dump([kjn_warn_set], [
-])
+    for kjn_warn in '' all extra m4_set_dump([kjn_warn_set], [ ])
     do :
       gl_WARN_ADD([-W$kjn_warn])
     done
