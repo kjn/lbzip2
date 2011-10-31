@@ -1,3 +1,9 @@
+2011-11-02  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Update and improve documentation
+	* README: Add Laszlo Ersek's copyright notice.
+	* yambi/blocksort.c: Add example Manber-Myers algorithm implementation.
+
 2011-10-31  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Include ChangeLog.old in tarball

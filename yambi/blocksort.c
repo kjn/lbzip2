@@ -239,6 +239,7 @@ bucket_sort(
   (III) THE MAIN SORTING ALGORITHM
   ========================================================================= */
 
+/* How much bytes rot_cmp() comares in one step. */
 #define FULLGT_GRANULARITY 256
 
 /* ============================================================================
@@ -254,6 +255,8 @@ rot_cmp(
   Int n,             /* Block size. */
   struct Work *work) /*  */
 {
+  /* Calculate number of steps. Rounding down is correct because the actual
+     number of steps is one greater. */
   Int k = n / FULLGT_GRANULARITY;
 
   do {
@@ -371,12 +374,18 @@ med5(
   const Int r14,
   const Int r15)
 {
-  CAS(1,2,1,2); CAS(1,2,3,4); PHI(1,2,5);
-  CAS(2,3,1,3); CAS(2,3,2,5); PHI(2,3,4);
-  CAS(3,4,1,2); CAS(3,4,3,4); PHI(3,4,5);
-  CAS(4,5,2,3); CAS(4,5,4,5); PHI(4,5,1);
-  CAS(5,6,3,4); PHI(5,6,1); PHI(5,6,2); PHI(5,6,5);
-  (void)(r61 + r62 + r64 + r65);  /* Avoid warnings about unused variables. */
+  /* The following code corresponds            1 ---*---*----*-----------
+     to this sorting network.                       |   |    |
+     The network isn't complete, but           2 ---*---+*---*---*-------
+     always gives correct median.                       ||       |
+                                               3 ---*---*+---*---*---*---  */
+  CAS(1,2,1,2); CAS(1,2,3,4); PHI(1,2,5);  /*       |    |   |       |     */
+  CAS(2,3,1,3); CAS(2,3,2,5); PHI(2,3,4);  /*  4 ---*----+---*---*---*---  */
+  CAS(3,4,1,2); CAS(3,4,3,4); PHI(3,4,5);  /*            |       |         */
+  CAS(4,5,2,3); CAS(4,5,4,5); PHI(4,5,1);  /*  5 --------*-------*-------  */
+  CAS(5,6,3,4);
+
+  (void)(r51 + r52 + r55 + r64);  /* Avoid warnings about unused variables. */
   return r63;
 }
 
@@ -757,6 +766,8 @@ copy_cache(
   return idx;
 }
 
+/* This wrapper function is here only to make sure that bevavior of setjmp()
+   is well-defined. */
 static int
 copy_cache_wrap(
   Int *ptr,
@@ -784,9 +795,13 @@ copy_cache_wrap(
   ========================================================================= */
 
 
+/* Depth factor of BPR. Must be >= 2. */
 #define BPR_K 2
 
-/* Here BH stands for `bucket header'. */
+/* BH stands for `bucket header'.  BH is a bit indicating whether a particular
+   rotation starts a new bucket (BH==1) or lies in the same bucket as preceding
+   rotation (BH==0).
+*/
 #define       SET_BH(zz)  bhtab[(zz) >> 6] |= ((Long)1 << ((zz) & 63))
 #define     ISSET_BH(zz)  (bhtab[(zz) >> 6] & ((Long)1 << ((zz) & 63)))
 #define      WORD_BH(zz)  bhtab[(zz) >> 6]
@@ -1062,7 +1077,7 @@ bpr_sort(
      only first 2 characters. */
   d = 2;
 
-  /* Scan initial buckets; set buket headers and create initial equivalence
+  /* Scan initial buckets; set bucket headers and create initial equivalence
      classes */
   for (i = 0; i < 65536; i++) {
     k = ftab[i];
@@ -1079,7 +1094,7 @@ bpr_sort(
 
        If the small bucket is done, we place all strings it contains in their
        own singleton buckets, and we assign them unique equivalence classes.
-       Otherwise we create one bucket that and one common equivalenc class. */
+       Otherwise we create one common equivalence class. */
     if (bigDone[i >> 8] | bigDone[i & 0xff]) {
       while (++k < r) {
         SET_BH(k);
@@ -1134,7 +1149,7 @@ bpr_sort(
       bpr_quick_sort(ptr, eclass, bhtab, k, r, d, nblock);
 
       /* Bucket refinement caused current equivalence class to be divided into
-         disjoint classes. Scan bucket header and update classes. */
+         disjoint classes. Scan bucket headers and update classes. */
       j = k;
       while (++k < r) {
         if (ISSET_BH(k)) j = k;
@@ -1159,17 +1174,15 @@ bpr_sort(
 /* ============================================================================
    Compute the BWT (Burrows-Wheeler Transform) of the input string.
 
-   This method uses three different algorithms for BWT computation. All of them
-   have space complexity of O(n), but they differ in time complexity.
+   This method uses three different algorithms for BWT computation:
    The algorithms are:
-     1) The Cache-Copy Algorithm
-          average-case time complexity - O(n log n)
-          worst-case time complexity - O(n^3)
-          implementation adopted from bzip2-1.0.5.
+     1) The Cache-Copy Algorithm (implementation adopted from bzip2-1.0.3)
      2) The Bucket-Pointer-Refinement (BPR) algorithm
-          average-case time complexity - O(n log n)
-          worst-case time complexity - O(n^2 log n)
-     3) The LSD radix sort algotim - O(n^2)
+     3) The LSD radix sort algotim
+
+   I have also implemented Ukkonen and Manber-Myers algorithms, but they turned
+   to be too slow in practice. Manber-Myers can be found  at the end of the
+   file (it's not used and therefore #if 0'ed).
 
    For very short strings (<= 512 characters) the naive LSD radix sort is used.
 
@@ -1259,3 +1272,79 @@ ok:
   free(ftab);
   free(ptr);
 }
+
+
+#if 0
+
+/* Manber-Myers algorithm, O(n log n) */
+static void
+manber_myers(Byte *D, Int n, Int *x)
+{
+  Int *P, *R, *C;
+  Byte *A, *B;
+  Int i, j, d, e, h;
+
+  A = xmalloc(n * sizeof(Byte));
+  B = xmalloc((n+1) * sizeof(Byte));
+  C = xmalloc(max(n,256) * sizeof(Int));
+  P = xmalloc(n * sizeof(Int));
+  R = xmalloc(n * sizeof(Int));
+
+  for (i = 0; i < 256; i++) C[i] = 0;
+  for (i = 0; i < n; i++) C[D[i]]++;
+  for (i = 1; i < 256; i++) C[i] += C[i-1];
+  for (i = 0; i < n; i++) P[--C[D[i]]] = i;
+
+  for (i = 0; i < n; i++) B[i] = 0;
+  for (i = 0; i < 256; i++) B[C[i]] = 1;
+  B[n] = 1;
+
+  for (h = 1; h < n; h *= 2) {
+    for (i = 0; i < n; i = j) {
+      C[i] = i;
+      for (j = i; j == i || !B[j]; j++) {
+        R[P[j]] = i;
+        A[j] = 0;
+      }
+    }
+
+    for (i = 0; i < n; i = j) {
+      for (j = i; j == i || !B[j]; j++) {
+        d = (P[j] - h + n) % n;
+        e = R[d];
+        R[d] = C[e]++;
+        A[R[d]] = 1;
+      }
+
+      for (j = i; j == i || !B[j]; j++) {
+        d = (P[j] - h + n) % n;
+        e = R[d];
+        if (A[e]) {
+          e++;
+          while (!B[e] && A[e]) {
+            A[e] = 0;
+            e++;
+          }
+        }
+      }
+    }
+
+    for (i = 0; i < n; i++) {
+      P[R[i]] = i;
+      B[i] |= A[i];
+    }
+  }
+
+  *x = R[0];
+  P[R[0]] = n;
+  for (i = 0; i < n; i++) B[i] = D[i];
+  for (i = 0; i < n; i++) D[i] = B[P[i]-1];
+
+  free(A);
+  free(B);
+  free(C);
+  free(P);
+  free(R);
+}
+
+#endif
