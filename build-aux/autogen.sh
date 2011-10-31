@@ -43,7 +43,7 @@ perl ./build-aux/make-scantab.pl
 
 gnulib-tool --avoid=xalloc-die --add-import pthread utimens warnings \
     timespec-add timespec-sub dtotimespec stat-time lstat malloc-gnu \
-    fprintf-posix inttypes xalloc realloc-gnu largefile
+    fprintf-posix inttypes xalloc realloc-gnu largefile gitlog-to-changelog
 
 aclocal -Im4
 autoconf

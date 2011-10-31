@@ -1,0 +1,396 @@
+2011-10-31  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Create changelogs
+	* build-aux/autogen.sh: Add gitlog-to-changelog Gnulib module.
+	* ChangeLog.old: Import from v0.23.
+	* ChangeLog: Generate with build-aux/gitlog-to-changelog.
+
+2011-10-30  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Minor documentation cleanup
+
+	Add BOOTSTRAP
+
+	Add filenames and short desc to license blocks
+
+	Run automated spelling check
+
+	Make tests/Tester more portable
+
+2011-10-29  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Make install and uninstall targets work
+
+	Add list of subdirs to README
+
+	Extend AUTHORS
+
+	Import ALGORITHM
+
+	Add a minimal README
+
+	Cleanup manpage
+
+2011-10-28  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Add scantab.h to noinst_HEADERS
+
+2011-10-27  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Minor code cleanups to avoid gcc warnings
+	 * Add extra braces in generated scantab.h
+	 * Add __attribute__((printf, ...)) to log_fatal()
+	 * Add extra switch case in lbunzip2 parser
+
+	Make file sizes unsigned integers (uintmax_t)
+
+	Remove SETX from lbunzip2
+
+2011-10-23  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix Tester to support VPATH builds
+
+	Display progress info during decompression
+
+	Improve error messages in lbunzip2 muxer
+
+	Move progress info printing code to main.c
+
+	Fix a bug that prevented VPATH build from working
+
+	Reimplement lbunzip2 magic pattern scanner as DFA
+
+2011-10-22  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Cleanup and improve lbunzip2 header parser
+	Improvements implemented:
+	 * block overruns are detected (fixes `overrun.bz2')
+	 * stream CRCs are computed and checked (fixes `crc1.bz2')
+	 * initial stream headers are parsed (fixes `trash.bz2' and `void.bz2')
+	 * files with gaps between streams are rejected (fixes `gap.bz2')
+	 * minor speed enchancements
+
+	NEWS were updated to reflect recent improvements.
+
+	Implement initial header parser for lbunzip2
+	Partly fixes `gap.bz2' bug. For now the parser isn't detecting
+	parse errors and parsing results (CRC and bs100k) are unused.
+
+	Reorder scanner code in lbunzip2.c
+
+	Pad lbunzip2 input blocks to multiple of 32 bits
+
+2011-10-20  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Add more files to EXTRA_DIST
+	Fix a typo in style-check.pl naming.
+
+2011-10-18  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a minor bug in autogen.sh
+
+2011-10-17  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Reimplement BPR algorithm
+
+2011-10-13  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Improve comments in blocksort.c, prefix.c and retrieve.c
+
+2011-10-08  Laszlo Ersek  <lacos@caesar.elte.hu>
+
+	trivial typo fix in man page
+
+2011-10-07  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix -Wno-unknown-warning-option
+
+	Narrow usage text width to 79 characters
+
+	Add missing _Noreturn attributes
+
+	Add -Wno-unknown-warning-option for clang
+
+	Remove Trace() macros
+
+	Turn off warnings about unreachable code
+
+	Link lbunzip2 and lbzcat manpages to lbzip2
+
+	Use uintmax_t for block identifiers
+
+	Import a newer version of minbzcat
+
+2011-10-04  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Unset LBZIP2 et al. in tests/Tester
+
+	Import and extend lbzip2 manpage
+
+2011-09-27  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Print version and usage info on stdout, not stderr
+	Add build-aux/pretty-usage.pl to help maintaining usage message.
+
+2011-09-23  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	autogen.sh: set IFS to space-tab-newline
+
+	Add make-crctab.pl
+
+	Style fixups based on style-check.pl report
+
+	Add build-aux/style-check.pl
+
+2011-09-22  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Move autogen.sh to build-aux/
+
+	Fix a bug with displaying an error message
+
+2011-09-20  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a typo in tests/cve.c
+	A typo in tests/cve.c caused tests/cve.bz2 to be invalid. Update both.
+
+2011-09-19  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	minbzcat: add checks for Kraft's inequality
+
+	Fix a typo in yambi/Makefile.am
+
+	Write initial NEWS
+
+	Import basic test cases
+
+	Add noinst_HEADERS in src and yambi subdirs
+
+2011-09-14  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Replace AC_SYS_LARGEFILE with largefile Gnulib module
+	Downgrade to autoconf 2.67 to ease development on Debian stable.
+	Import realloc-gnu module. Remove redundant checks from configure.ac.
+
+2011-09-12  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Rename the project back to lbzip2
+
+2011-09-11  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	In lbunzip2 initialise `scan' with all ones, not all zeros
+	This decreases probability of finding false-positives when looking
+	for the magic bit pattern.
+
+	Remove split_chkstart()
+	Upcoming stream parser obsoletes split_chkstart().
+
+	Prioritize decompressing earlier blocks
+	Decompress retrieved blocks basing on their position within the
+	stream, not FCFS.
+
+	Replace lacos_rbtree with pqueue
+
+	Fix a bug related to htonl() usage
+
+	Drop fupport for LBZIP2_TRACE_ALLOC
+	Replace home-made xalloc() with xmalloc() provided by Gnulib.
+
+	Disable compiler warnings about aggregate return
+
+2011-09-10  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Reduce memory usage during decompression
+
+2011-09-09  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Remove emacs file variables
+
+	Add missing copyright notices
+
+	Implement smarter scanner in lbunzip2
+	Redesign yambi's retrieve pass.  Remove IBS structure and related
+	functions from yambi API.  Perform yambi's retrieve pass directly
+	during lbunzip2's scan pass and not during decompress pass.
+
+2011-09-07  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Read 32 bits at time in lbunzip2
+
+	Add #include <sys/types.h> for size_t
+	Include sys/types.h instead of stddef.h for size_t.
+
+	Guard config.h inclusions
+	Surround #include <config.h> with #ifdef HAVE_CONFIG_H.
+
+	Make use of SIZE_MAX
+	Replace (size_t)-1 with SIZE_MAX.
+
+	Improve configure.ac
+
+	Added -r option to autogen.sh
+
+	Delete corr-perf.sh, malloc_trace.pl and test.sh
+
+	Optimize lbunzip2 state machine
+
+2011-08-28  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Restore atime and mtime with nanosec accuracy
+
+	Convert gettimeofday() calls to gettime()
+
+	Don't display file name with progress info
+
+2011-08-26  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Add a configure switch to enable warnings
+
+2011-08-25  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Rename to bzimp2
+	Update externally visible names to bzimp2. Remove man page.
+	Split usage and version printing options.
+
+	Fix GCC compatibility bugs
+
+2011-08-23  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Remove .cvsignore
+
+	Add more checks to configure.ac
+
+2011-08-20  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Include <config.h> in all source files
+
+	Replace utime() with fdutimens()
+
+	Create autogen.sh
+
+	Migrate to GNU build system
+	Move lbzip2 source files to "src" subdirectory. Remove Makefiles.
+	Create initial "configure.ac" and "Makefile.am" files.
+
+2011-08-19  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Display progress info during compression
+
+	Display compression ratio in verbose mode
+
+2011-08-16  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Remove redundant includes
+
+2011-08-15  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a compatibility bug
+
+2011-08-14  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Add support for decompressing randomized blocks
+
+2011-08-13  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Minor comments and code cleanup
+	Add more coments on prefix code decoding. Remove a potential
+	incompatibility with platforms that don't use U2 encoding for signed
+	integers. Remove unused auto variables. Replace loops zeroing bigger
+	arrays with calls to bzero().
+
+2011-08-12  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Minor formatting cleanup
+
+	Eliminate SIZES() macro
+	Get rid of SIZES() to simplify the code.
+
+	Introduce xread() and xwrite()
+	Generalize existing I/O code and create xread() and xwrite() to ease
+	maintaintenance.  Pack "fd", "sep" and "fmt" into struct filespec
+	to emphasise their close relationship and simplify the code.
+
+2011-08-11  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Clean up the code
+	Minor code cleanups:
+	 * move nested function declaration to global scope,
+	 * convert K&R function definitions to ANSI,
+	 * move common macros to header file,
+	 * remove unused auto variables,
+	 * make pointer casts not strip the const qualifier,
+	 * change some variable types between signed and unsigned,
+	 * add missing copyright notices,
+	 * correct intentation in lbzip2.c,
+	 * remove white spaces from end of lines,
+	 * replace tabs by spaces (except from Makefiles).
+
+	Improve compression performance
+	The main block sorting algorithm is reworked to behave better
+	in average case while remaining fast enough in the worst case.
+
+2011-08-09  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Make decompression error messages more datailed
+	Implement Yberr_detail() -- a function returning a textual
+	representation of decompression error codes. Make use of
+	Yberr_detail() in lbunzip2.c.
+
+2011-07-30  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a buffer overflow in yambi decompression code
+	Fix a security vulnerability.  A specially crafted compressed file
+	could potentially cause a buffer overflow in YBibs_retrieve.
+
+	Some minor optimizations and cleanups:
+	 * utilize htonl() and nothl() for (hopefully) faster memory access
+	 * remove outdated code that wasn't used anyways
+	 * change default values of some yambi tuning parameters
+	 * reorder some struct members; move bigger arrays to the end
+	 * remove some automatic variables to reduce register pollution
+
+	Fix a bug in sorting algorithm implementation
+	Fix a bug in main sorting algorithm implementation.
+
+	Fix two different bugs
+	Fix a bug in decompression code that was caused by a typo.
+	Fix a compatibility issue in yambi/private.h.
+
+2011-07-29  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a bug in lbzip2 compresion code
+	This commit fixes a bug that was introduced in the previous commit.
+
+	Minor enchancements:
+	 * implement --exponential command line switch with the same semantics
+	   as bzip2's equivalent
+	 * reduce average-case memory consumption in compression mode
+	   by about 3.5 MB per worker
+
+	Minor cleanups:
+	 * remove unused code
+	 * remove whitespaces from end of source code lines
+	 * replace some tabs with spaces
+	 * correct line indentation
+	 * remove bogus __builtin_prefetch'es
+	 * remove GPLv2 as now the code in under GPLv3+ only
+	 * remove README as it doesn't reflect current code
+	 * remove ChangeLog as it was obsoleted by migration to git
+
+2011-07-28  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Import a newer version of yambi
+	Import a newer version of yambi, which contains compression code.
+	Remove libbz2 compatibility layer from yambi.  Modify lbzip2 and lbunzip2
+	so that they use yambi's API directly, without the compatibility layer.
+	Update Makefiles.  Remove dependency on libbz2.
+
+	Remove lbunzip2_single
+	Remove lbunzip2_single, as upcoming sequential decompressor is
+	obsoleting it.
+
+2011-07-26  Laszlo Ersek  <lacos@caesar.elte.hu>
+
+	base decompression on newly imported yambi
+	Import yambi. Adapt Makefiles and decompression modules.
+
+	import lbzip2-0.23
