@@ -1,5 +1,8 @@
 2011-10-31  Mikołaj Izdebski  <zurgunt@gmail.com>
 
+	Include ChangeLog.old in tarball
+	* Makefile.am: Add ChangeLog.old to EXTRA_DIST.
+
 	Create changelogs
 	* build-aux/autogen.sh: Add gitlog-to-changelog Gnulib module.
 	* ChangeLog.old: Import from v0.23.
