@@ -1,3 +1,8 @@
+2011-11-05  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Update autogen.sh to remove gitlog-to-changelog
+	* build-aux/autogen.sh: Remove gitlog-to-changelog with -r option.
+
 2011-11-02  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Update and improve documentation
