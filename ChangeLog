@@ -1,3 +1,8 @@
+2011-11-11  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix build error on OpenBSD 5.0
+	* src/main.c (opts_setup): Use _SC_THREAD_THREADS_MAX conditionally.
+
 2011-11-05  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Update autogen.sh to remove gitlog-to-changelog
