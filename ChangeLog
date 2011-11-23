@@ -1,3 +1,9 @@
+2011-11-23  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a use-after-free vulnerability in lbunzip2
+	* src/lbunzip2.c (work_retrieve.c): Move access to s2w_blk before
+	work_release() call. Fixes #4.
+
 2011-11-11  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Fix build error on OpenBSD 5.0

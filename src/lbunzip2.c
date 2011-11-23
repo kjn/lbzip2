@@ -1112,11 +1112,11 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
                 xlock(&sw2w_q->proceed);
                 assert(0 == s2w_blk->next);
                 assert(sw2w_q->eof);
+                w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) *
+                    MX_SPLIT + ipos : 0u;
                 work_release(s2w_blk, sw2w_q, w2m_q);
 
                 assert(w2w_blk != 0);
-                w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) *
-                    MX_SPLIT + ipos : 0u;
                 work_oflush(&w2w_blk, first_s2w_blk_id, &bzip2_blk_id, 1,
                   sw2w_q);
                 return;
