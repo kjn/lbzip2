@@ -1,6 +1,13 @@
 NEWS for lbzip2                                                 -*- outline -*-
 
 
+* What's new in lbzip2 2.1
+
+** Bug fixes
+
+   Version 2.1 fixes a use-after-free security vulnerability in decompressor
+   code responsible for displaying progress information.
+
 * What's new in lbzip2 2.0
 
 ** Bug fixes

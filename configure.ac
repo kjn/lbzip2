@@ -17,13 +17,14 @@
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
 AC_PREREQ([2.67])
-AC_INIT([lbzip2], [2.0])
+AC_INIT([lbzip2], [2.1])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([lib/config.h])
 
 AM_INIT_AUTOMAKE([1.11 color-tests])
+AM_MAINTAINER_MODE
 AM_SILENT_RULES([yes])
 
 AC_PROG_LN_S

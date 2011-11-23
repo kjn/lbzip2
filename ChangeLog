@@ -1,5 +1,7 @@
 2011-11-23  Mikołaj Izdebski  <zurgunt@gmail.com>
 
+	Bump version to 2.1
+
 	Fix a use-after-free vulnerability in lbunzip2
 	* src/lbunzip2.c (work_retrieve.c): Move access to s2w_blk before
 	work_release() call. Fixes #4.
