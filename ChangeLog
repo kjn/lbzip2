@@ -1,3 +1,8 @@
+2011-11-24  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Get rid of AM_MAINTAINER_MODE
+	* configure.ac: Remove AM_MAINTAINER_MODE which was included by mistake.
+
 2011-11-23  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Bump version to 2.1
