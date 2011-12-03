@@ -889,10 +889,11 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
 
 
   /* Effectuate option defaults. */
+#ifdef _SC_THREAD_THREADS_MAX
   mx_worker = sysconf(_SC_THREAD_THREADS_MAX);
-  if (-1L == mx_worker) {
+  if (-1L == mx_worker)
+#endif
     mx_worker = LONG_MAX;
-  }
   if (UINT_MAX < (long unsigned)mx_worker) {
     mx_worker = UINT_MAX;
   }

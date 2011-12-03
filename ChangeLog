@@ -1,4 +1,31 @@
+2011-11-23  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Bump version to 2.1
+
+	Fix a use-after-free vulnerability in lbunzip2
+	* src/lbunzip2.c (work_retrieve.c): Move access to s2w_blk before
+	work_release() call. Fixes #4.
+
+2011-11-11  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix build error on OpenBSD 5.0
+	* src/main.c (opts_setup): Use _SC_THREAD_THREADS_MAX conditionally.
+
+2011-11-05  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Update autogen.sh to remove gitlog-to-changelog
+	* build-aux/autogen.sh: Remove gitlog-to-changelog with -r option.
+
+2011-11-02  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Update and improve documentation
+	* README: Add Laszlo Ersek's copyright notice.
+	* yambi/blocksort.c: Add example Manber-Myers algorithm implementation.
+
 2011-10-31  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Include ChangeLog.old in tarball
+	* Makefile.am: Add ChangeLog.old to EXTRA_DIST.
 
 	Create changelogs
 	* build-aux/autogen.sh: Add gitlog-to-changelog Gnulib module.

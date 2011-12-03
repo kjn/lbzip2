@@ -17,5 +17,5 @@
 
 SUBDIRS = yambi lib src man tests
 ACLOCAL_AMFLAGS = -Im4
-EXTRA_DIST = build-aux/autogen.sh build-aux/make-scantab.pl \
+EXTRA_DIST = build-aux/autogen.sh build-aux/make-scantab.pl ChangeLog.old \
     build-aux/pretty-usage.pl build-aux/style-check.pl build-aux/make-crctab.pl
