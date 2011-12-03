@@ -10,10 +10,7 @@ Package: lbzip2
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: fast, multi-threaded bzip2 utility
- lbzip2 is a multi-threaded implementation of bzip2, suited for serial and
- parallel processing. On a multi-core computer, lbzip2 is commonly the fastest
- bzip2 decompressor for most bz2 files found on the Internet.
+ lbzip2 is an independent, multi-threaded implementation of bzip2. It is
+ commonly the fastest SMP (and uniprocessor) bzip2 compressor and decompressor.
  .
- lbzip2 integrates nicely with GNU tar. Even on single-core computers, lbzip2
- can speed up archiving in combination with tar, because lbzip2 allows
- compression to overlap with disk usage to a greater extent than bzip2 does.
+ lbzip2 integrates nicely with GNU tar.

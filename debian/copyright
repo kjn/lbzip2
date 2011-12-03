@@ -1,4 +1,4 @@
-Format: http://dep.debian.net/deps/dep5/
+Format: http://anonscm.debian.org/viewvc/dep/web/deps/dep5.mdwn?revision=208
 Upstream-Name: lbzip2
 Upstream-Contact: Mikolaj Izdebski <zurgunt@gmail.com>
 Source: https://github.com/kjn/lbzip2

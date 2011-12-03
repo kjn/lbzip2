@@ -1,16 +1,23 @@
+lbzip2 (2.1-1) unstable; urgency=low
+
+  * New upstream release; fixes a security vulnerability.
+  * debian/control: Simplify description.
+
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Sun, 27 Nov 2011 01:32:04 +0100
+
 lbzip2 (2.0-1) unstable; urgency=low
 
   * New upstream release.
-  * new maintainer
-  * debian/rules: migrate to autotools
-  * debian/copyright updated
-  * debian/rules simplified
-  * debian/watch updated
-  * bump debhelper dependancy to 8
-  * debian/compat to 8
-  * bump Standards-Version to 3.9.2
-  * add new build dependences (autoconf, automake, gnulib)
-  * More changes to be added. XXX
+  * debian/control:
+    - update description,
+    - update maintainer info,
+    - bump debhelper dependancy to 8,
+    - bump Standards-Version to 3.9.2,
+    - add new build dependences (autoconf, automake, gnulib).
+  * debian/rules: rewrite from scratch.
+  * debian/copyright: rewrite in DEP-5 format.
+  * debian/watch: update to githubredir.debian.net.
+  * debian/compat: bump to 8.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 05 Nov 2011 11:55:12 +0100
 
