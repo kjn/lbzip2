@@ -5,6 +5,8 @@ Maintainer: Mikolaj Izdebski <zurgunt@gmail.com>
 Build-Depends: debhelper (>= 8), gnulib (>= 20110908), autoconf (>= 2.67), automake (>= 1.11)
 Standards-Version: 3.9.2
 Homepage: https://github.com/kjn/lbzip2
+Vcs-Git: git://github.com/kjn/lbzip2.git
+Vcs-Browser: https://github.com/kjn/lbzip2/tree/debian
 
 Package: lbzip2
 Architecture: any
