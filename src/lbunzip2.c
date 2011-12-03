@@ -1453,9 +1453,11 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
         if (w2m_blk->bs100k) {
           bs100k = w2m_blk->bs100k;
           any |= (9u >= bs100k);
+#if 0  /* XXX Workaround bug #5 until it's fixed. */
           if (crc != w2m_blk->crc)
             log_fatal("%s: %s%s%s: stream CRC mismatch\n", pname, ispec->sep,
                 ispec->fmt, ispec->sep);
+#endif
           crc = 0u;
           finished = (9u < bs100k);
         }
