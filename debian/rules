@@ -1,0 +1,65 @@
+#!/usr/bin/make -f
+
+# Do not #define NDEBUG in CFLAGS!
+
+export CC      = gcc
+export CFLAGS  = $$$$($$(SHELL) lfs.sh CFLAGS) -D _XOPEN_SOURCE=500 -pipe \
+  -ansi -pedantic -g3 -Wall
+export LDFLAGS = $$$$($$(SHELL) lfs.sh LDFLAGS)
+export LIBS    = -l pthread -l bz2 $$$$($$(SHELL) lfs.sh LIBS)
+
+ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+  CFLAGS += -O2
+else
+  CFLAGS += -O0
+endif
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+  NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+  MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+  export INSTDEP = debian-sanity
+else
+  export INSTDEP = lbzip2
+endif
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+	$(MAKE)
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+	[ ! -f Makefile ] || $(MAKE) clean
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	$(MAKE) DESTDIR=$(CURDIR)/debian/lbzip2 install
+
+binary-indep:
+
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs ChangeLog
+	dh_installdocs README
+	dh_installman lbzip2.1
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean install binary-indep binary-arch binary

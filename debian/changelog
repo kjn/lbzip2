@@ -1,0 +1,185 @@
+lbzip2 (0.23-1) unstable; urgency=low
+
+  * New upstream release implements process termination with SIGPIPE and
+    SIGXFSZ. This matches the traditional UNIX(R) utility behavior more, and
+    should improve cooperation with GNU tar.
+  * Adapt the "man-inst-paths" patch to the updated manual page.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Wed, 03 Mar 2010 02:47:34 +0100
+
+lbzip2 (0.22-1) unstable; urgency=low
+
+  * New upstream release fixes a SUSv2-nonconformity in the "lfs.sh" build
+    script.
+  * As Daniel Baumann <daniel@debian.org> advised:
+    - remove all prerequisites of "binary-indep" in debian/rules,
+    - reformat debian/copyright to a list of "Header: value" pairs.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Fri, 19 Feb 2010 00:06:08 +0100
+
+lbzip2 (0.21-1) unstable; urgency=low
+
+  * New upstream release fixes a negligible probability race between the muxer
+    thread printing an error message due to a write error, and the main thread
+    freeing the output file name after catching a SIGINT or SIGTERM. The bug
+    was introduced in 0.18-1.
+  * Bump Standards-Version to 3.8.4 from 3.8.3. No changes necessary after
+    checking unstable's "upgrading-checklist.txt.gz".
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Wed, 17 Feb 2010 23:20:21 +0100
+
+lbzip2 (0.20-1) unstable; urgency=low
+
+  * New upstream release cleans up theoretical portability problems:
+    - don't rely on character constants '1' and '9' being encoded in ASCII,
+    - replace non-C89 flexible array members (struct hacks) with ordinary
+      pointer dereferences.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Mon, 28 Dec 2009 18:20:33 +0100
+
+lbzip2 (0.19-1) unstable; urgency=low
+
+  * New upstream release checks for most errno macros before relying on them
+    (Closes: #559052).
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Tue, 01 Dec 2009 23:25:12 +0100
+
+lbzip2 (0.18-2) unstable; urgency=low
+
+  * Based on Laszlo Boszormenyi's remark in
+    http://lists.debian.org/debian-mentors/2009/12/msg00001.html, updated
+    compat to reflect debhelper compatibility level (7).
+  * Fix consequently appearing "dh-clean-k-is-deprecated" lintian warning:
+    replace "dh_clean -k" with "dh_prep" in rules.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Tue, 01 Dec 2009 02:49:31 +0100
+
+lbzip2 (0.18-1) unstable; urgency=low
+
+  * New upstream release:
+    - Add sanity checks to both decompressors.
+    - Remove input FILE operands.
+    - Implement options --keep and --force.
+    - Copy file attributes from original to (de)compressed.
+    - Add new exit status 4 to signal warnings.
+    - (Author eats his own dog-food, replaced bzip2 with lbzip2 on his system.)
+  * Author switched to cvsnt from cvs; change date separators from "-" to "/"
+    in the substituted $Id$ value in patches/makefile.
+  * Adapt line numbers in patches/man-inst-paths to updated manual page.
+  * Following Anibal Monsalve Salazar's advice in
+    http://lists.debian.org/debian-mentors/2009/11/msg00511.html, convert the
+    package to "3.0 (quilt)" and bz2 format:
+    - update debhelper build-dependency to >= 7,
+    - remove quilt references from control and rules,
+    - add source/format and source/options,
+    - remove README.source altogether.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Mon, 30 Nov 2009 19:40:24 +0100
+
+lbzip2 (0.17-1) unstable; urgency=low
+
+  * New upstream release fixes possible undefined behavior, reported by Paul
+    Wise in http://lists.debian.org/debian-mentors/2009/10/msg00470.html.
+  * Adapt the "debian-sanity" target to the new environment variables
+    introduced by lbzip2-0.16rc1.
+  * Following http://lists.debian.org/debian-mentors/2009/10/msg00470.html:
+    - Add -Wall to CFLAGS.
+    - Add descriptive headers to the makefile and manual page patches.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Thu, 29 Oct 2009 00:10:46 +0100
+
+lbzip2 (0.16-1) unstable; urgency=low
+
+  * New upstream release:
+    - handle signals and problems with input/output files more gracefully,
+    - close standard output after (de)compressing to it from file operands.
+  * debian/rules: unpatch the source as the last step of the "clean" target, so
+    that the package can be built more than once in a row.
+  * debian/changelog, debian/control, debian/copyright: refresh e-mail address.
+  * Replace version string of previous changelog entry ("0.16rc1-1") with
+    "0.16~rc1-1" for correct ordering; thanks to Ruben Molina in
+    <6d57146c1ed5d6a38b1320ab63f163c7.squirrel@200.24.17.170>.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Mon, 26 Oct 2009 20:58:46 +0100
+
+lbzip2 (0.16~rc1-1) unstable; urgency=low
+
+  * New upstream release (candidate):
+    - (Mostly) bzip2-compatible command-line, e.g. settable compression block
+      size, file operands etc. However, lbzip2 never deletes or overwrites
+      files it didn't create.
+    - Merged eglibc getconf bug workaround (patches/eglibc-getconf) from
+      0.15-2.
+  * Changed the "bzip2 filter program" substring in the short description to
+    "bzip2 utility".
+  * Adapted "patches/man-inst-paths" to new upstream manual page.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Wed, 21 Oct 2009 04:48:38 +0200
+
+lbzip2 (0.15-2) unstable; urgency=low
+
+  * Move those patches from the 0.15-1 diff.gz that were modifying upstream
+    files ("Makefile" and "lbzip2.1") under debian/patches. Also
+    - extend Build-Depends with quilt,
+    - after including "quilt.make", make the "build-stamp" target depend on
+      $(QUILT_STAMPFN),
+    - add "README.source" to make users aware of quilt.
+  * Temporarily extend the glibc getconf bug workaround in "lfs.sh" to eglibc
+    getconf. Patch will be probably merged in a new upstream version.
+  * Update Homepage to lacos.hu.
+  * Bump Standards-Version to 3.8.3 from 3.8.1 without any changes, after
+    verifying the package against sid's upgrading-checklist.txt.gz.
+  * Change the package description according to suggestions by Ben Finney and
+    Justin B Rye on the debian-l10n-english mailing list.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Tue, 06 Oct 2009 21:46:04 +0200
+
+lbzip2 (0.15-1) unstable; urgency=low
+
+  * New upstream release. From the upstream ChangeLog:
+    - fix a (theoretically occurring) wrongful "premature EOF" error in the
+      single-worker decompressor,
+    - clean up buffer sizes for IO-friendliness and logical independece,
+    - document the derivation of the multiple-workers decompressor's splitter
+      block size,
+    - enable users to track peak memory usage with "malloc_trace.pl".
+  * Follow upstream's change from -O3 to -O2 in "debian/rules".
+    - Since lbzip2 is multi-threaded, "-fpredictive-commoning" (enabled at -O3)
+      seems scary.
+    - See also Don Armstrong's mail <20090217002744.GP25486@rzlab.ucr.edu>
+      (http://lists.debian.org/debian-mentors/2009/02/msg00155.html).
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Sun, 05 Apr 2009 22:23:48 +0200
+
+lbzip2 (0.14-1) unstable; urgency=low
+
+  * New upstream release.
+  * Modify the following files in order to comply with Standards-Version 3.8.1,
+    specifically Debian Policy Manual 4.9.1, "nocheck" build option:
+    - Makefile: the "install" target depends on $(INSTDEP) now, instead of the
+      fixed "debian-sanity" target.
+    - debian/rules: if "nocheck" is absent, make installation depend on
+      "debian-sanity", like before; if "nocheck" is present, make installation
+      depend only on "lbzip2".
+    - debian/control: bump Standards-Version.
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Mon, 16 Mar 2009 21:36:13 +0100
+
+lbzip2 (0.13-1) unstable; urgency=low
+
+  * Initial release (Closes: #507492). Thanks to Anibal Monsalve Salazar for
+    guidance. Thanks to Paul Wise for guidance and sponsoring.
+  * In lbzip2.1: debianized README and malloc_trace.pl pathnames.
+  * In Makefile:
+    - removed $Id$,
+    - moved macro definitions from Makefile to debian/rules,
+    - removed "check" target (which supports interactive testing with a big
+      external file),
+    - added "install" target (thanks to Sedat Dilek for squashing a bashism
+      (brace expansion)).
+    - Installation depends on the "debian-sanity" target, which executes some
+      basic compression/decompression tests.
+    - Extended the "clean" target's action to remove the temporary files
+      created by "debian-sanity".
+
+ -- Laszlo Ersek <lacos@caesar.elte.hu>  Mon, 16 Feb 2009 19:30:49 +0100
