@@ -1,3 +1,19 @@
+lbzip2 (2.0-1) unstable; urgency=low
+
+  * New upstream release.
+  * new maintainer
+  * debian/rules: migrate to autotools
+  * debian/copyright updated
+  * debian/rules simplified
+  * debian/watch updated
+  * bump debhelper dependancy to 8
+  * debian/compat to 8
+  * bump Standards-Version to 3.9.2
+  * add new build dependences (autoconf, automake, gnulib)
+  * More changes to be added. XXX
+
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 05 Nov 2011 11:55:12 +0100
+
 lbzip2 (0.23-1) unstable; urgency=low
 
   * New upstream release implements process termination with SIGPIPE and

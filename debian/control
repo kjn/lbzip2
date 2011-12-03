@@ -1,10 +1,10 @@
 Source: lbzip2
 Section: utils
 Priority: extra
-Maintainer: Laszlo Ersek <lacos@caesar.elte.hu>
-Build-Depends: debhelper (>= 7), libbz2-dev, sharutils
-Standards-Version: 3.8.4
-Homepage: http://lacos.hu/
+Maintainer: Mikolaj Izdebski <zurgunt@gmail.com>
+Build-Depends: debhelper (>= 8), gnulib (>= 20110908), autoconf (>= 2.67), automake (>= 1.11)
+Standards-Version: 3.9.2
+Homepage: https://github.com/kjn/lbzip2
 
 Package: lbzip2
 Architecture: any
@@ -12,9 +12,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: fast, multi-threaded bzip2 utility
  lbzip2 is a multi-threaded implementation of bzip2, suited for serial and
  parallel processing. On a multi-core computer, lbzip2 is commonly the fastest
- bzip2 decompressor for most bz2 files found on the internet. (On dual-core
- computers, the 7za utility from the p7zip-full package may prove more
- efficient.)
+ bzip2 decompressor for most bz2 files found on the Internet.
  .
  lbzip2 integrates nicely with GNU tar. Even on single-core computers, lbzip2
  can speed up archiving in combination with tar, because lbzip2 allows

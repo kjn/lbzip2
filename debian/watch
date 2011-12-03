@@ -1,2 +1,2 @@
 version=3
-http://lacos.web.elte.hu/pub/lbzip2/lbzip2-(.*)\.tar\.gz
+http://githubredir.debian.net/github/kjn/lbzip2 /v(.*)\.tar\.gz

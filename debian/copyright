@@ -1,44 +1,110 @@
-Upstream-Contact: Laszlo Ersek <lacos@caesar.elte.hu>
-Upstream-Homepage: http://lacos.hu/
-Maintainer-Contact: Laszlo Ersek <lacos@caesar.elte.hu>
-Maintainer-Homepage: http://lacos.hu/
+Format: http://dep.debian.net/deps/dep5/
+Upstream-Name: lbzip2
+Upstream-Contact: Mikolaj Izdebski <zurgunt@gmail.com>
+Source: https://github.com/kjn/lbzip2
+Comment: This package was debianized by Laszlo Ersek <lacos@caesar.elte.hu>.
+ It's currently maintained by Mikolaj Izdebski <zurgunt@gmail.com>.
 
 Files: *
-Copyright: (C) 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
-License: GPL-2+
- This package is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation; either version 2 of the License, or
- (at your option) any later version.
- .
- This package is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
- .
- You should have received a copy of the GNU General Public License
- along with this package; if not, write to the Free Software
- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
- .
- On Debian systems, the complete text of the GNU General Public License
- can be found in `/usr/share/common-licenses/GPL-2'.
+Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+License: GPL-3+
 
-Files: debian/*
-Copyright: (C) 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
+Files: build-aux/pretty-usage.pl debian/changelog debian/control src/lbunzip2.c
+ src/lbunzip2.h src/lbzip2.c src/lbzip2.h src/main.c src/main.h
+Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+ 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
+License: GPL-3+
+
+Files: man/lbzip2.1
+Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+ 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
+ 1996 Julian Seward <sewardj@cs.man.ac.uk>
+License: GPL-3+
+
+Files: yambi/blocksort.c yambi/prefix.c
+Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+ 1996-2005 Julian R Seward <jseward@acm.org>
+License: GPL-3+ and bzip2
+
+Files: ChangeLog.old
+Copyright: 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
+License: GPL-3+
+
+Files: tests/bzip2-0.1pl2.c
+Copyright: 1996, 1997 Julian Seward <jseward@acm.org>
 License: GPL-2+
- This package is free software; you can redistribute it and/or modify
+ This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation; either version 2 of the License, or
  (at your option) any later version.
  .
- This package is distributed in the hope that it will be useful,
+ This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
  .
- You should have received a copy of the GNU General Public License
- along with this package; if not, write to the Free Software
- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+ On Debian systems, the full text of the GNU General Public License
+ can be found in the file `/usr/share/common-licenses/GPL-2'.
+
+Files: tests/minbzcat.c
+Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+License: ISC
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
  .
- On Debian systems, the complete text of the GNU General Public License
- can be found in `/usr/share/common-licenses/GPL-2'.
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+Files: COPYING
+Copyright: 2007 Free Software Foundation, Inc. <http://fsf.org/>
+License: verbatim
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+License: GPL-3+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ On Debian systems, the full text of the GNU General Public License
+ can be found in the file `/usr/share/common-licenses/GPL-3'.
+
+License: bzip2
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. The origin of this software must not be misrepresented; you must
+     not claim that you wrote the original software.  If you use this
+     software in a product, an acknowledgment in the product
+     documentation would be appreciated but is not required.
+  3. Altered source versions must be plainly marked as such, and must
+     not be misrepresented as being the original software.
+  4. The name of the author may not be used to endorse or promote
+     products derived from this software without specific prior written
+     permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+ OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
