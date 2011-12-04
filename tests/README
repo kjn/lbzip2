@@ -58,6 +58,11 @@ Test cases for lbzip2.                                          -*- outline -*-
    Check if decompressor allows a gap consisting of garbage bytes between
    bzip2 streams. Pre-2.0 lbzip2 allows that.
 
+** incomp-[12]
+
+   Check if cyclic, non-randomized files are supported. See comments in
+   `incomp' file for more infomation.
+
 ** overrun
 
    Check if decompressor correctly rejects blocks that overrun maximal block

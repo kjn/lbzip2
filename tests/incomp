@@ -1,0 +1,46 @@
+#!/bin/sh
+# A script that generates incomp-[12].bz2 files.
+
+# It's commonly believed that bzip2 always creates bit-identical compressed
+# files for given input file, provided that the block size used is the same.
+#
+# In fact that's not true. Output file can be different because the Reversible
+# Transformation (aka BWT) is sometimes ambiguous. In some cases for given
+# input string it's possible to construct two or more different transforms.
+#
+# The simplest case is a string consisting of two identical characters, for
+# instance AA. There exist exactly 2 transformates for this string, namely
+# AA with bwt_idx=0 and AA with bwt_idx=1.
+#
+# bzip2 uses two different algorithms for block-sorting, both of them can
+# produce different transformates for the same input, resulting in slightly
+# different resulting .bz2 files. The direct reason for that is usage of
+# non-stable sorting algorithms, namely shellsort and quicksort.
+
+# The following code first creates input string that has exactly 10 different
+# transforms. Then it's compressed with different work factors. The two
+# resulting .bz2 files are different (at least for bzip2 1.0.6 and 1.0.5).
+
+(for x in $(seq 10); do echo -n \
+A123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+B123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+C123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+D123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+E123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+F123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+G123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+H123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+I123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789\
+J123456789b123456789c123456789d123456789e123456789\
+f123456789g123456789h123456789i123456789j123456789; done) | bzip2 >incomp-1.bz2
+
+bzcat incomp-1.bz2 | bzip2 --exponential >incomp-2.bz2
