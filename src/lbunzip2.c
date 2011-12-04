@@ -604,7 +604,7 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
     w2m_blk->id.decompr_blk_id = decompr_blk_id++;
     w2m_blk->id.last_decompr = (YB_OK == ybret);
     w2m_blk->produced = sizeof w2m_blk->decompr - oleft;
-    w2m_blk->bs100k = w2w_blk->bs100k;
+    w2m_blk->bs100k = (YB_OK == ybret) ? w2w_blk->bs100k : 0u;
     w2m_blk->crc = w2w_blk->crc;
     w2m_blk->crc1 = crc;
     w2m_blk->bs100k1 = bs100k;
@@ -1453,11 +1453,9 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
         if (w2m_blk->bs100k) {
           bs100k = w2m_blk->bs100k;
           any |= (9u >= bs100k);
-#if 0  /* XXX Workaround bug #5 until it's fixed. */
           if (crc != w2m_blk->crc)
             log_fatal("%s: %s%s%s: stream CRC mismatch\n", pname, ispec->sep,
                 ispec->fmt, ispec->sep);
-#endif
           crc = 0u;
           finished = (9u < bs100k);
         }

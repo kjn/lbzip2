@@ -1,5 +1,12 @@
 2011-12-04  Mikołaj Izdebski  <zurgunt@gmail.com>
 
+	Fix bug #5
+	* src/lbunzip2.c (work_decompr): Assign w2w_blk->bs100k
+	to w2m_blk->bs100k only if YB_OK == ybret. Fixes: #5. This bug caused
+	files with input blocks larger than 1 MiB to be rejected by lbunzip2.
+	* tests/ch255.bz2: Add as a regression test for bug #5.
+	* tests/Makefile.am: Re-enable crc1.bz2, add ch255.bz2.
+
 	Workaround bug #5
 	* src/lbunzip2.c (mux): Disable stream CRC check. Fixes #5.
 	* tests/Makefile.am: Exclude crc1.bz2 from test cases.
