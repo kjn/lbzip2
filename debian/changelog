@@ -1,3 +1,11 @@
+lbzip2 (2.1-2) unstable; urgency=low
+
+  * debian/control: add Vcs-Git and Vcs-Browser.
+  * debian/copyright: Update DEP-5 Format URL.
+  * debian/patches/stream-crc: Add patch fixing upstream bug #5.
+
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Tue, 06 Dec 2011 22:15:46 +0100
+
 lbzip2 (2.1-1) unstable; urgency=low
 
   * New upstream release; fixes a security vulnerability.
