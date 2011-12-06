@@ -1,0 +1,16 @@
+Description: Fix upstream bug #5
+Author: Mikolaj Izdebski <zurgunt@gmail.com>
+Bug: https://github.com/kjn/lbzip2/issues/5
+Applied-Upstream: commit: b0808cade3a7554bf7c0a00314218feccc8398f5
+Last-Update: 2011-12-06
+--- a/src/lbunzip2.c
++++ b/src/lbunzip2.c
+@@ -604,7 +604,7 @@
+     w2m_blk->id.decompr_blk_id = decompr_blk_id++;
+     w2m_blk->id.last_decompr = (YB_OK == ybret);
+     w2m_blk->produced = sizeof w2m_blk->decompr - oleft;
+-    w2m_blk->bs100k = w2w_blk->bs100k;
++    w2m_blk->bs100k = (YB_OK == ybret) ? w2w_blk->bs100k : 0u;
+     w2m_blk->crc = w2w_blk->crc;
+     w2m_blk->crc1 = crc;
+     w2m_blk->bs100k1 = bs100k;
