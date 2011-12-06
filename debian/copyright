@@ -1,4 +1,4 @@
-Format: http://anonscm.debian.org/viewvc/dep/web/deps/dep5.mdwn?revision=208
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0
 Upstream-Name: lbzip2
 Upstream-Contact: Mikolaj Izdebski <zurgunt@gmail.com>
 Source: https://github.com/kjn/lbzip2
