@@ -7,6 +7,10 @@ IFS=' ''	''
 
 test -r "$1"
 
+# Try limiting virtual memory usage to 1 GiB. This can save users of systems
+# with memory overcommit enabled and no ulimit set.
+ulimit -v $(expr 1024 \* 1024) || :
+
 # Unset variables that may affect behavior of lbzip2.
 # (Some shells don't like unsetting variables that are not set.)
 LBZIP2= unset LBZIP2
@@ -20,8 +24,8 @@ r2=tmp.$bn.2.$$
 
 # Run decompressors, temporarly disabling error checking.
 set +e
-./minbzcat <"$1" >$r1 2>/dev/null; rc1=$?
-../src/lbzip2 -dcq <"$1" >$r2 2>/dev/null; rc2=$?
+./timeout ./minbzcat <"$1" >$r1 2>/dev/null; rc1=$?
+./timeout ../src/lbzip2 -dcqn4 <"$1" >$r2 2>/dev/null; rc2=$?
 set -e
 
 # Make sure none of decompressors crashed (exit code >= 128)

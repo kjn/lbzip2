@@ -1,5 +1,11 @@
 2011-12-23  Mikolaj Izdebski  <zurgunt@gmail.com>
 
+	Limit time and memory usage during tests
+	* tests/timeout.c: Initial version.
+	* tests/Makefile.am: Build timeout from timeout.c.
+	* tests/Tester: Try limiting virtual memory usage with `ulimit -v'.
+	Run decompresion subprocesses with alarm set to 1 minute.
+
 	Make minbzcat be more compatible with bzip2
 	* tests/minbzcat.c (main): Count block size digit as part of stream
 	header. Fixes #3.

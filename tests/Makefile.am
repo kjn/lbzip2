@@ -15,10 +15,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-check_PROGRAMS = minbzcat
+check_PROGRAMS = minbzcat timeout
 
 minbzcat_SOURCES = minbzcat.c
 minbzcat_LDADD = $(top_builddir)/lib/libgnu.a
+
+timeout_SOURCES = timeout.c
+timeout_LDADD = $(top_builddir)/lib/libgnu.a
 
 TESTS_ENVIRONMENT = $(SHELL) $(srcdir)/Tester
 TESTS = 32767.bz2 concat.bz2 ch255.bz2 crc1.bz2 crc2.bz2 cve.bz2 empty.bz2 \
