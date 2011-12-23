@@ -18,10 +18,19 @@ bn=$(echo "$1" | sed 's@^\(.*/\)*\([^/.][^/.]*\)\.[^/]*$@\2@')
 r1=tmp.$bn.1.$$
 r2=tmp.$bn.2.$$
 
+# Run decompressors, temporarly disabling error checking.
+set +e
+./minbzcat <"$1" >$r1 2>/dev/null; rc1=$?
+../src/lbzip2 -dcq <"$1" >$r2 2>/dev/null; rc2=$?
+set -e
+
+# Make sure none of decompressors crashed (exit code >= 128)
+test $rc1 -lt 128 -a $rc2 -lt 128
+
 # bad - bad bz2 file according to lbzip2
 # xbad - bad bz2 file according to minbzcat (expected bad)
-./minbzcat <"$1" >$r1 2>/dev/null && xbad= || xbad=1
-../src/lbzip2 -dcq <"$1" >$r2 2>/dev/null && bad= || bad=1
+test $rc1 = 0 && xbad= || xbad=1
+test $rc2 = 0 &&  bad= ||  bad=1
 
 # pdksh needs whitespace between the two left parentheses.
 # dash builtin test needs this redundand quoting before $bad and $xbad,
