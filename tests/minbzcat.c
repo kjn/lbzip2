@@ -406,10 +406,10 @@ void expand(void) {
   unsigned long t = 0, c;
   init_crc();
   if (get(24) != 0x425A68) bad();
+  t = get(8) - 0x31;
+  if (t >= 9) bad();
   do {
     c = 0;
-    t = get(8) - 0x31;
-    if (t >= 9) bad();
     mbs = 100000 * (t+1);
     while ((t = get(16)) == 0x3141) {
       if (get(32) != 0x59265359) bad();
@@ -427,5 +427,6 @@ void expand(void) {
     if (get(32) != 0x45385090) bad();
     if (get(32) != c) bad();
     bk = 0;
-  } while (read() == 0x42 && read() == 0x5A && read() == 0x68);
+  } while (read() == 0x42 && read() == 0x5A && read() == 0x68 &&
+      (t = get(8) - 0x31) < 9);
 }

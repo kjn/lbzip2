@@ -1,4 +1,21 @@
+2011-12-23  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Make minbzcat be more compatible with bzip2
+	* tests/minbzcat.c (main): Count block size digit as part of stream
+	header. Fixes #3.
+
+	Add check for fatal signals in tester
+	* tests/Tester: Add checks for subprocess exit codes >= 128. All tests
+	in which either lbzip2 or minbzcat exited because of unhandled signals
+	are treated as failed.
+
 2011-12-04  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Add two more test cases.
+	* tests/incomp: Initial version.
+	* tests/incomp-1.bz2, tests/incomp-2.bz2: Generate using tests/incomp.
+	* tests/README: Update to mention incomp-[12].bz2.
+	* tests/Makefile.am: Add the new test cases.
 
 	Fix bug #5
 	* src/lbunzip2.c (work_decompr): Assign w2w_blk->bs100k
