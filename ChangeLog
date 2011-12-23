@@ -1,5 +1,9 @@
 2011-12-23  Mikolaj Izdebski  <zurgunt@gmail.com>
 
+	Import new test case -- load0
+	* tests/load0.bz2: Initial version.
+	* tests/Makefile.am: Add load0.bz2 as a new test.
+
 	Limit time and memory usage during tests
 	* tests/timeout.c: Initial version.
 	* tests/Makefile.am: Build timeout from timeout.c.
