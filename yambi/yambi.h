@@ -41,7 +41,6 @@ typedef unsigned long  YBcrc_t;  /* CRC32 */
 #define YB_UNDERFLOW (-1)  /* not enough input space */
 #define YB_OVERFLOW  (-2)  /* not enough output space */
 #define YB_DONE      (-3)  /* nothing more to do */
-#define YB_CANCELED  (-4)  /* operation canceled */
 
 #define YB_ERR_MAGIC    (-101)  /* bad stream header magic */
 #define YB_ERR_HEADER   (-102)  /* bad block header magic */

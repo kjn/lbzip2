@@ -1,3 +1,8 @@
+2011-12-25  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Remove unused constant definition
+	* yambi/yambi.h: Remove YB_CANCELED macro definition.
+
 2011-12-23  Mikolaj Izdebski  <zurgunt@gmail.com>
 
 	Import new test case -- load0
