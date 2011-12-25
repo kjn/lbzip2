@@ -1,5 +1,8 @@
 2011-12-25  Mikolaj Izdebski  <zurgunt@gmail.com>
 
+	Remove unused constants
+	* src/lbunzip2.c: Remove magic_mask and magic_hdr definitions.
+
 	Remove unused constant definition
 	* yambi/yambi.h: Remove YB_CANCELED macro definition.
 

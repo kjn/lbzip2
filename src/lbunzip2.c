@@ -38,14 +38,6 @@
 #include "pqueue.h"       /* struct pqueue */
 
 
-/* 48 bit mask for bzip2 block header and end of stream marker. */
-static const uint64_t
-    magic_mask = (uint64_t)0xFFFFlu << 32 | (uint64_t)0xFFFFFFFFlu;
-
-/* 48 bit bzip2 block header. */
-static const uint64_t
-    magic_hdr = (uint64_t)0x3141lu << 32 | (uint64_t)0x59265359lu;
-
 /*
   We assume that there exists an upper bound on the size of any bzip2 block,
   i.e. we don't try to support arbitarly large blocks.
