@@ -23,6 +23,10 @@
 # include <config.h>
 #endif
 
+#include <stdlib.h>  /* free() */
+
+#include "xalloc.h"  /* xmalloc() */
+
 #include "encode.h"
 
 
@@ -50,7 +54,7 @@ make_map_e(Byte *cmap, const Byte *inuse)
 static Int
 do_mtf(
   Short *mtfv,
-  Byte *block,
+  Int *bwt,
   Int *mtffreq,
   Byte *cmap,
   SInt nblock,
@@ -101,7 +105,7 @@ do_mtf(
 
   for (i = 0; i < nblock; i++)
   {
-    if ((c = cmap[block[i]]) == u)
+    if ((c = cmap[bwt[i]]) == u)
     { k++; continue; }
     RUN(); MTF();
   }
@@ -134,8 +138,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
 
 
   /* Finalize initial RLE. */
-  if (s->rle_state >= 4)
-  {
+  if (s->rle_state >= 4) {
     assert(s->nblock < s->max_block_size);
     s->block[s->nblock++] = s->rle_state-4;
     s->cmap[s->rle_state-4] = 1;
@@ -144,13 +147,15 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
   assert(s->nblock > 0);
 
   /* Sort block. */
+  s->bwt = xmalloc(s->nblock * sizeof(Int));
   YBpriv_block_sort(s);
 
   EOB = make_map_e(cmap, s->cmap) + 1;
   assert(EOB >= 2);
   assert(EOB < 258);
 
-  s->nmtf = do_mtf(s->mtfv, s->block, s->lookup[0], cmap, s->nblock, EOB);
+  s->nmtf = do_mtf(s->mtfv, s->bwt, s->lookup[0], cmap, s->nblock, EOB);
+  free(s->bwt);
 
   cost =
     + 48  /* header */

@@ -49,6 +49,7 @@ struct YBenc_s
 
   Byte *block;
   Short *mtfv;
+  Int *bwt;
 
   Byte *selector;
   Byte *selectorMTF;
@@ -64,4 +65,5 @@ struct YBenc_s
 
 
 void YBpriv_block_sort(YBenc_t *s);
+void YBpriv_sais(YBenc_t *s);
 Int YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf);

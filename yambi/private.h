@@ -35,14 +35,16 @@ typedef uint64_t Long;
 typedef int64_t  SLong;
 
 
-/* These macros load (peek) or store (poke) 16 or 32-bit values from/to
+/* These macros load (peek) or store (poke) 8, 16 or 32-bit values from/to
    memory pointed by p.  The pointer p must be properly aligned. The casts
    to void * are only to prevent compiler warnings about unaligned access.
 */
+#define peekb(p)      (*(const Byte  *)(const void *)(p))
 #define peeks(p) ntohs(*(const Short *)(const void *)(p))
-#define peekl(p) ntohl(*(const Int *)(const void *)(p))
+#define peekl(p) ntohl(*(const Int   *)(const void *)(p))
+#define pokeb(p,v) ((void)(*(Byte  *)(void *)(p) =      (v)))
 #define pokes(p,v) ((void)(*(Short *)(void *)(p) = htons(v)))
-#define pokel(p,v) ((void)(*(Int *)(void *)(p) = htonl(v)))
+#define pokel(p,v) ((void)(*(Int   *)(void *)(p) = htonl(v)))
 
 
 /* Other generic macros. */

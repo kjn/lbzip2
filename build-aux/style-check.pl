@@ -30,6 +30,7 @@ yambi/prefix.c
 yambi/collect.c
 yambi/retrieve.c
 yambi/emit.c
+yambi/sais.c
 src/lbzip2.h
 src/lbunzip2.h
 src/pqueue.h
