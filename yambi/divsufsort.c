@@ -142,8 +142,7 @@ typedef int_fast32_t saint_t;
 #define BUCKET_BSTAR(_c0, _c1) (bucket_B[(_c0) * ALPHABET_SIZE + (_c1)])
 #endif
 /* for trsort.c */
-/* FIXME: undefined bahavior !!! */
-#define TR_GETC(p) (((ISAd + (p)) < ISAn) ? ISAd[(p)] : ISA[(ISAd - ISA + (p)) % (ISAn - ISA)])
+#define TR_GETC(_p) (((_p) < (ISAn - ISAd)) ? ISAd[(_p)] : ISA[(ISAd - ISA + (_p)) % (ISAn - ISA)])
 /* for sssort.c and trsort.c */
 static const saint_t lg_table[256]= {
  -1,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
@@ -1280,8 +1279,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd, const saidx_t *ISAn,
   saint_t ssize, trlink = -1;
 
   for(ssize = 0, limit = tr_ilg(last - first);;) {
-
-    if(ISAd >= ISAn) { limit = -3; }  /* FIXME: undefined bahavior !!! */
+    assert((ISAd < ISAn) || (limit == -3));
 
     if(limit < 0) {
       if(limit == -1) {
@@ -1340,7 +1338,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd, const saidx_t *ISAn,
         }
         if(first < last) {
           a = first; do { *a = ~*a; } while(*++a < 0);
-          next = (ISA[*a] != TR_GETC(*a)) ? tr_ilg(a - first + 1) : -1;
+          next = (incr < (ISAn - ISAd)) ? ((ISA[*a] != TR_GETC(*a)) ? tr_ilg(a - first + 1) : -1) : -3;
           if(++a < last) { for(b = first, v = a - SA - 1; b < a; ++b) { ISA[*b] = v; } }
 
           /* push */
@@ -1394,7 +1392,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd, const saidx_t *ISAn,
     /* partition */
     tr_partition(ISA, ISAd, ISAn, first, first + 1, last, &a, &b, v);
     if((last - first) != (b - a)) {
-      next = (ISA[*a] != v) ? tr_ilg(b - a) : -1;
+      next = (incr < (ISAn - ISAd)) ? ((ISA[*a] != v) ? tr_ilg(b - a) : -1) : -3;
 
       /* update ranks */
       for(c = first, v = a - SA - 1; c < a; ++c) { ISA[*c] = v; }
@@ -1479,7 +1477,8 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd, const saidx_t *ISAn,
       }
     } else {
       if(trbudget_check(budget, last - first)) {
-        limit = tr_ilg(last - first), ISAd += incr;
+        limit = (incr < (ISAn - ISAd)) ? ((ISA[*first] != TR_GETC(*first)) ? (limit + 1) : -1) : -3;
+        ISAd += incr;
       } else {
         if(0 <= trlink) { stack[trlink].d = -1; }
         STACK_POP5(ISAd, first, last, limit, trlink);
@@ -1499,7 +1498,7 @@ static
 void
 trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
   saidx_t *ISAd;
-  saidx_t *first, *last;
+  saidx_t *first, *last, *a;
   trbudget_t budget;
   saidx_t t, skip, unsorted;
 
@@ -1507,6 +1506,17 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
 /*  trbudget_init(&budget, tr_ilg(n) * 3 / 4, n); */
   for(ISAd = ISA + depth; -n < *SA; ISAd += ISAd - ISA) {
     first = SA;
+    if(n < (ISAd - ISA)) {
+      do {
+        if((t = *first) < 0) { first -= t; }
+        else {
+          last = SA + ISA[t] + 1;
+          for(a = first; a < last; ++a) { ISA[*a] = a - SA; }
+          first = last;
+        }
+      } while(first < (SA + n));
+      break;
+    }
     skip = 0;
     unsorted = 0;
     do {
