@@ -142,6 +142,7 @@ typedef int_fast32_t saint_t;
 #define BUCKET_BSTAR(_c0, _c1) (bucket_B[(_c0) * ALPHABET_SIZE + (_c1)])
 #endif
 /* for trsort.c */
+/* FIXME: undefined bahavior !!! */
 #define TR_GETC(p) (((ISAd + (p)) < ISAn) ? ISAd[(p)] : ISA[(ISAd - ISA + (p)) % (ISAn - ISA)])
 /* for sssort.c and trsort.c */
 static const saint_t lg_table[256]= {
@@ -1279,6 +1280,8 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd, const saidx_t *ISAn,
   saint_t ssize, trlink = -1;
 
   for(ssize = 0, limit = tr_ilg(last - first);;) {
+
+    if(ISAd >= ISAn) { limit = -3; }  /* FIXME: undefined bahavior !!! */
 
     if(limit < 0) {
       if(limit == -1) {
