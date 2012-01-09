@@ -23,9 +23,10 @@
 # include <config.h>
 #endif
 
-#include <stdlib.h>  /* free() */
+#include <stdlib.h>      /* free() */
 
-#include "xalloc.h"  /* xmalloc() */
+#include "xalloc.h"      /* xmalloc() */
+#include "divsufsort.h"  /* cyclic_divbwt() */
 
 #include "encode.h"
 
@@ -54,7 +55,6 @@ make_map_e(Byte *cmap, const Byte *inuse)
 static Int
 do_mtf(
   Short *mtfv,
-  Int *bwt,
   Int *mtffreq,
   Byte *cmap,
   SInt nblock,
@@ -66,7 +66,8 @@ do_mtf(
   SInt t;
   Byte c;
   Byte u;
-  Short *mtfv0 = mtfv;
+  Int *bwt = (Int *)mtfv;
+  const Short *mtfv0 = mtfv;
 
 
   for (i = 0; i <= EOB; i++)
@@ -105,7 +106,7 @@ do_mtf(
 
   for (i = 0; i < nblock; i++)
   {
-    if ((c = cmap[bwt[i]]) == u)
+    if ((c = cmap[*bwt++]) == u)
     { k++; continue; }
     RUN(); MTF();
   }
@@ -120,7 +121,6 @@ do_mtf(
 #undef RUN
 #undef MTF
 }
-
 
 size_t
 YBenc_work(YBenc_t *s, YBcrc_t *crc)
@@ -143,19 +143,18 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
     s->block[s->nblock++] = s->rle_state-4;
     s->cmap[s->rle_state-4] = 1;
   }
-
   assert(s->nblock > 0);
-
-  /* Sort block. */
-  s->bwt = xmalloc(s->nblock * sizeof(Int));
-  YBpriv_block_sort(s);
 
   EOB = make_map_e(cmap, s->cmap) + 1;
   assert(EOB >= 2);
   assert(EOB < 258);
 
-  s->nmtf = do_mtf(s->mtfv, s->bwt, s->lookup[0], cmap, s->nblock, EOB);
-  free(s->bwt);
+  /* Sort block. */
+  s->mtfv = xmalloc((s->nblock + 50) * sizeof(Int));
+  s->bwt_idx = cyclic_divbwt(s->block, s->mtfv, s->nblock);
+  free(s->block);
+  s->nmtf = do_mtf(s->mtfv, s->lookup[0], cmap, s->nblock, EOB);
+  s->mtfv = xrealloc(s->mtfv, (s->nmtf + 50) * sizeof(Short));
 
   cost =
     + 48  /* header */

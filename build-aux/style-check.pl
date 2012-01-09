@@ -23,14 +23,13 @@ yambi/yambi.h
 yambi/private.h
 yambi/decode.h
 yambi/transmit.c
-yambi/blocksort.c
+yambi/divsufsort.c
 yambi/decode.c
 yambi/encode.c
 yambi/prefix.c
 yambi/collect.c
 yambi/retrieve.c
 yambi/emit.c
-yambi/sais.c
 src/lbzip2.h
 src/lbunzip2.h
 src/pqueue.h

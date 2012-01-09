@@ -48,8 +48,7 @@ struct YBenc_s
   Int prefix_factor;
 
   Byte *block;
-  Short *mtfv;
-  Int *bwt;
+  void *mtfv;
 
   Byte *selector;
   Byte *selectorMTF;

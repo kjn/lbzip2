@@ -109,9 +109,7 @@ YBenc_init(unsigned long max_block_size,
   s->cmap = xmalloc(256 * sizeof(Byte));
   s->selector = xmalloc((18000+1+1) * sizeof(Byte));
   s->selectorMTF = xmalloc((18000+1+7) * sizeof(Byte));
-  /* +1000 because mtfv is also used to store quadrants */
-  s->mtfv = xmalloc((max_block_size+1000) * sizeof(Short));
-  s->block = (void *)s->mtfv;
+  s->block = xmalloc((max_block_size+1) * sizeof(Byte));
 
 
   for (i = 0; i < 256; i++)
