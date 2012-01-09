@@ -1,55 +1,56 @@
-/*
- * cyclic-divsufsort-lite.c for cyclic-divsufsort-lite
- * Copyright (c) 2012 Yuta Mori All Rights Reserved.
- *
- * Permission is hereby granted, free of charge, to any person
- * obtaining a copy of this software and associated documentation
- * files (the "Software"), to deal in the Software without
- * restriction, including without limitation the rights to use,
- * copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following
- * conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
- * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
- * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- */
+/*-
+  divsufsort.c -- cyclic version of divsufsort
 
-#ifndef _CYCLIC_DIVSUFSORT_LITE_C
-#define _CYCLIC_DIVSUFSORT_LITE_C 1
+  Copyright (c) 2012 Yuta Mori All Rights Reserved.
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "cyclic-divsufsort-lite.h"
+  Permission is hereby granted, free of charge, to any person
+  obtaining a copy of this software and associated documentation
+  files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use,
+  copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following
+  conditions:
 
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
 
-#if defined(ENABLE_64BIT_INDEX) && !defined(BUILD_DIVSUFSORT64)
-# define BUILD_DIVSUFSORT64
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+#ifdef HAVE_CONFIG_H
+# include <config.h>
 #endif
+
+#include <assert.h>      /* assert() */
+#include <stdlib.h>      /* free() */
+
+#include "xalloc.h"      /* xmalloc() */
+
+#include "divsufsort.h"
+
+
+/*- Settings -*/
+#define SS_INSERTIONSORT_THRESHOLD 8
+#define SS_BLOCKSIZE 1024
+#define ALPHABET_SIZE 256
+
+
+/*- Datatypes -*/
+typedef uint8_t sauchar_t;
+typedef int32_t saidx_t;
+typedef int_fast32_t saint_t;
+
 
 /*- Constants -*/
-#ifndef INLINE
-# define INLINE __inline
-#endif
-#if !defined(UINT8_MAX)
-# define UINT8_MAX (255)
-#endif /* UINT8_MAX */
-#if defined(ALPHABET_SIZE) && (ALPHABET_SIZE < 1)
-# undef ALPHABET_SIZE
-#endif
-#if !defined(ALPHABET_SIZE)
-# define ALPHABET_SIZE (UINT8_MAX + 1)
-#endif
+#define INLINE
 /* for divsufsort.c */
 #define BUCKET_A_SIZE (ALPHABET_SIZE)
 #define BUCKET_B_SIZE (ALPHABET_SIZE * ALPHABET_SIZE)
@@ -105,9 +106,6 @@
 #ifndef MIN
 # define MIN(_a, _b) (((_a) < (_b)) ? (_a) : (_b))
 #endif /* MIN */
-#ifndef MAX
-# define MAX(_a, _b) (((_a) > (_b)) ? (_a) : (_b))
-#endif /* MAX */
 #define STACK_PUSH(_a, _b, _c, _d)\
   do {\
     assert(ssize < STACK_SIZE);\
@@ -1489,7 +1487,6 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd, const saidx_t *ISAn,
 }
 
 
-
 /*---------------------------------------------------------------------------*/
 
 /*- Function -*/
@@ -1683,76 +1680,11 @@ note:
   return m;
 }
 
-/* Constructs the suffix array by using the sorted order of type B* suffixes. */
-static
-void
-construct_SA(const sauchar_t *T, saidx_t *SA,
-             saidx_t *bucket_A, saidx_t *bucket_B,
-             saidx_t n, saidx_t m) {
-  saidx_t *i, *j, *k;
-  saidx_t s, t;
-  saint_t c0, c1, c2;
-
-  /* Construct the sorted order of type B suffixes by using
-      the sorted order of type B* suffixes. */
-  for(c1 = ALPHABET_SIZE - 2; 0 <= c1; --c1) {
-    /* Scan the suffix array from right to left. */
-    for(i = SA + BUCKET_BSTAR(c1, c1 + 1),
-        j = SA + BUCKET_A(c1 + 1) - 1,
-        k = NULL, c2 = -1;
-        i <= j;
-        --j) {
-      s = *j; *j = ~s;
-      if(0 <= s) {
-        assert(s < n);
-        assert(T[s] == c1);
-        assert(T[s] <= T[((s + 1) < n) ? (s + 1) : (0)]);
-        t = (s != 0) ? (s - 1) : (n - 1);
-        assert(T[t] <= T[s]);
-        c0 = T[t];
-        if(c0 != c2) {
-          if(0 <= c2) { BUCKET_B(c2, c1) = k - SA; }
-          k = SA + BUCKET_B(c2 = c0, c1);
-        }
-        assert(k < j);
-        *k-- = (((t != 0) ? T[t - 1] : T[n - 1]) > c2) ? ~t : t;
-#ifndef NDEBUG
-      } else {
-        assert(~s < n);
-      }
-#endif
-    }
-  }
-
-  /* Construct the suffix array by using
-     the sorted order of type B suffixes. */
-  k = SA + BUCKET_A(c2 = 0);
-  /* Scan the suffix array from left to right. */
-  for(i = SA, j = SA + n; i < j; ++i) {
-    if(0 <= (s = *i)) {
-      assert(s < n);
-      t = (s != 0) ? (s - 1) : (n - 1);
-      assert(T[t] >= T[s]);
-      c0 = T[t];
-      if(c0 != c2) {
-        BUCKET_A(c2) = k - SA;
-        k = SA + BUCKET_A(c2 = c0);
-      }
-      assert(i <= k);
-      *k++ = (((t != 0) ? T[t - 1] : T[n - 1]) < c2) ? ~t : t;
-    } else {
-      assert(s < 0);
-      *i = ~s;
-    }
-
-  }
-}
-
 static
 saidx_t
 construct_BWT(const sauchar_t *T, saidx_t *SA,
               saidx_t *bucket_A, saidx_t *bucket_B,
-              saidx_t n, saidx_t m) {
+              saidx_t n) {
   saidx_t *i, *j, *k;
   saidx_t s, t, orig = -10;
   saint_t c0, c1, c2;
@@ -1823,68 +1755,31 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
 
 /*- Function -*/
 
-saint_t
-cyclic_divsufsort(const sauchar_t *T, saidx_t *SA, saidx_t n) {
-  saidx_t *bucket_A, *bucket_B;
-  saidx_t m;
-  saint_t err = 0;
-
-  /* Check arguments. */
-  if((T == NULL) || (SA == NULL) || (n < 0)) { return -1; }
-  else if(n <= 1) { if(n == 1) { SA[0] = 0; } return 0; }
-
-  bucket_A = (saidx_t *)malloc(BUCKET_A_SIZE * sizeof(saidx_t));
-  bucket_B = (saidx_t *)malloc(BUCKET_B_SIZE * sizeof(saidx_t));
-
-  /* Suffixsort. */
-  if((bucket_A != NULL) && (bucket_B != NULL)) {
-    m = sort_typeBstar(T, SA, bucket_A, bucket_B, n);
-    if(0 < m) {
-      construct_SA(T, SA, bucket_A, bucket_B, n, m);
-    }
-  } else {
-    err = -2;
-  }
-
-  free(bucket_B);
-  free(bucket_A);
-
-  return err;
-}
-
 saidx_t
-cyclic_divbwt(const sauchar_t *T, sauchar_t *U, saidx_t *A, saidx_t n) {
-  saidx_t *B;
+cyclic_divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
   saidx_t *bucket_A, *bucket_B;
-  saidx_t m, pidx = 0, i;
+  saidx_t m, pidx, i;
 
   /* Check arguments. */
-  if((T == NULL) || (U == NULL) || (n < 0)) { return -1; }
-  else if(n <= 1) { if(n == 1) { U[0] = T[0]; } return 0; }
+  assert(n > 0);
+  if(n == 1) { SA[0] = T[0]; return 0; }
 
-  if((B = A) == NULL) { B = (saidx_t *)malloc((size_t)(n + 1) * sizeof(saidx_t)); }
-  bucket_A = (saidx_t *)malloc(BUCKET_A_SIZE * sizeof(saidx_t));
-  bucket_B = (saidx_t *)malloc(BUCKET_B_SIZE * sizeof(saidx_t));
+  T[n] = T[0];
+
+  bucket_A = xmalloc(BUCKET_A_SIZE * sizeof(saidx_t));
+  bucket_B = xmalloc(BUCKET_B_SIZE * sizeof(saidx_t));
 
   /* Burrows-Wheeler Transform. */
-  if((B != NULL) && (bucket_A != NULL) && (bucket_B != NULL)) {
-    m = sort_typeBstar(T, B, bucket_A, bucket_B, n);
-    if(0 < m) {
-      pidx = construct_BWT(T, B, bucket_A, bucket_B, n, m);
-      /* Copy to output string. */
-      for(i = 0; i < n; ++i) { U[i] = (sauchar_t)B[i]; }
-    } else if(T != U) {
-      for(i = 0; i < n; ++i) { U[i] = T[i]; }
-    }
+  m = sort_typeBstar(T, SA, bucket_A, bucket_B, n);
+  if(0 < m) {
+    pidx = construct_BWT(T, SA, bucket_A, bucket_B, n);
   } else {
-    pidx = -2;
+    pidx = 0;
+    for(i = 0; i < n; ++i) { SA[i] = T[0]; }
   }
 
   free(bucket_B);
   free(bucket_A);
-  if(A == NULL) { free(B); }
 
   return pidx;
 }
-
-#endif /* _CYCLIC_DIVSUFSORT_LITE_C */
