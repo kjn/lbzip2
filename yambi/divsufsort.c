@@ -1503,20 +1503,10 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
   saidx_t t, skip, unsorted;
 
   trbudget_init(&budget, tr_ilg(n) * 2 / 3, n);
-/*  trbudget_init(&budget, tr_ilg(n) * 3 / 4, n); */
-  for(ISAd = ISA + depth; -n < *SA; ISAd += ISAd - ISA) {
+  for(ISAd = ISA + depth;; ISAd += ISAd - ISA) {
+    assert(-n < *SA);
+    assert(n > ISAd - ISA);
     first = SA;
-    if(n < (ISAd - ISA)) {
-      do {
-        if((t = *first) < 0) { first -= t; }
-        else {
-          last = SA + ISA[t] + 1;
-          for(a = first; a < last; ++a) { ISA[*a] = a - SA; }
-          first = last;
-        }
-      } while(first < (SA + n));
-      break;
-    }
     skip = 0;
     unsorted = 0;
     do {
@@ -1536,7 +1526,18 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
       }
     } while(first < (SA + n));
     if(skip != 0) { *(first + skip) = skip; }
-    if(unsorted == 0) { break; }
+    if(unsorted == 0 || -n >= *SA) { break; }
+    if(n <= (ISAd - ISA) * 2) {
+      do {
+        if((t = *first) < 0) { first -= t; }
+        else {
+          last = SA + ISA[t] + 1;
+          for(a = first; a < last; ++a) { ISA[*a] = a - SA; }
+          first = last;
+        }
+      } while(first < (SA + n));
+      break;
+    }
   }
 }
 
@@ -1589,7 +1590,8 @@ sort_typeBstar(const sauchar_t *T, saidx_t *SA,
     }
   }
   m = n - m;
-  if(m == 0) { for(i = 0; i < n; ++i) { SA[i] = i; } return 0; }
+  assert(m <= n/2);
+  if(m == 0) { return 0; }
 /*
 note:
   A type B* suffix is lexicographically smaller than a type B suffix that
@@ -1645,7 +1647,7 @@ note:
   /* Construct the inverse suffix array of type B* suffixes using trsort. */
   trsort(ISAb, SA, m, 1);
 
-  /* Set the sorted order of tyoe B* suffixes. */
+  /* Set the sorted order of type B* suffixes. */
   i = n - 1, j = m, c0 = T[n - 1], c1 = T[0];
   if((c0 < c1) || ((c0 == c1) && (flag != 0))) {
     t = i;
@@ -1667,7 +1669,7 @@ note:
     }
   }
 
-#ifndef NDEBUG
+#ifdef DEBUG
   for(i = m; i < n; ++i) {
     SA[i] = ~n;
   }
@@ -1703,7 +1705,7 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
   saint_t c0, c1, c2;
 
   /* Construct the sorted order of type B suffixes by using
-      the sorted order of type B* suffixes. */
+     the sorted order of type B* suffixes. */
   for(c1 = ALPHABET_SIZE - 2; 0 <= c1; --c1) {
     /* Scan the suffix array from right to left. */
     for(i = SA + BUCKET_BSTAR(c1, c1 + 1),
@@ -1727,9 +1729,7 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
         *k-- = (((t != 0) ? T[t - 1] : T[n - 1]) > c2) ? ~t : t;
       } else {
         *j = ~s;
-#ifndef NDEBUG
         assert(~s < n);
-#endif
       }
     }
   }
