@@ -1,6 +1,24 @@
 NEWS for lbzip2                                                 -*- outline -*-
 
 
+* What's new in lbzip2 2.2
+
+** Bug fixes
+
+   Version 2.2 fixes a bug that caused some legitimate bz2 files to be rejected
+   during decompression with a CRC error message.
+
+** New features
+
+   Compression performance is increased significantly by inclusion of new
+   block-sorting code using divsufsort algorithm.
+
+** Abandoned features
+
+   The new block-sorting algorithm made `--exponential' command-line switch
+   irrelevant. The switch is retained for compatibility with bzip2 and older
+   versions of lbzip2, but otherwise has no effect.
+
 * What's new in lbzip2 2.1
 
 ** Bug fixes
