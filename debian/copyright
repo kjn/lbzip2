@@ -6,25 +6,30 @@ Comment: This package was debianized by Laszlo Ersek <lacos@caesar.elte.hu>.
  It's currently maintained by Mikolaj Izdebski <zurgunt@gmail.com>.
 
 Files: *
-Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
 License: GPL-3+
 
 Files: build-aux/pretty-usage.pl debian/changelog debian/control src/lbunzip2.c
  src/lbunzip2.h src/lbzip2.c src/lbzip2.h src/main.c src/main.h
-Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
  2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
 License: GPL-3+
 
 Files: man/lbzip2.1
-Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
  2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
  1996 Julian Seward <sewardj@cs.man.ac.uk>
 License: GPL-3+
 
-Files: yambi/blocksort.c yambi/prefix.c
-Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+Files: yambi/prefix.c
+Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
  1996-2005 Julian R Seward <jseward@acm.org>
 License: GPL-3+ and bzip2
+
+Files: yambi/divsufsort.c
+Copyright: 2012 Mikolaj Izdebski <zurgunt@gmail.com>
+ 2012 Yuta Mori All Rights Reserved
+License: GPL-3+ and Expat
 
 Files: ChangeLog.old
 Copyright: 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
@@ -47,7 +52,7 @@ License: GPL-2+
  can be found in the file `/usr/share/common-licenses/GPL-2'.
 
 Files: tests/minbzcat.c
-Copyright: 2011 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
 License: ISC
  Permission to use, copy, modify, and/or distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
