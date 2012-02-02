@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -56,8 +56,8 @@ for $f (@ARGV) {
   /\n[^\n]{80}/ and msg "has line longer than 79 chars";
 
   # C specific stuff.
-  m{^/\*-([^*]|\*[^/])*Copyright([^*]|\*[^/])*\*/}
-      or msg "has missing copyright block";
+  m{^/\*-([^*]|\*[^/])*Copyright[^*]+2012([^*]|\*[^/])*\*/}
+      or msg "has missing or outdated copyright notice";
   $f =~ /\.h$/ xor /\n *# *include *<config\.h>\n/
       or msg "missing or excessive #include <config.h>";
 }

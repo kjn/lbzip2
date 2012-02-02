@@ -1,7 +1,7 @@
 /*-
   main.h -- main module header
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.

@@ -1,6 +1,6 @@
 /*-
   minbzcat - minimalistic bzcat
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above

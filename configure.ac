@@ -1,5 +1,5 @@
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -68,7 +68,7 @@ AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile
 AC_OUTPUT
 
 
-AC_COPYRIGHT([Copyright (C) 2011 Mikolaj Izdebski
+AC_COPYRIGHT([Copyright (C) 2011, 2012 Mikolaj Izdebski
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

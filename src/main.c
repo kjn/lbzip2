@@ -783,7 +783,7 @@ static void _Noreturn
 version(void)
 {
   if (0 > printf("%s version %s\n\n%s%s", PACKAGE_NAME, PACKAGE_VERSION,
-      "Copyright (C) 2011 Mikolaj Izdebski\n"
+      "Copyright (C) 2011, 2012 Mikolaj Izdebski\n"
       "Copyright (C) 2008, 2009, 2010 Laszlo Ersek\n"
       "\n"
       "This program is free software: you can redistribute it and/or modify\n"

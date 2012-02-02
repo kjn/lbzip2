@@ -1,7 +1,7 @@
 /*-
   pqueue.c -- priority queue implementation
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
