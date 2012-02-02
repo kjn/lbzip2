@@ -1,7 +1,7 @@
 /*-
   lbzip2.h -- high-level compression routines header
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -31,8 +31,7 @@ struct lbzip2_arg
   struct filespec *ispec,
       *ospec;
   int bs100k,
-      verbose,
-      exponential;
+      verbose;
 };
 
 void *

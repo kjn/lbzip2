@@ -1,7 +1,7 @@
 /*-
   lbzip2.c -- high-level compression routines
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -268,8 +268,7 @@ split_wrap(void *v_split_arg)
 
 
 static void
-work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
-    int exponential)
+work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k)
 {
   struct w2m_blk *w2m_blk;
   char unsigned *ibuf;    /* pointer to the next input byte */
@@ -294,8 +293,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
     /*
       Allocate a yambi encoder with given block size and default parameters.
     */
-    enc = YBenc_init(bs100k * 100000, exponential ? 0 : YB_DEFAULT_SHALLOW,
-        YB_DEFAULT_PREFIX);
+    enc = YBenc_init(bs100k * 100000, YB_DEFAULT_SHALLOW, YB_DEFAULT_PREFIX);
 
     /* Collect as much data as we can. */
     consumed = ileft;
@@ -337,7 +335,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k,
 
 
 static void
-work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential)
+work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k)
 {
   for (;;) {
     struct s2w_blk *s2w_blk;
@@ -359,7 +357,7 @@ work(struct s2w_q *s2w_q, struct w2m_q *w2m_q, int bs100k, int exponential)
     }
     xunlock(&s2w_q->av_or_eof);
 
-    work_compr(s2w_blk, w2m_q, bs100k, exponential);
+    work_compr(s2w_blk, w2m_q, bs100k);
     free(s2w_blk);
   }
 
@@ -376,8 +374,7 @@ struct work_arg
 {
   struct s2w_q *s2w_q;
   struct w2m_q *w2m_q;
-  int bs100k,
-      exponential;
+  int bs100k;
 };
 
 
@@ -390,8 +387,7 @@ work_wrap(void *v_work_arg)
   work(
       work_arg->s2w_q,
       work_arg->w2m_q,
-      work_arg->bs100k,
-      work_arg->exponential
+      work_arg->bs100k
   );
   return 0;
 }
@@ -502,8 +498,7 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
 
 static void
 lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
-    struct filespec *ispec, struct filespec *ospec, int bs100k, int verbose,
-    int exponential)
+    struct filespec *ispec, struct filespec *ospec, int bs100k, int verbose)
 {
   struct s2w_q s2w_q;
   struct w2m_q w2m_q;
@@ -515,7 +510,6 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   unsigned i;
 
   assert(1 <= bs100k && bs100k <= 9);
-  assert(exponential == !!exponential);
   assert(verbose == !!verbose);
 
   s2w_q_init(&s2w_q);
@@ -540,7 +534,6 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   work_arg.s2w_q = &s2w_q;
   work_arg.w2m_q = &w2m_q;
   work_arg.bs100k = bs100k;
-  work_arg.exponential = exponential;
 
   assert(0u < num_worker);
   assert(SIZE_MAX / sizeof *worker >= num_worker);
@@ -611,8 +604,7 @@ lbzip2_wrap(void *v_lbzip2_arg)
       lbzip2_arg->ispec,
       lbzip2_arg->ospec,
       lbzip2_arg->bs100k,
-      lbzip2_arg->verbose,
-      lbzip2_arg->exponential
+      lbzip2_arg->verbose
   );
 
   xraise(SIGUSR2);

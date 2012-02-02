@@ -15,7 +15,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 lbzip2. If not, see <http://www.gnu.org/licenses/>.
 ..
-.TH LBZIP2 1 "01 October 2011" "lbzip2-2.1" "User commands"
+.TH LBZIP2 1 "02 February 2012" "lbzip2-2.2" "User commands"
 
 .SH NAME
 lbzip2 \- parallel bzip2 utility
@@ -166,17 +166,10 @@ Print condition variable statistics to standard error for each completed
 
 .TP
 .BR \-s ", " \-\-small ", " \-q ", " \-\-quiet ", " \-\-repetitive\-fast ", " \
-    \-\-repetitive\-best
+    \-\-repetitive\-best ", " \-\-exponential
 Accepted for compatibility with
 .BR bzip2 ,
 otherwise ignored.
-
-.TP
-.B \-\-exponential
-Use an alternative block-sorting algorithm -- bucket-pointer refinement (BPR).
-See also
-.B REPETITIVE DATA
-below.
 
 .TP
 .BR \-h ", " \-\-help
@@ -308,42 +301,6 @@ compression and decompression speed. The speed difference is more noticeable
 as the number of CPU cores grows.
 
 
-.SH "REPETITIVE DATA"
-
-The core transformation of the compression algorithm is sorting all rotations
-of a single string (the algorithm is known as Burrows-Wheeler transformation).
-The primary factor of compression speed is therefore the ability to sort
-strings quickly.
-
-The primary sorting algorithm of
-.B lbzip2
-is a highly optimized variation of Bentley-McIlroy three-way quicksort, which
-behaves well in the average case, but in the worst case it can run very slowly.
-.B lbzip2
-also implements an alternative block-sorting algorithm -- the bucket-pointer
-refinement (BPR in short).
-
-Quicksort is usually faster than BPR, but sometimes, for very repetitive input
-data, it may be much slower. Normally, when
-.B \-\-exponential
-is not given,
-.B lbzip2
-first tries to use quicksort and then possibly switches to BPR if quicksort
-runs into difficulties. This allows
-.B lbzip2
-to run fast in average case while remaining reasonable speed in corner cases.
-
-With the
-.B \-\-exponential
-option given,
-.B lbzip2
-will skip quicksorting and use BPR straight away. This option doesn't affect
-neither compression ratio nor decompression speed. Use of
-.B \-\-exponential
-makes sense if you know the input data is repetitive. Otherwise it's just waste
-of CPU cycles, but otherwise harmless.
-
-
 .SH "ERROR HANDLING"
 
 Dealing with error conditions is the least satisfactory aspect of
@@ -450,7 +407,7 @@ lbzip2. If not, see <http://www.gnu.org/licenses/>.
 Adam Maulis at ELTE IIG; Julian Seward; Paul Sladen; Michael Thomas from
 Caltech HEP; Bryan Stillwell; Zsolt Bartos-Elekes; Imre Csatlos; Gabor
 Kovesdan; Paul Wise; Paolo Bonzini; Department of Electrical and Information
-Engineering at the University of Oulu.
+Engineering at the University of Oulu; Yuta Mori.
 
 
 .SH "SEE ALSO"

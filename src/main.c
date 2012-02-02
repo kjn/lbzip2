@@ -1,7 +1,7 @@
 /*-
   main.c -- main module
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -688,7 +688,6 @@ struct opts
   enum outmode outmode; /* How to store output, -c/-t. */
   int decompress,       /* Run in bunzip2 mode, -d/-z. */
       bs100k,           /* Block size switch for compression, -1 .. -9. */
-      exponential,      /* Use an alternative block-sorting algorithm. */
       force,            /* Open anything / break links / remove output, -f. */
       keep,             /* Don't rm FILE oprnds / open rf with >1 links, -k. */
       verbose,          /* Print a msg. each time when starting a muxer, -v. */
@@ -755,18 +754,18 @@ utput file before\n                       opening it.\n  -v, --verbose      : \
 Log each (de)compression start to stderr. Display\n                       comp\
 ression ratio and space savings. Display progress\n                       info\
 rmation if stderr is connected to a terminal.\n  -S                 : Print co\
-ndition variable statistics to stderr.\n  --exponential      : Use an alternat\
-ive block-sorting algorithm.\n  -s, --small, -q,\n  --quiet,\n  --repetitive-f\
-ast,\n  --repetitive-bes", "t  : Accepted for compatibility, otherwise ignored\
-.\n  -h, --help         : Print this help to stdout and exit.\n  -L, --license\
-, -V,\n  --version          : Print version information to stdout and exit.\n\
-\nOperands:\n\n  FILE               : Specify files to compress or decompress.\
- If no FILE is\n                       given, work as a filter. FILEs with `.b\
-z2', `.tbz',\n                       `.tbz2' and `.tz2' name suffixes will be \
-skipped when\n                       compressing. When decompressing, `.bz2' s\
-uf", "fixes will be\n                       removed in output filenames; `.tbz\
-', `.tbz2' and `.tz2'\n                       suffixes will be replaced by `.t\
-ar'; other filenames\n                       will be suffixed with `.out'.\n"
+ndition variable statistics to stderr.\n  -s, --small, -q,\n  --quiet,\n  --re\
+petitive-fast,\n  --repetitive-best,\n  --exponential      : Accepted for comp\
+atibility, otherwise ign", "ored.\n  -h, --help         : Print this help to s\
+tdout and exit.\n  -L, --license, -V,\n  --version          : Print version in\
+formation to stdout and exit.\n\nOperands:\n\n  FILE               : Specify f\
+iles to compress or decompress. If no FILE is\n                       given, w\
+ork as a filter. FILEs with `.bz2', `.tbz',\n                       `.tbz2' an\
+d `.tz2' name suffixes will be skipped when\n                       compressin\
+g. When decompressing, `.bz2' suffixes will be\n                       removed\
+ i", "n output filenames; `.tbz', `.tbz2' and `.tz2'\n                       s\
+uffixes will be replaced by `.tar'; other filenames\n                       wi\
+ll be suffixed with `.out'.\n"
 
 
 static void _Noreturn
@@ -917,7 +916,6 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
     }
   }
   opts->bs100k = 9;
-  opts->exponential = 0;
   opts->force = 0;
   opts->keep = 0;
   opts->verbose = 0;
@@ -975,9 +973,6 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
           else if (0 == strcmp("fast", argscan)) {
             opts->bs100k = 1;
           }
-          else if (0 == strcmp("exponential", argscan)) {
-            opts->exponential = 1;
-          }
           else if (0 == strcmp("best", argscan)) {
             opts->bs100k = 9;
           }
@@ -1000,7 +995,8 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
           else if (0 != strcmp("small", argscan)
               && 0 != strcmp("quiet", argscan)
               && 0 != strcmp("repetitive-fast", argscan)
-              && 0 != strcmp("repetitive-best", argscan)) {
+              && 0 != strcmp("repetitive-best", argscan)
+              && 0 != strcmp("exponential", argscan)) {
             log_fatal("%s: unknown option \"%s\", specify \"-h\" for help\n",
                 pname, arg->val);
           }
@@ -1594,7 +1590,6 @@ process(const struct opts *opts, unsigned num_slot, struct filespec *ispec,
     muxer_arg.lbzip2.ospec = ospec;
     muxer_arg.lbzip2.bs100k = opts->bs100k;
     muxer_arg.lbzip2.verbose = opts->verbose;
-    muxer_arg.lbzip2.exponential = opts->exponential;
     xcreate(&muxer, lbzip2_wrap, &muxer_arg.lbzip2);
   }
 
