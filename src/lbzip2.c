@@ -293,7 +293,7 @@ work_compr(struct s2w_blk *s2w_blk, struct w2m_q *w2m_q, int bs100k)
     /*
       Allocate a yambi encoder with given block size and default parameters.
     */
-    enc = YBenc_init(bs100k * 100000, YB_DEFAULT_SHALLOW, YB_DEFAULT_PREFIX);
+    enc = YBenc_init(bs100k * 100000, YB_DEFAULT_PREFIX);
 
     /* Collect as much data as we can. */
     consumed = ileft;

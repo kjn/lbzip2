@@ -85,7 +85,6 @@ YBobs_finish(YBobs_t *obs, void *buf)
 
 YBenc_t *
 YBenc_init(unsigned long max_block_size,
-           unsigned shallow_factor,
            unsigned prefix_factor)
 {
   int i;
@@ -96,14 +95,12 @@ YBenc_init(unsigned long max_block_size,
      behaviour. */
   assert(s != 0);
   assert(max_block_size > 0 && max_block_size <= 900000);
-  assert(shallow_factor <= 65535);
   assert(prefix_factor > 0 && prefix_factor <= 65535);
 
   s->rle_state = 0;
   s->nblock = 0;
   s->max_block_size = max_block_size;
   s->block_crc = 0xFFFFFFFF;
-  s->shallow_factor = shallow_factor;
   s->prefix_factor = prefix_factor;
 
   s->cmap = xmalloc(256 * sizeof(Byte));

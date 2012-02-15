@@ -44,7 +44,6 @@ struct YBenc_s
   Int alpha_size;
 
   Int max_block_size;
-  Int shallow_factor;
   Int prefix_factor;
 
   Byte *block;

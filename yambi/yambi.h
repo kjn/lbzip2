@@ -32,7 +32,6 @@ typedef struct YBenc_s YBenc_t;  /* encoder */
 typedef unsigned long  YBcrc_t;  /* CRC32 */
 
 
-#define YB_DEFAULT_SHALLOW 64u
 #define YB_DEFAULT_PREFIX  8u
 #define YB_HEADER_SIZE     4u
 #define YB_TRAILER_SIZE    10u
@@ -117,7 +116,6 @@ const char *YBerr_detail(int code);
 
 YBobs_t *YBobs_init(unsigned long max_block_size, void *buf);
 YBenc_t *YBenc_init(unsigned long max_block_size,
-                    unsigned shallow_factor,
                     unsigned prefix_factor);
 
 /* Returns YB_OK on successful collect, YB_OVERFLOW on overflow. */
