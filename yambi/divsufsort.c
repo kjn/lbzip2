@@ -1519,9 +1519,9 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
   trbudget_t budget;
   saidx_t t, skip, unsorted;
 
+  if (-n >= *SA) { return; }
   trbudget_init(&budget, tr_ilg(n) * 2 / 3, n);
   for(ISAd = ISA + depth;; ISAd += ISAd - ISA) {
-    assert(-n < *SA);
     assert(n > ISAd - ISA);
     first = SA;
     skip = 0;
