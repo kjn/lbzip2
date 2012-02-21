@@ -517,12 +517,10 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   m2s_q_init(&m2s_q, num_slot);
 
   if (SIZE_MAX < (unsigned)bs100k * 100000u) {
-    log_fatal("%s: %s%s%s: size_t overflow in sizeof_plain\n", pname,
-        ispec->sep, ispec->fmt, ispec->sep);
+    failf(ispec, "size_t overflow in sizeof_plain");
   }
   if (SIZE_MAX - sizeof(struct s2w_blk) < (unsigned)bs100k * 100000u) {
-    log_fatal("%s: %s%s%s: size_t overflow in sizeof_s2w_blk\n", pname,
-        ispec->sep, ispec->fmt, ispec->sep);
+    failf(ispec, "size_t overflow in sizeof_s2w_blk");
   }
 
   split_arg.m2s_q = &m2s_q;
@@ -565,16 +563,15 @@ lbzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
     http://www.opengroup.org/openbrand/register/brand2700.htm
   */
   if (print_cctrs) {
-    log_info(
-        "%s: %s%s%s: condvar counters:\n"
+    infof(ispec,
+        "condvar counters:"
 #define FW ((int)sizeof(long unsigned) * (int)CHAR_BIT / 3 + 1)
-        "%s: any worker tried to consume from splitter: %*lu\n"
-        "%s: any worker stalled                       : %*lu\n"
-        "%s: muxer tried to consume from workers      : %*lu\n"
-        "%s: muxer stalled                            : %*lu\n"
-        "%s: splitter tried to consume from muxer     : %*lu\n"
-        "%s: splitter stalled                         : %*lu\n",
-        pname, ispec->sep, ispec->fmt, ispec->sep,
+        "\n%s: any worker tried to consume from splitter: %*lu"
+        "\n%s: any worker stalled                       : %*lu"
+        "\n%s: muxer tried to consume from workers      : %*lu"
+        "\n%s: muxer stalled                            : %*lu"
+        "\n%s: splitter tried to consume from muxer     : %*lu"
+        "\n%s: splitter stalled                         : %*lu",
         pname, FW, s2w_q.av_or_eof.ccount,
         pname, FW, s2w_q.av_or_eof.wcount,
         pname, FW, w2m_q.av_or_exit.ccount,

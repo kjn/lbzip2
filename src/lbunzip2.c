@@ -573,9 +573,10 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
   decompr_blk_id = 0u;
 
   ybret = YBdec_work(w2w_blk->ybdec, &bs100k);
-  if (ybret != YB_OK)
-    log_fatal("%s: %s%s%s: data error while decompressing block: %s\n",
-        pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+  if (ybret != YB_OK) {
+    failf(ispec, "data error while decompressing block: %s",
+        YBerr_detail(ybret));
+  }
 
   do {
     struct w2m_blk *w2m_blk;
@@ -588,9 +589,9 @@ work_decompr(struct w2w_blk *w2w_blk, struct w2m_q *w2m_q,
     ybret = YBdec_emit(w2w_blk->ybdec, obuf, &oleft, &crc);
     if (ybret == YB_OK) {
     }
-    else if (YB_UNDERFLOW != ybret)
-      log_fatal("%s: %s%s%s: data error while emitting block: %s\n",
-          pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+    else if (YB_UNDERFLOW != ybret) {
+      failf(ispec, "data error while emitting block: %s", YBerr_detail(ybret));
+    }
 
     w2m_blk->id.w2w_blk_id = w2w_blk->id;
     w2m_blk->id.decompr_blk_id = decompr_blk_id++;
@@ -1011,9 +1012,10 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
         s2w_blk->compr, &ipos, s2w_blk->loaded, &ibitbuf, &ibits_left))) {
       if (YB_DONE == ybret)
         goto out;
-      if (YB_OK != ybret)
-        log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
-            pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+      if (YB_OK != ybret) {
+        failf(ispec, "data error while retrieving block: %s",
+            YBerr_detail(ybret));
+      }
       assert(w2w_blk != 0);
       w2w_blk->end_offs = 0u < s2w_blk->id ? (s2w_blk->id - 1u) * MX_SPLIT +
           ipos : 0u;
@@ -1024,16 +1026,16 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
       w2w_blk->crc = 0u;
     }
 
-    if (MX_SPLIT > s2w_blk->loaded)
-      log_fatal("%s: %s%s%s: unterminated bzip2 block in short first"
-            " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+    if (MX_SPLIT > s2w_blk->loaded) {
+      failf(ispec, "unterminated bzip2 block in short first input block");
+    }
     assert(MX_SPLIT == s2w_blk->loaded);
 
     s2w_blk = work_get_second(s2w_blk, sw2w_q, w2m_q, ispec);
 
-    if (0 == s2w_blk)
-      log_fatal("%s: %s%s%s: unterminated bzip2 block in full first"
-          " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+    if (0 == s2w_blk) {
+      failf(ispec, "unterminated bzip2 block in full first input block");
+    }
 
     ipos = 0u;
     first = 0;
@@ -1043,15 +1045,16 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
       while (YB_DONE != (ybret = YBdec_retrieve(w2w_blk->ybdec, s2w_blk->compr,
           &ipos, s2w_blk->loaded, &ibitbuf, &ibits_left))) {
 
-        if (YB_UNDERFLOW == ybret)
-          log_fatal("%s: %s%s%s: %s second input block\n", pname, ispec->sep,
-              ispec->fmt, ispec->sep, MX_SPLIT == s2w_blk->loaded ?
-              "missing bzip2 block header in full" :
-              "unterminated bzip2 block in short");
+        if (YB_UNDERFLOW == ybret) {
+          failf(ispec, MX_SPLIT == s2w_blk->loaded ?
+              "missing bzip2 block header in full second input block" :
+              "unterminated bzip2 block in short second input block");
+        }
 
-        if (YB_OK != ybret)
-          log_fatal("%s: %s%s%s: data error while retrieving block: %s\n",
-              pname, ispec->sep, ispec->fmt, ispec->sep, YBerr_detail(ybret));
+        if (YB_OK != ybret) {
+          failf(ispec, "data error while retrieving block: %s",
+              YBerr_detail(ybret));
+        }
 
         if ((size_t)((48u + ibits_left + 7u) / 8u) <= 4u * ipos) {
           xlock(&sw2w_q->proceed);
@@ -1093,9 +1096,8 @@ work_retrieve(struct s2w_blk *s2w_blk, size_t ipos, unsigned ibitbuf,
                 w2w_blk->bs100k = -1;
               if (!first) {
                 if (MX_SPLIT == s2w_blk->loaded) {
-                  log_fatal("%s: %s%s%s: missing bzip2 block header in full"
-                      " second input block\n", pname, ispec->sep, ispec->fmt,
-                      ispec->sep);
+                  failf(ispec, "missing bzip2 block header in full"
+                      " second input block");
                 }
 
                 /*
@@ -1292,8 +1294,7 @@ work_scan(struct s2w_blk *s2w_blk, struct sw2w_q *sw2w_q, struct w2m_q *w2m_q,
     if (ACCEPT != state) {
       assert(s2w_blk->loaded == ipos);
       if (MX_SPLIT == s2w_blk->loaded)
-        log_fatal("%s: %s%s%s: missing bzip2 block header in full first"
-            " input block\n", pname, ispec->sep, ispec->fmt, ispec->sep);
+        failf(ispec, "missing bzip2 block header in full first input block");
 
       /* Short first input block without a bzip2 block header. */
       assert(MX_SPLIT > s2w_blk->loaded);
@@ -1437,17 +1438,17 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
       if (!finished) {
         if (w2m_blk->id.last_decompr) {
           crc = (crc << 1) ^ (crc >> 31) ^ w2m_blk->crc1;
-          if (bs100k < w2m_blk->bs100k1)
-            log_fatal("%s: %s%s%s: block overrun\n", pname, ispec->sep,
-                ispec->fmt, ispec->sep);
+          if (bs100k < w2m_blk->bs100k1) {
+            failf(ispec, "block overrun");
+          }
         }
 
         if (w2m_blk->bs100k) {
           bs100k = w2m_blk->bs100k;
           any |= (9u >= bs100k);
-          if (crc != w2m_blk->crc)
-            log_fatal("%s: %s%s%s: stream CRC mismatch\n", pname, ispec->sep,
-                ispec->fmt, ispec->sep);
+          if (crc != w2m_blk->crc) {
+            failf(ispec, "stream CRC mismatch");
+          }
           crc = 0u;
           finished = (9u < bs100k);
         }
@@ -1495,9 +1496,9 @@ mux(struct w2m_q *w2m_q, struct m2s_q *m2s_q, struct filespec *ispec,
   } while (0u < working);
   xunlock(&w2m_q->av_or_ex_or_rel);
 
-  if (!any)
-    log_fatal("%s: %s%s%s: not a valid bzip2 file\n", pname, ispec->sep,
-        ispec->fmt, ispec->sep);
+  if (!any) {
+    failf(ispec, "not a valid bzip2 file");
+  }
 
   if (!finished)
     progress_update(&progr, (ispec->size + 3u) / 4u - last_offs);
@@ -1553,16 +1554,15 @@ lbunzip2(unsigned num_worker, unsigned num_slot, int print_cctrs,
   xjoin(splitter);
 
   if (print_cctrs) {
-    log_info(
-        "%s: %s%s%s: condvar counters:\n"
+    infof(ispec,
+        "condvar counters:"
 #define FW ((int)sizeof(long unsigned) * (int)CHAR_BIT / 3 + 1)
-        "%s: any worker tried to consume from splitter or workers: %*lu\n"
-        "%s: any worker stalled                                  : %*lu\n"
-        "%s: muxer tried to consume from workers                 : %*lu\n"
-        "%s: muxer stalled                                       : %*lu\n"
-        "%s: splitter tried to consume from muxer                : %*lu\n"
-        "%s: splitter stalled                                    : %*lu\n",
-        pname, ispec->sep, ispec->fmt, ispec->sep,
+        "\n%s: any worker tried to consume from splitter or workers: %*lu"
+        "\n%s: any worker stalled                                  : %*lu"
+        "\n%s: muxer tried to consume from workers                 : %*lu"
+        "\n%s: muxer stalled                                       : %*lu"
+        "\n%s: splitter tried to consume from muxer                : %*lu"
+        "\n%s: splitter stalled                                    : %*lu",
         pname, FW, sw2w_q.proceed.ccount,
         pname, FW, sw2w_q.proceed.wcount,
         pname, FW, w2m_q.av_or_ex_or_rel.ccount,

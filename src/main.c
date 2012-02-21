@@ -62,9 +62,7 @@ static pid_t pid;
 
 
 static void
-#ifdef __GNUC__
 __attribute__((noreturn))
-#endif
 bailout(void)
 {
   sigset_t tmp_set;
@@ -101,300 +99,70 @@ bailout(void)
 /* (II) Logging utilities. */
 
 const char *pname;
+static int warned;
 
 
-struct errstr
+static void
+log_generic(const struct filespec *fs, int code, const char *fmt, va_list args,
+    int nl) __attribute__((format(printf, 3, 0)));
+
+static void
+log_generic(const struct filespec *fs, int code, const char *fmt, va_list args,
+    int nl)
 {
-  int err;
-  const char *str;
-};
-
-
-static const struct errstr errstr[] = {
-#ifdef E2BIG
-    { E2BIG,           "Argument list too long" },
-#endif
-#ifdef EACCES
-    { EACCES,          "Permission denied" },
-#endif
-#ifdef EADDRINUSE
-    { EADDRINUSE,      "Address in use" },
-#endif
-#ifdef EADDRNOTAVAIL
-    { EADDRNOTAVAIL,   "Address not available" },
-#endif
-#ifdef EAFNOSUPPORT
-    { EAFNOSUPPORT,    "Address family not supported" },
-#endif
-#ifdef EAGAIN
-    { EAGAIN,          "Resource temporarily unavailable" },
-#endif
-#ifdef EALREADY
-    { EALREADY,        "Connection already in progress" },
-#endif
-#ifdef EBADF
-    { EBADF,           "Bad file descriptor" },
-#endif
-#ifdef EBADMSG
-    { EBADMSG,         "Bad message" },
-#endif
-#ifdef EBUSY
-    { EBUSY,           "Device or resource busy" },
-#endif
-#ifdef ECANCELED
-    { ECANCELED,       "Operation canceled" },
-#endif
-#ifdef ECHILD
-    { ECHILD,          "No child processes" },
-#endif
-#ifdef ECONNABORTED
-    { ECONNABORTED,    "Connection aborted" },
-#endif
-#ifdef ECONNREFUSED
-    { ECONNREFUSED,    "Connection refused" },
-#endif
-#ifdef ECONNRESET
-    { ECONNRESET,      "Connection reset" },
-#endif
-#ifdef EDEADLK
-    { EDEADLK,         "Resource deadlock would occur" },
-#endif
-#ifdef EDESTADDRREQ
-    { EDESTADDRREQ,    "Destination address required" },
-#endif
-#ifdef EDOM
-    { EDOM,            "Domain error" },
-#endif
-#ifdef EDQUOT
-    { EDQUOT,          "EDQUOT" },
-#endif
-#ifdef EEXIST
-    { EEXIST,          "File exists" },
-#endif
-#ifdef EFAULT
-    { EFAULT,          "Bad address" },
-#endif
-#ifdef EFBIG
-    { EFBIG,           "File too large" },
-#endif
-#ifdef EHOSTUNREACH
-    { EHOSTUNREACH,    "Host is unreachable" },
-#endif
-#ifdef EIDRM
-    { EIDRM,           "Identifier removed" },
-#endif
-#ifdef EILSEQ
-    { EILSEQ,          "Illegal byte sequence" },
-#endif
-#ifdef EINPROGRESS
-    { EINPROGRESS,     "Operation in progress" },
-#endif
-#ifdef EINVAL
-    { EINVAL,          "Invalid argument" },
-#endif
-#ifdef EIO
-    { EIO,             "Input/output error" },
-#endif
-#ifdef EISCONN
-    { EISCONN,         "Socket is connected" },
-#endif
-#ifdef EISDIR
-    { EISDIR,          "Is a directory" },
-#endif
-#ifdef ELOOP
-    { ELOOP,           "Too many levels of symbolic links" },
-#endif
-#ifdef EMFILE
-    { EMFILE,          "Too many open files" },
-#endif
-#ifdef EMLINK
-    { EMLINK,          "Too many links" },
-#endif
-#ifdef EMSGSIZE
-    { EMSGSIZE,    "Message too large / Inappropriate message buffer length" },
-#endif
-#ifdef EMULTIHOP
-    { EMULTIHOP,       "EMULTIHOP" },
-#endif
-#ifdef ENAMETOOLONG
-    { ENAMETOOLONG,    "Filename too long" },
-#endif
-#ifdef ENETDOWN
-    { ENETDOWN,        "Network is down" },
-#endif
-#ifdef ENETUNREACH
-    { ENETUNREACH,     "Network unreachable" },
-#endif
-#ifdef ENFILE
-    { ENFILE,          "Too many files open in system" },
-#endif
-#ifdef ENOBUFS
-    { ENOBUFS,         "No buffer space available" },
-#endif
-#ifdef ENODATA
-    { ENODATA,         "No message available" },
-#endif
-#ifdef ENODEV
-    { ENODEV,          "No such device" },
-#endif
-#ifdef ENOEXEC
-    { ENOEXEC,         "Executable file format error" },
-#endif
-#ifdef ENOLCK
-    { ENOLCK,          "No locks available" },
-#endif
-#ifdef ENOLINK
-    { ENOLINK,         "ENOLINK" },
-#endif
-#ifdef ENOMEM
-    { ENOMEM,          "Not enough space" },
-#endif
-#ifdef ENOMSG
-    { ENOMSG,          "No message of the desired type" },
-#endif
-#ifdef ENOPROTOOPT
-    { ENOPROTOOPT,     "Protocol not available" },
-#endif
-#ifdef ENOSPC
-    { ENOSPC,          "No space left on device" },
-#endif
-#ifdef ENOSR
-    { ENOSR,           "No STREAM resources" },
-#endif
-#ifdef ENOSTR
-    { ENOSTR,          "Not a STREAM" },
-#endif
-#ifdef ENOSYS
-    { ENOSYS,          "Function not implemented" },
-#endif
-#ifdef ENOTCONN
-    { ENOTCONN,        "Socket not connected" },
-#endif
-#ifdef ENOTDIR
-    { ENOTDIR,         "Not a directory" },
-#endif
-#ifdef ENOTEMPTY
-    { ENOTEMPTY,       "Directory not empty" },
-#endif
-#ifdef ENOTSOCK
-    { ENOTSOCK,        "Not a socket" },
-#endif
-#ifdef ENOTSUP
-    { ENOTSUP,         "Not supported" },
-#endif
-#ifdef ENOTTY
-    { ENOTTY,          "Inappropriate I/O control operation" },
-#endif
-#ifdef ENXIO
-    { ENXIO,           "No such device or address" },
-#endif
-#ifdef EOPNOTSUPP
-    { EOPNOTSUPP,      "Operation not supported on socket" },
-#endif
-#ifdef EOVERFLOW
-    { EOVERFLOW,       "Value too large to be stored in data type" },
-#endif
-#ifdef EPERM
-    { EPERM,           "Operation not permitted" },
-#endif
-#ifdef EPIPE
-    { EPIPE,           "Broken pipe" },
-#endif
-#ifdef EPROTO
-    { EPROTO,          "Protocol error" },
-#endif
-#ifdef EPROTONOSUPPORT
-    { EPROTONOSUPPORT, "Protocol not supported" },
-#endif
-#ifdef EPROTOTYPE
-    { EPROTOTYPE,      "Socket type not supported" },
-#endif
-#ifdef ERANGE
-    { ERANGE,          "Numerical result out of range" },
-#endif
-#ifdef EROFS
-    { EROFS,           "Read-only file system" },
-#endif
-#ifdef ESPIPE
-    { ESPIPE,          "Invalid seek" },
-#endif
-#ifdef ESRCH
-    { ESRCH,           "No such process" },
-#endif
-#ifdef ESTALE
-    { ESTALE,          "ESTALE" },
-#endif
-#ifdef ETIME
-    { ETIME,           "STREAM ioctl() timeout" },
-#endif
-#ifdef ETIMEDOUT
-    { ETIMEDOUT,       "Connection timed out / Operation timed out" },
-#endif
-#ifdef ETXTBSY
-    { ETXTBSY,         "Text file busy" },
-#endif
-#ifdef EWOULDBLOCK
-    { EWOULDBLOCK,     "Operation would block" },
-#endif
-#ifdef EXDEV
-    { EXDEV,           "Cross-device link" },
-#endif
-    { EINTR,           "Interrupted function call" },
-    { ENOENT,          "No such file or directory" }
-};
-
-
-const char *
-err2str(int err)
-{
-  size_t idx;
-
-  for (idx = 0u; idx < sizeof errstr / sizeof errstr[0]; ++idx) {
-    if (errstr[idx].err == err) {
-      return errstr[idx].str;
-    }
-  }
-
-  return "Unknown error";
-}
-
-
-void
-log_info(const char *fmt, ...)
-{
-  va_list args;
-  int ret;
-
-  va_start(args, fmt);
-  ret = vfprintf(stderr, fmt, args);
-  va_end(args);
-
-  if (0 > ret) {
-    /* stderr is never fully buffered originally. */
+  if (0 > fprintf(stderr, "%s: ", pname)
+      || (fs && 0 > fprintf(stderr, "%s%s%s: ", fs->sep, fs->fmt, fs->sep))
+      || 0 > vfprintf(stderr, fmt, args)
+      || (0 != code && 0 > fprintf(stderr, ": %s", strerror(code)))
+      || (nl && 0 > fprintf(stderr, "\n"))
+      || 0 != fflush(stderr))
     bailout();
+}
+
+
+#define DEF(proto, f, x, warn, bail, nl)        \
+  void proto                                    \
+  {                                             \
+    va_list args;                               \
+                                                \
+    flockfile(stderr);                          \
+    va_start(args, fmt);                        \
+    log_generic(f, x, fmt, args, nl);           \
+                                                \
+    if (!bail) {                                \
+      va_end(args);                             \
+      if (warn)                                 \
+        warned = 1;                             \
+      funlockfile(stderr);                      \
+    }                                           \
+    else                                        \
+      bailout();                                \
   }
-}
 
+static void display(const char *fmt, ...) PRINTF_FMT(0);
 
-void
-log_fatal(const char *fmt, ...)
-{
-  va_list args;
+DEF(info  (                                 const char *fmt, ...), 0,0,0,0,1)
+DEF(infof (const struct filespec *f,        const char *fmt, ...), f,0,0,0,1)
+DEF(infox (                          int x, const char *fmt, ...), 0,x,0,0,1)
+DEF(infofx(const struct filespec *f, int x, const char *fmt, ...), f,x,0,0,1)
+DEF(warn  (                                 const char *fmt, ...), 0,0,1,0,1)
+DEF(warnf (const struct filespec *f,        const char *fmt, ...), f,0,1,0,1)
+DEF(warnx (                          int x, const char *fmt, ...), 0,x,1,0,1)
+DEF(warnfx(const struct filespec *f, int x, const char *fmt, ...), f,x,1,0,1)
+DEF(fail  (                                 const char *fmt, ...), 0,0,0,1,1)
+DEF(failf (const struct filespec *f,        const char *fmt, ...), f,0,0,1,1)
+DEF(failx (                          int x, const char *fmt, ...), 0,x,0,1,1)
+DEF(failfx(const struct filespec *f, int x, const char *fmt, ...), f,x,0,1,1)
+DEF(display( /* WITH NO ADVANCING :) */     const char *fmt, ...), 0,0,0,0,0)
 
-  va_start(args, fmt);
-  (void)vfprintf(stderr, fmt, args);
-  va_end(args);
-
-  /* stderr is never fully buffered originally. */
-  bailout();
-}
+#undef DEF
 
 
 /* Called when one of xalloc functions fails. */
 void
 xalloc_die(void)
 {
-  log_fatal("%s: xalloc: %s\n", pname, err2str(errno));
+  failx(errno, "xalloc");
 }
 
 
@@ -414,7 +182,7 @@ progress_init(struct progress *p, int verbose, uintmax_t file_size)
     p->processed = 0u;
     gettime(&p->start_time);
     p->next_time = p->start_time;
-    log_info("%s: progress: %.2f%%\r", pname, 0.0);
+    display("progress: %.2f%%\r", 0.0);
   }
 }
 
@@ -442,10 +210,10 @@ progress_update(struct progress *p, uintmax_t chunk_size)
   completed = (double)p->processed / p->size;
 
   if (elapsed < 5)
-    log_info("%s: progress: %.2f%%\r", pname, 100 * completed);
+    display("progress: %.2f%%\r", 100 * completed);
   else
-    log_info("%s: progress: %.2f%%, ETA: %.0f s    \r", pname,
-        100 * completed, elapsed * (1 / completed - 1));
+    display("progress: %.2f%%, ETA: %.0f s    \r", 100 * completed,
+        elapsed * (1 / completed - 1));
 }
 
 
@@ -461,36 +229,27 @@ progress_finish(struct progress *p)
 
 /* (III) Threading utilities. */
 
+static void
+failxc(int x, const char *fname)
+{
+  if (0 != x) {
+    failx(x, "%s", fname);
+  }
+}
+
+#define pthread(fn, args) failxc(pthread_ ## fn args, "pthread_" #fn "()")
+
+
 void
 xinit(struct cond *cond)
 {
-  int ret;
   pthread_mutexattr_t attr;
 
-  ret = pthread_mutexattr_init(&attr);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutexattr_init(): %s\n", pname, err2str(ret));
-  }
-
-  ret = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutexattr_settype(): %s\n", pname, err2str(ret));
-  }
-
-  ret = pthread_mutex_init(&cond->lock, &attr);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutex_init(): %s\n", pname, err2str(ret));
-  }
-
-  ret = pthread_mutexattr_destroy(&attr);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutexattr_destroy(): %s\n", pname, err2str(ret));
-  }
-
-  ret = pthread_cond_init(&cond->cond, 0);
-  if (0 != ret) {
-    log_fatal("%s: pthread_cond_init(): %s\n", pname, err2str(ret));
-  }
+  pthread(mutexattr_init, (&attr));
+  pthread(mutexattr_settype, (&attr, PTHREAD_MUTEX_ERRORCHECK));
+  pthread(mutex_init, (&cond->lock, &attr));
+  pthread(mutexattr_destroy, (&attr));
+  pthread(cond_init, (&cond->cond, 0));
 
   cond->ccount = 0lu;
   cond->wcount = 0lu;
@@ -500,29 +259,15 @@ xinit(struct cond *cond)
 void
 xdestroy(struct cond *cond)
 {
-  int ret;
-
-  ret = pthread_cond_destroy(&cond->cond);
-  if (0 != ret) {
-    log_fatal("%s: pthread_cond_destroy(): %s\n", pname, err2str(ret));
-  }
-
-  ret = pthread_mutex_destroy(&cond->lock);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutex_destroy(): %s\n", pname, err2str(ret));
-  }
+  pthread(cond_destroy, (&cond->cond));
+  pthread(mutex_destroy, (&cond->lock));
 }
 
 
 void
 xlock(struct cond *cond)
 {
-  int ret;
-
-  ret = pthread_mutex_lock(&cond->lock);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutex_lock(): %s\n", pname, err2str(ret));
-  }
+  pthread(mutex_lock, (&cond->lock));
 }
 
 
@@ -537,25 +282,15 @@ xlock_pred(struct cond *cond)
 void
 xunlock(struct cond *cond)
 {
-  int ret;
-
-  ret = pthread_mutex_unlock(&cond->lock);
-  if (0 != ret) {
-    log_fatal("%s: pthread_mutex_unlock(): %s\n", pname, err2str(ret));
-  }
+  pthread(mutex_unlock, (&cond->lock));
 }
 
 
 void
 xwait(struct cond *cond)
 {
-  int ret;
-
   ++cond->wcount;
-  ret = pthread_cond_wait(&cond->cond, &cond->lock);
-  if (0 != ret) {
-    log_fatal("%s: pthread_cond_wait(): %s\n", pname, err2str(ret));
-  }
+  pthread(cond_wait, (&cond->cond, &cond->lock));
   ++cond->ccount;
 }
 
@@ -563,48 +298,28 @@ xwait(struct cond *cond)
 void
 xsignal(struct cond *cond)
 {
-  int ret;
-
-  ret = pthread_cond_signal(&cond->cond);
-  if (0 != ret) {
-    log_fatal("%s: pthread_cond_signal(): %s\n", pname, err2str(ret));
-  }
+  pthread(cond_signal, (&cond->cond));
 }
 
 
 void
 xbroadcast(struct cond *cond)
 {
-  int ret;
-
-  ret = pthread_cond_broadcast(&cond->cond);
-  if (0 != ret) {
-    log_fatal("%s: pthread_cond_broadcast(): %s\n", pname, err2str(ret));
-  }
+  pthread(cond_broadcast, (&cond->cond));
 }
 
 
 void
 xcreate(pthread_t *thread, void *(*routine)(void *), void *arg)
 {
-  int ret;
-
-  ret = pthread_create(thread, 0, routine, arg);
-  if (0 != ret) {
-    log_fatal("%s: pthread_create(): %s\n", pname, err2str(ret));
-  }
+  pthread(create, (thread, 0, routine, arg));
 }
 
 
 void
 xjoin(pthread_t thread)
 {
-  int ret;
-
-  ret = pthread_join(thread, 0);
-  if (0 != ret) {
-    log_fatal("%s: pthread_join(): %s\n", pname, err2str(ret));
-  }
+  pthread(join, (thread, 0));
 }
 
 
@@ -612,7 +327,7 @@ void
 xraise(int sig)
 {
   if (-1 == kill(pid, sig)) {
-    log_fatal("%s: kill(): %s\n", pname, err2str(errno));
+    failx(errno, "kill()");
   }
 }
 
@@ -636,8 +351,7 @@ xread(struct filespec *ispec, char unsigned *buffer, size_t *vacant)
 
     /* Read error. */
     if (-1 == rd) {
-      log_fatal("%s: read(%s%s%s): %s\n", pname, ispec->sep, ispec->fmt,
-          ispec->sep, err2str(errno));
+      failfx(ispec, errno, "read()");
     }
 
     *vacant -= (size_t)rd;
@@ -662,8 +376,7 @@ xwrite(struct filespec *ospec, const char unsigned *buffer, size_t size)
 
       /* Write error. */
       if (-1 == wr) {
-        log_fatal("%s: write(%s%s%s): %s\n", pname, ospec->sep, ospec->fmt,
-            ospec->sep, err2str(errno));
+        failfx(ospec, errno, "write()");
       }
 
       size -= (size_t)wr;
@@ -714,8 +427,8 @@ xstrtol(const char *str, const char *source, long lower, long upper)
   tmp = strtol(str, &endptr, 10);
   if ('\0' == *str || '\0' != *endptr || 0 != errno
       || tmp < lower || tmp > upper) {
-    log_fatal("%s: failed to parse \"%s\" from %s as a long in [%ld..%ld],"
-        " specify \"-h\" for help\n", pname, str, source, lower, upper);
+    fail("failed to parse \"%s\" from %s as a long in [%ld..%ld],"
+        " specify \"-h\" for help\n", str, source, lower, upper);
   }
 
   return tmp;
@@ -772,9 +485,9 @@ static void _Noreturn
 usage(void)
 {
   if (0 > printf(USAGE_STRING))
-    log_fatal("%s: printf(): %s\n", pname, err2str(errno));
+    failx(errno, "printf()");
   if (0 != fclose(stdout))
-    log_fatal("%s: fclose(stdout): %s\n", pname, err2str(errno));
+    failx(errno, "fclose(stdout)");
   _exit(EX_OK);
 }
 
@@ -798,9 +511,9 @@ version(void)
       "\n"
       "You should have received a copy of the GNU General Public License\nal"
       "ong with this program.  If not, see <http://www.gnu.org/licenses/>.\n"))
-    log_fatal("%s: printf(): %s\n", pname, err2str(errno));
+    failx(errno, "printf()");
   if (0 != fclose(stdout))
-    log_fatal("%s: fclose(stdout): %s\n", pname, err2str(errno));
+    failx(errno, "fclose(stdout)");
   _exit(EX_OK);
 }
 
@@ -817,8 +530,7 @@ opts_outmode(struct opts *opts, char ch)
 {
   assert('c' == ch || 't' == ch);
   if (('c' == ch ? OM_DISCARD : OM_STDOUT) == opts->outmode) {
-    log_fatal("%s: \"-c\" and \"-t\" are incompatible, specify \"-h\" for"
-        " help\n", pname);
+    fail("\"-c\" and \"-t\" are incompatible, specify \"-h\" for help");
   }
   if ('c' == ch) {
     opts->outmode = OM_STDOUT;
@@ -997,8 +709,7 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
               && 0 != strcmp("repetitive-fast", argscan)
               && 0 != strcmp("repetitive-best", argscan)
               && 0 != strcmp("exponential", argscan)) {
-            log_fatal("%s: unknown option \"%s\", specify \"-h\" for help\n",
-                pname, arg->val);
+            fail("unknown option \"%s\", specify \"-h\" for help", arg->val);
           }
         } /* long option */
         else {
@@ -1055,8 +766,8 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
                   /* Move to next argument, which is an option argument. */
                   arg = next;
                   if (0 == arg) {
-                    log_fatal("%s: option \"-%.1s\" requires an argument,"
-                        " specify \"-h\" for help\n", pname, argscan - 1);
+                    fail("option \"-%.1s\" requires an argument,"
+                        " specify \"-h\" for help", argscan - 1);
                   }
                   argscan = arg->val;
                 }
@@ -1066,8 +777,8 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
                 break;
 
               default:
-                log_fatal("%s: unknown option \"-%.1s\", specify \"-h\" for"
-                    " help\n", pname, argscan);
+                fail("unknown option \"-%.1s\", specify \"-h\" for"
+                    " help", argscan);
             } /* switch (*argscan) */
 
             ++argscan;
@@ -1101,14 +812,14 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
 
   if (opts->decompress) {
     if (0 == *operands && isatty(STDIN_FILENO)) {
-      log_fatal("%s: won't read compressed data from a terminal, specify"
-          " \"-h\" for help\n", pname);
+      fail("won't read compressed data from a terminal, specify"
+          " \"-h\" for help");
     }
   }
   else {
     if (OM_STDOUT == opts->outmode && isatty(STDOUT_FILENO)) {
-      log_fatal("%s: won't write compressed data to a terminal, specify"
-          " \"-h\" for help\n", pname);
+      fail("won't write compressed data to a terminal, specify"
+          " \"-h\" for help");
     }
   }
 
@@ -1118,13 +829,13 @@ opts_setup(struct opts *opts, struct arg **operands, size_t argc, char **argv)
 
     num_online = sysconf(_SC_NPROCESSORS_ONLN);
     if (-1 == num_online) {
-      log_fatal("%s: number of online processors unavailable, specify \"-h\""
-          " for help\n", pname);
+      fail("number of online processors unavailable, specify \"-h\""
+          " for help");
     }
     assert(1L <= num_online);
     opts->num_worker = (mx_worker < num_online) ? mx_worker : num_online;
 #else
-    log_fatal("%s: WORKER-THREADS not set, specify \"-h\" for help\n", pname);
+    fail("WORKER-THREADS not set, specify \"-h\" for help");
 #endif
   }
 }
@@ -1134,7 +845,7 @@ static void
 xsigemptyset(sigset_t *set)
 {
   if (-1 == sigemptyset(set)) {
-    log_fatal("%s: sigemptyset(): %s\n", pname, err2str(errno));
+    failx(errno, "sigemptyset()");
   }
 }
 
@@ -1143,7 +854,7 @@ static void
 xsigaddset(sigset_t *set, int signo)
 {
   if (-1 == sigaddset(set, signo)) {
-    log_fatal("%s: sigaddset(): %s\n", pname, err2str(errno));
+    failx(errno, "sigaddset()");
   }
 }
 
@@ -1151,12 +862,7 @@ xsigaddset(sigset_t *set, int signo)
 static void
 xsigmask(int how, const sigset_t *set, sigset_t *oset)
 {
-  int ret;
-
-  ret = pthread_sigmask(how, set, oset);
-  if (0 != ret) {
-    log_fatal("%s: pthread_sigmask(): %s\n", pname, err2str(ret));
-  }
+  pthread(sigmask, (how, set, oset));
 }
 
 
@@ -1170,7 +876,7 @@ xsigaction(int sig, void (*handler)(int))
   act.sa_flags = 0;
 
   if (-1 == sigaction(sig, &act, 0)) {
-    log_fatal("%s: sigaction(): %s\n", pname, err2str(errno));
+    failx(errno, "sigaction()");
   }
 }
 
@@ -1259,8 +965,7 @@ suffix_xform(const char *compr_pathname, char **decompr_pathname)
       if (0 == strcmp(compr_pathname + prefix_len, suffix[ofs].compr)) {
         if (0 != decompr_pathname) {
           if (SIZE_MAX - prefix_len < suffix[ofs].decompr_len + 1u) {
-            log_fatal("%s: \"%s\": size_t overflow in dpn_alloc\n", pname,
-                compr_pathname);
+            fail("\"%s\": size_t overflow in dpn_alloc\n", compr_pathname);
           }
           *decompr_pathname
               = xmalloc(prefix_len + suffix[ofs].decompr_len + 1u);
@@ -1273,34 +978,6 @@ suffix_xform(const char *compr_pathname, char **decompr_pathname)
   }
   assert(0 == decompr_pathname);
   return 0;
-}
-
-
-static int warned;
-
-
-static void
-log_warning(const char *fmt, ...)
-#ifdef __GNUC__
-__attribute__((format(printf, 1, 2)))
-#endif
-;
-
-static void
-log_warning(const char *fmt, ...)
-{
-  va_list args;
-  int ret;
-
-  va_start(args, fmt);
-  ret = vfprintf(stderr, fmt, args);
-  va_end(args);
-
-  if (0 > ret) {
-    /* stderr is never fully buffered originally. */
-    bailout();
-  }
-  warned = 1;
 }
 
 
@@ -1332,35 +1009,30 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
 
   if (!force) {
     if (-1 == lstat(operand->val, sbuf)) {
-      log_warning("%s: skipping \"%s\": lstat(): %s\n", pname, operand->val,
-          err2str(errno));
+      warnx(errno, "skipping \"%s\": lstat()", operand->val);
       return -1;
     }
 
     if (!S_ISREG(sbuf->st_mode)) {
-      log_warning("%s: skipping \"%s\": not a regular file\n", pname,
-          operand->val);
+      warn("skipping \"%s\": not a regular file", operand->val);
       return -1;
     }
 
     if (OM_REGF == outmode && !keep && sbuf->st_nlink > (nlink_t)1) {
-      log_warning("%s: skipping \"%s\": more than one links\n", pname,
-          operand->val);
+      warn("skipping \"%s\": more than one links", operand->val);
       return -1;
     }
   }
 
   if (!decompress && suffix_xform(operand->val, 0)) {
-    log_warning("%s: skipping \"%s\": compressed suffix\n", pname,
-        operand->val);
+    warn("skipping \"%s\": compressed suffix", operand->val);
   }
   else {
     int infd;
 
     infd = open(operand->val, O_RDONLY | O_NOCTTY);
     if (-1 == infd) {
-      log_warning("%s: skipping \"%s\": open(): %s\n", pname, operand->val,
-          err2str(errno));
+      warnx(errno, "skipping \"%s\": open()", operand->val);
     }
     else {
       if (-1 != fstat(infd, sbuf)) {
@@ -1372,11 +1044,9 @@ input_init(const struct arg *operand, enum outmode outmode, int decompress,
         return 0;
       }
 
-      log_warning("%s: skipping \"%s\": fstat(): %s\n", pname, operand->val,
-          err2str(errno));
+      warnx(errno, "skipping \"%s\": fstat()", operand->val);
       if (-1 == close(infd)) {
-        log_fatal("%s: close(\"%s\"): %s\n", pname, operand->val,
-            err2str(errno));
+        failx(errno, "close(\"%s\")", operand->val);
       }
     }
   }
@@ -1391,8 +1061,7 @@ input_oprnd_rm(const struct arg *operand)
   assert(0 != operand);
 
   if (-1 == unlink(operand->val) && ENOENT != errno) {
-    log_warning("%s: unlink(\"%s\"): %s\n", pname, operand->val,
-        err2str(errno));
+    warnx(errno, "unlink(\"%s\")", operand->val);
   }
 }
 
@@ -1401,8 +1070,7 @@ static void
 input_uninit(struct filespec *ispec)
 {
   if (-1 == close(ispec->fd)) {
-    log_fatal("%s: close(%s%s%s): %s\n", pname, ispec->sep, ispec->fmt,
-        ispec->sep, err2str(errno));
+    failx(errno, "close(%s%s%s)", ispec->sep, ispec->fmt, ispec->sep);
   }
 }
 
@@ -1453,8 +1121,7 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
 
           len = strlen(operand->val);
           if (SIZE_MAX - sizeof ".bz2" < len) {
-            log_fatal("%s: \"%s\": size_t overflow in cpn_alloc\n", pname,
-                operand->val);
+            fail("\"%s\": size_t overflow in cpn_alloc\n", operand->val);
           }
           tmp = xmalloc(len + sizeof ".bz2");
           (void)memcpy(tmp, operand->val, len);
@@ -1466,15 +1133,14 @@ output_init(const struct arg *operand, enum outmode outmode, int decompress,
             This doesn't warrant a warning in itself, just an explanation if
             the following open() fails.
           */
-          log_info("%s: unlink(\"%s\"): %s\n", pname, tmp, err2str(errno));
+          infox(errno, "unlink(\"%s\")", tmp);
         }
 
         ospec->fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL,
             sbuf->st_mode & (S_IRUSR | S_IWUSR));
 
         if (-1 == ospec->fd) {
-          log_warning("%s: skipping \"%s\": open(\"%s\"): %s\n", pname,
-              operand->val, tmp, err2str(errno));
+          warnx(errno, "skipping \"%s\": open(\"%s\")", operand->val, tmp);
           free(tmp);
         }
         else {
@@ -1501,19 +1167,17 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
 
   if (-1 == fchown(outfd, sbuf->st_uid, sbuf->st_gid)) {
     /* File stays with euid:egid, and at most 0600. */
-    log_warning("%s: fchown(\"%s\"): %s\n", pname, *output_pathname,
-        err2str(errno));
+    warnx(errno, "fchown(\"%s\")", *output_pathname);
   }
   else {
     if (sbuf->st_mode & (S_ISUID | S_ISGID | S_ISVTX)) {
-      log_warning("%s: \"%s\": won't restore any of setuid, setgid, sticky\n",
-          pname, *output_pathname);
+      warn("\"%s\": won't restore any of setuid, setgid, sticky",
+          *output_pathname);
     }
 
     if (-1 == fchmod(outfd, sbuf->st_mode & (S_IRWXU | S_IRWXG | S_IRWXO))) {
       /* File stays with orig-uid:orig-gid, and at most 0600. */
-      log_warning("%s: fchmod(\"%s\"): %s\n", pname, *output_pathname,
-          err2str(errno));
+      warnx(errno, "fchmod(\"%s\")", *output_pathname);
     }
   }
 
@@ -1524,14 +1188,12 @@ output_regf_uninit(int outfd, const struct stat *sbuf, char **output_pathname)
     ts[1] = get_stat_mtime(sbuf);
 
     if (-1 == fdutimens(outfd, *output_pathname, ts)) {
-      log_warning("%s: fdutimens(\"%s\"): %s\n", pname, *output_pathname,
-          err2str(errno));
+      warnx(errno, "fdutimens(\"%s\")", *output_pathname);
     }
   }
 
   if (-1 == close(outfd)) {
-    log_fatal("%s: close(\"%s\"): %s\n", pname, *output_pathname,
-        err2str(errno));
+    failx(errno, "close(\"%s\")", *output_pathname);
   }
 
   free(*output_pathname);
@@ -1568,8 +1230,8 @@ process(const struct opts *opts, unsigned num_slot, struct filespec *ispec,
   pthread_t muxer;
 
   if (opts->verbose) {
-    log_info("%s: %s %s%s%s to %s%s%s\n", pname, opts->decompress
-        ? "decompressing" : "compressing", ispec->sep, ispec->fmt, ispec->sep,
+    info(opts->decompress ? "decompressing %s%s%s to %s%s%s" :
+        "compressing %s%s%s to %s%s%s", ispec->sep, ispec->fmt, ispec->sep,
         ospec->sep, ospec->fmt, ospec->sep);
   }
 
@@ -1690,11 +1352,13 @@ main(int argc, char **argv)
   struct opts opts;
   struct arg *operands;
   unsigned num_slot;
+  static char stderr_buf[BUFSIZ];
 
   main_thread = pthread_self();
   pid = getpid();
   pname = strrchr(argv[0], '/');
   pname = pname ? pname + 1 : argv[0];
+  setbuf(stderr, stderr_buf);
 
   /*
     SIGPIPE and SIGXFSZ will be blocked in all sub-threads during the entire
@@ -1768,9 +1432,8 @@ main(int argc, char **argv)
             savings = 1 - ratio;
             ratio_magnitude = ratio < 1 ? 1 / ratio : ratio;
 
-            log_info("%s: %s%s%s: compression ratio is %s%.3f%s, "
-                "space savings is %.2f%%\n", pname, ispec.sep, ispec.fmt,
-                ispec.sep, ratio < 1 ? "1:" : "", ratio_magnitude,
+            infof(&ispec, "compression ratio is %s%.3f%s, space savings is "
+                "%.2f%%\n", ratio < 1 ? "1:" : "", ratio_magnitude,
                 ratio < 1 ? "" : ":1", 100 * savings);
           }
         } /* output available or discarding */
@@ -1792,7 +1455,7 @@ main(int argc, char **argv)
 
   assert(0 == opathn);
   if (OM_STDOUT == opts.outmode && -1 == close(STDOUT_FILENO)) {
-    log_fatal("%s: close(stdout): %s\n", pname, err2str(errno));
+    failx(errno, "close(stdout)");
   }
 
   _exit(warned ? EX_WARN : EX_OK);

@@ -35,6 +35,11 @@
 # error "Environments where 8 != CHAR_BIT are not supported."
 #endif
 
+#ifndef __GNUC__
+# define __attribute__(x)
+#endif
+#define PRINTF_FMT(p) __attribute__((format(printf, (p)+1, (p)+2)))
+
 
 /* Utilities that can be called/accessed from multiple threads. */
 
@@ -68,31 +73,44 @@
 */
 extern const char *pname;
 
-/*
-  Return a static string corresponding to the error number. strerror_r() is not
-  SUSv2.
-*/
-const char *
-err2str(int err);
+struct filespec;
 
-/*
-  Format a message to standard error. If the underlying vfprintf() fails, call
-  bailout().
-*/
 void
-log_info(const char *fmt, ...)
-#ifdef __GNUC__
-__attribute__((format(printf, 1, 2)))
-#endif
-;
+info(const char *fmt, ...) PRINTF_FMT(0);
 
-/* Same as log_info(), but always call bailout(). */
+void
+infof(const struct filespec *f, const char *fmt, ...) PRINTF_FMT(1);
+
+void
+infox(int x, const char *fmt, ...) PRINTF_FMT(1);
+
+void
+infofx(const struct filespec *f, int x, const char *fmt, ...) PRINTF_FMT(2);
+
+void
+warn(const char *fmt, ...) PRINTF_FMT(0);
+
+void
+warnf(const struct filespec *f, const char *fmt, ...) PRINTF_FMT(1);
+
+void
+warnx(int x, const char *fmt, ...) PRINTF_FMT(1);
+
+void
+warnfx(const struct filespec *f, int x, const char *fmt, ...) PRINTF_FMT(2);
+
 void _Noreturn
-log_fatal(const char *fmt, ...)
-#ifdef __GNUC__
-__attribute__((format(printf, 1, 2)))
-#endif
-;
+fail(const char *fmt, ...) PRINTF_FMT(0);
+
+void _Noreturn
+failf(const struct filespec *f, const char *fmt, ...) PRINTF_FMT(1);
+
+void _Noreturn
+failx(int x, const char *fmt, ...) PRINTF_FMT(1);
+
+void _Noreturn
+failfx(const struct filespec *f, int x, const char *fmt, ...) PRINTF_FMT(2);
+
 
 struct progress {
   int enabled;
