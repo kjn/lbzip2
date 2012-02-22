@@ -127,7 +127,9 @@ log_generic(const struct filespec *fs, int code, const char *fmt, va_list args,
                                                 \
     flockfile(stderr);                          \
     va_start(args, fmt);                        \
-    log_generic(f, x, fmt, args, nl);           \
+    if (!bail || (EPIPE != x && EFBIG != x)) {  \
+      log_generic(f, x, fmt, args, nl);         \
+    }                                           \
                                                 \
     if (!bail) {                                \
       va_end(args);                             \

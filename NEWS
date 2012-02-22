@@ -19,6 +19,9 @@ NEWS for lbzip2                                                 -*- outline -*-
    irrelevant. The switch is retained for compatibility with bzip2 and older
    versions of lbzip2, but otherwise has no effect.
 
+   File write errors caused by broken pipes or exceeded file size limits are no
+   longer reported to standard error.
+
 * What's new in lbzip2 2.1
 
 ** Bug fixes
