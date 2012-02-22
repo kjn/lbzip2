@@ -62,6 +62,6 @@ struct YBenc_s
 };
 
 
-void YBpriv_block_sort(YBenc_t *s);
-void YBpriv_sais(YBenc_t *s);
+SInt YBpriv_cyclic_divbwt(Byte *T, SInt *SA, SInt n);
+
 Int YBpriv_prefix(YBenc_t *s, Short *mtfv, Int nmtf);

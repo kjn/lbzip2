@@ -32,7 +32,6 @@ typedef uint16_t Short;
 typedef uint32_t Int;
 typedef int32_t  SInt;
 typedef uint64_t Long;
-typedef int64_t  SLong;
 
 
 /* These macros load (peek) or store (poke) 8, 16 or 32-bit values from/to

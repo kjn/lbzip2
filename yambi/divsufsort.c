@@ -51,7 +51,7 @@
 
 #include "xalloc.h"      /* xmalloc() */
 
-#include "divsufsort.h"
+#include "encode.h"
 
 
 /*- Settings -*/
@@ -61,8 +61,8 @@
 
 
 /*- Datatypes -*/
-typedef uint8_t sauchar_t;
-typedef int32_t saidx_t;
+typedef Byte sauchar_t;
+typedef SInt saidx_t;
 typedef int_fast32_t saint_t;
 
 
@@ -1786,7 +1786,7 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
 /*- Function -*/
 
 saidx_t
-cyclic_divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
+YBpriv_cyclic_divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
   saidx_t *bucket_A, *bucket_B;
   saidx_t m, pidx, i;
 

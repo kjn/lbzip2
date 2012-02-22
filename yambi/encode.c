@@ -26,7 +26,6 @@
 #include <stdlib.h>      /* free() */
 
 #include "xalloc.h"      /* xmalloc() */
-#include "divsufsort.h"  /* cyclic_divbwt() */
 
 #include "encode.h"
 
@@ -151,7 +150,7 @@ YBenc_work(YBenc_t *s, YBcrc_t *crc)
 
   /* Sort block. */
   s->mtfv = xmalloc((s->nblock + 50) * sizeof(Int));
-  s->bwt_idx = cyclic_divbwt(s->block, s->mtfv, s->nblock);
+  s->bwt_idx = YBpriv_cyclic_divbwt(s->block, s->mtfv, s->nblock);
   free(s->block);
   s->nmtf = do_mtf(s->mtfv, s->lookup[0], cmap, s->nblock, EOB);
   s->mtfv = xrealloc(s->mtfv, (s->nmtf + 50) * sizeof(Short));
