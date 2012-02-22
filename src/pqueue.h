@@ -48,7 +48,7 @@ pqueue_uninit(struct pqueue *pqueue);
 void
 pqueue_insert(struct pqueue *pqueue, void *element);
 
-void
+void *
 pqueue_pop(struct pqueue *pqueue);
 
 

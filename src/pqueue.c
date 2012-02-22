@@ -81,16 +81,17 @@ pqueue_insert(
 }
 
 
-void
+void *
 pqueue_pop(
   struct pqueue *pq)
 {
   size_t j;
-  void *el;
+  void *el, *top;
 
   assert(!pqueue_empty(pq));
 
   el = pq->root[--pq->size];
+  top = pq->root[0];
 
   j = 0;
   while (left(j) < pq->size) {
@@ -104,4 +105,5 @@ pqueue_pop(
   }
 
   pq->root[j] = el;
+  return top;
 }
