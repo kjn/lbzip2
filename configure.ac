@@ -17,7 +17,7 @@
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
 AC_PREREQ([2.67])
-AC_INIT([lbzip2], [2.1])
+AC_INIT([lbzip2], [2.2])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
