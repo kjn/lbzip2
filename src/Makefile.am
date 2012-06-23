@@ -19,8 +19,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/yambi -I$(top_srcdir)/lib
 AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 
 bin_PROGRAMS = lbzip2
-noinst_HEADERS = main.h lbzip2.h lbunzip2.h pqueue.h deque.h scantab.h
-lbzip2_SOURCES = main.c lbzip2.c lbunzip2.c pqueue.c deque.c
+noinst_HEADERS = main.h lbzip2.h lbunzip2.h pqueue.h scantab.h
+lbzip2_SOURCES = main.c lbzip2.c lbunzip2.c pqueue.c
 lbzip2_LDADD = $(top_builddir)/lib/libgnu.a $(top_builddir)/yambi/libyambi.a \
     $(LIB_CLOCK_GETTIME) $(LIB_PTHREAD)
 
