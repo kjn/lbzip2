@@ -272,6 +272,11 @@ YBdec_retrieve(YBdec_t *dec, const void *buf, size_t *ipos_p, size_t ipos_lim,
 
   in = (const Int *)buf + *ipos_p;
   in_avail = ipos_lim - *ipos_p;
+  if (in_avail == 0) {
+    /* XXX 23 Jun 2012: workaround for Debian bug #673378
+       (for now I don't have time to fix this properly...) */
+    return YB_UNDERFLOW;
+  }
   assert(in_avail >= 1);
 
   w = *bits_left;
