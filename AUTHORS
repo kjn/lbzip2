@@ -1,7 +1,2 @@
-lbzip2 was originally written by Laszlo Ersek <lacos@caesar.elte.hu>. Versions
-2.0 and later were written by Mikolaj Izdebski <zurgunt@gmail.com>.
-
-lbzip2 also includes some code derrived from Julian Seward's bzip2 1.0.3, some
-code derrived from Mark Adler's public domain inflate.c and some documentation
-derrived from Julian Seward's bzip 0.21. Finally lbzip2 includes some code and
-documentation from GNU build system and Gnulib.
+Laszlo Ersek <lacos@caesar.elte.hu>
+Mikolaj Izdebski <zurgunt@gmail.com>
