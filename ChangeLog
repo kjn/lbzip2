@@ -1,3 +1,124 @@
+2012-06-23  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Bump version to 2.2
+
+	Simplify AUTHORS file
+
+	Add workaround for Debian bug #673378
+	* yambi/retrieve.c (YBdec_retrieve): Return YB_UNDERFLOW if in_avail is 0.
+	This Works around dDebian bug #673378.
+
+	Revert "Implement double-ended queue."
+	* src/deque.c: Delete file.
+	* src/deque.h: Likewise.
+
+2012-02-22  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Implement double-ended queue.
+	* src/deque.c: New file.
+	* src/deque.h: New file.
+	* src/Makefile.am: Add deque.[ch].
+
+	Make pqueue_pop() return the popped element
+	* src/pqueue.c (pqueue_pop): Return popped element.
+	* src/pqueue.h (pqueue_pop): Change function prototype.
+
+	Don't print EPIPE and EFBIG fatal errors
+	* src/main.c (DEF): Skip printing fatal error messages if error number
+	is EPIPE or EFGIG.
+
+	Cleanup yambi code
+	* yambi/divsufsort.h: Delete header file.
+	* yambi/Makefile.am: Remove reference to divsufsort.h.
+	* yambi/divsufsort.c: Include encode.h instead of divsufsort.h.
+	Change cyclic_divbwt() function name to YBpriv_cyclic_divbwt().
+	* yambi/encode.h (YBpriv_block_sort, YBpriv_sais): Remove prototypes
+	of previously removed functions.
+	* yambi/encode.c (YBenc_work): Replace reference to cyclic_divbwt()
+	with YBpriv_cyclic_divbwt().
+	* yambi/private.h (SLong): Remove unused type definition.
+
+2012-02-21  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Implement new error handling
+
+	Fix a bug in tandem repeat sort code
+	* yambi/divsufsort.c (trsort): Fix a bug introduced in 336008f
+	by altering the main trsort loop invariant. Adding a pre-condition
+	of `-n < *SA' seems to fix the issue.
+
+2012-02-16  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Remove obsolete shallow factor
+	* yambi/collect.c, yambi/encode.h: Get rid of shallow_factor.
+	* yambi/yambi.h: Remove YB_DEFAULT_SHALLOW #definition.
+	* src/lbzip2.c (work_compr): Remove YB_DEFAULT_SHALLOW
+
+2012-02-02  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Update copyright dates
+
+	Disable load0 test
+
+	Add version 2.2 entry in NEWS
+
+	Update references in ALGORITHM
+
+	Deprecate `--exponential'
+	* build-aux/pretty-usage.pl, man/lbzip2.1: Update `--exponential' info.
+	* src/main.c, src/lbzip2.c, src/lbzip2.h: Drop support for exponential.
+
+2012-01-09  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix undefined behavior in divsufsort
+	* yambi/divsufsort.c (trsort): Add bounds checks before moving pointer
+	beyond allocated space.
+
+	Extend bugfix from ca8e703c
+	* yambi/divsufsort.c: Apply patch provided by Yuta Mori.
+
+	Fix a bug with sorting periodic strings
+	yambi/divsufsort.c (tr_introsort): Add depth condition.
+
+	Integrate divsufsort with yambi
+	* yambi/collect.c, yambi/encode.h: Let mtfv[] and SA[] share space
+	and block[] be a separate array.
+	* yambi/encode.c: Use divsufsort instead of old blocksort code.
+
+	Adjust divsufsort to yambi
+	* yambi/divsufsort.c: Remove include guardians. Define sauchar_t,
+	saint_t and saidx_t in terms of <inttypes.h>. Remove __inline.
+	(MAX): Remove unused macro. (construct_SA): Remove unused function.
+	(construct_BWT): Remove unused parameter `m'. (cyclic_divsufsort):
+	Remove unused function. (cyclic_divbwt): Write resulting BWT
+	transform to SA[] instead of separate output array. Replace malloc()
+	with xmalloc(). Optimize code for case with no B* suffixes.
+	* yambi/divsufsort.h: Remove C++ code. Remove unused prototype.
+
+	Import code from cyclic-divsufsort-lite
+	yambi/divsufsort.c, yambi/divsufsort.h: New files.
+
+	Remove existing block-sorting code
+	yambi/blocksort.c, yambi/sais.c: Remove files.
+
+2012-01-07  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Integrate new block-sorting code with yambi
+	yambi/collect.c: Share block[] and mtfv[] space for better cache
+	perfoemance and lower memory usage.
+	yambi/encode.c: Read BWT characters from bwt[] and not block[].
+	yambi/encode.h: Add YBpriv_sais() prototype. Add bwt field to YBenc_s.
+	yambi/private.h: Implement peekb() and pokeb() macros.
+	build-aux/style-check.pl, yambi/Makefile.am: Mention yambi/sais.c.
+
+	Refactor block-sorting code
+	yambi/blocksort.c: Refactor quicksort and bucket sort code for better
+	readability. Remove BPR code. Remove code copyrighted by Juliad Seward
+	and the corresponding license block.
+
+	Import cyclic-sais
+	yambi/sais.c: Import from cyclic-sais 1.0 by Yuta Mori.
+
 2011-12-25  Mikolaj Izdebski  <zurgunt@gmail.com>
 
 	Remove unused constants
@@ -152,6 +273,8 @@
 	 * minor speed enchancements
 
 	NEWS were updated to reflect recent improvements.
+
+2011-10-22  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Implement initial header parser for lbunzip2
 	Partly fixes `gap.bz2' bug. For now the parser isn't detecting
@@ -428,6 +551,8 @@
 	 * change default values of some yambi tuning parameters
 	 * reorder some struct members; move bigger arrays to the end
 	 * remove some automatic variables to reduce register pollution
+
+2011-07-30  Mikołaj Izdebski  <zurgunt@gmail.com>
 
 	Fix a bug in sorting algorithm implementation
 	Fix a bug in main sorting algorithm implementation.
