@@ -20,7 +20,7 @@ set -e
 IFS=' ''	''
 '
 
-if ! test -r build-aux/autogen.sh || ! test -r yambi/yambi.h; then
+if ! test -r build-aux/autogen.sh || ! test -r src/main.c; then
   echo autogen.sh: need to be called from top source directory >&2
   exit 1
 fi
@@ -34,8 +34,8 @@ if test x"$1" = x-r; then
     do rm -f build-aux/$f; done
 
   rm -f configure aclocal.m4 INSTALL
-  for dir in . src yambi man tests; do rm -f $dir/Makefile.in; done
-  rm -f yambi/crctab.c src/scantab.h
+  for dir in . src man tests; do rm -f $dir/Makefile.in; done
+  rm -f src/crctab.c src/scantab.h
 
   exit
 fi
@@ -47,7 +47,8 @@ perl ./build-aux/make-scantab.pl
 
 gnulib-tool --avoid=xalloc-die --add-import pthread utimens warnings \
     timespec-add timespec-sub dtotimespec stat-time lstat malloc-gnu \
-    fprintf-posix inttypes xalloc realloc-gnu largefile gitlog-to-changelog
+    fprintf-posix inttypes xalloc largefile gitlog-to-changelog
+# flockfile?
 
 aclocal -Im4
 autoconf

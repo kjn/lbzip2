@@ -1,8 +1,7 @@
 /*-
-  lbzip2.h -- high-level compression routines header
+  signals.h -- signal handling header
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
-  Copyright (C) 2008, 2009, 2010 Laszlo Ersek
+  Copyright (C) 2012 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -20,21 +19,11 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef LBZIP2_H
-#  define LBZIP2_H
+void setup_signals(void);
+void cli(void);
+void sti(void);
+void halt(void);
+void xraise(int sig);
+void _Noreturn bailout(void);
 
-struct lbzip2_arg
-{
-  unsigned num_worker,
-      num_slot;
-  int print_cctrs;
-  struct filespec *ispec,
-      *ospec;
-  int bs100k,
-      verbose;
-};
-
-void *
-lbzip2_wrap(void *v_lbzip2_arg);
-
-#endif
+void cleanup(void);

@@ -17,17 +17,14 @@
 #
 
 use Text::Wrap;
-open F, ">yambi/crctab.c" or die;
+open F, ">src/crctab.c" or die;
 printf F q(/* This file was generated automatically by make-crctab.pl.
    For comments refer to the generator script -- make-crctab.pl. */
 
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif
+#include "common.h"
+#include "encode.h"
 
-#include "private.h"
-
-Int YB_crc_table[256] = {
+uint32_t crc_table[256] = {
 %s
 };
 ), wrap '  ','  ',map {

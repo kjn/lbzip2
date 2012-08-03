@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = yambi lib src man tests
+SUBDIRS = lib src man tests
 ACLOCAL_AMFLAGS = -Im4
 EXTRA_DIST = build-aux/autogen.sh build-aux/make-scantab.pl ChangeLog.old \
     build-aux/pretty-usage.pl build-aux/style-check.pl build-aux/make-crctab.pl

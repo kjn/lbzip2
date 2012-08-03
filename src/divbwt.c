@@ -1,7 +1,8 @@
 /*-
-  divsufsort.c -- cyclic version of divsufsort
+  divbwt.c -- Burrows-Wheeler transformation
 
   Copyright (C) 2012 Mikolaj Izdebski
+  Copyright (c) 2012 Yuta Mori
 
   This file is part of lbzip2.
 
@@ -19,37 +20,7 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/*-
-  Copyright (c) 2012 Yuta Mori All Rights Reserved.
-
-  Permission is hereby granted, free of charge, to any person obtaining
-  a copy of this software and associated documentation files (the
-  "Software"), to deal in the Software without restriction, including
-  without limitation the rights to use, copy, modify, merge, publish,
-  distribute, sublicense, and/or sell copies of the Software, and to
-  permit persons to whom the Software is furnished to do so, subject to
-  the following conditions:
-
-  The above copyright notice and this permission notice shall be included
-  in all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif
-
-#include <assert.h>      /* assert() */
-#include <stdlib.h>      /* free() */
-
-#include "xalloc.h"      /* xmalloc() */
+#include "common.h"
 
 #include "encode.h"
 
@@ -61,8 +32,8 @@
 
 
 /*- Datatypes -*/
-typedef Byte sauchar_t;
-typedef SInt saidx_t;
+typedef uint8_t sauchar_t;
+typedef int32_t saidx_t;
 typedef int_fast32_t saint_t;
 
 
@@ -1786,7 +1757,7 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
 /*- Function -*/
 
 saidx_t
-YBpriv_cyclic_divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
+divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
   saidx_t *bucket_A, *bucket_B;
   saidx_t m, pidx, i;
 
@@ -1796,8 +1767,8 @@ YBpriv_cyclic_divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
 
   T[n] = T[0];
 
-  bucket_A = xmalloc(BUCKET_A_SIZE * sizeof(saidx_t));
-  bucket_B = xmalloc(BUCKET_B_SIZE * sizeof(saidx_t));
+  bucket_A = XCALLOC(BUCKET_A_SIZE, saidx_t);
+  bucket_B = XCALLOC(BUCKET_B_SIZE, saidx_t);
 
   /* Burrows-Wheeler Transform. */
   m = sort_typeBstar(T, SA, bucket_A, bucket_B, n);
