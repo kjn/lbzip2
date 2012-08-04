@@ -5,6 +5,13 @@ NEWS for lbzip2                                                 -*- outline -*-
 
 ** Bug fixes
 
+   In version 2.2 decompressor was made more bzip2-compatible. All valid bzip2
+   files should now be properly decompressed by lbzip2.
+
+   Memory allocation was reduced significantly. Previous versions could
+   allocate large amounts of memory during decompression and testing of highly
+   compressed files.
+
    Version 2.2 fixes a bug that caused some legitimate bz2 files to be rejected
    during decompression with a CRC error message.
 

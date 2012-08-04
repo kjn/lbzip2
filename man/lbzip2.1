@@ -15,7 +15,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 lbzip2. If not, see <http://www.gnu.org/licenses/>.
 ..
-.TH LBZIP2 1 "02 February 2012" "lbzip2-2.2" "User commands"
+.TH LBZIP2 1 "04 August 2012" "lbzip2-2.2" "User commands"
 
 .SH NAME
 lbzip2 \- parallel bzip2 utility
@@ -317,7 +317,7 @@ closed successfully.
 
 
 
-.SH RESOURCE ALLOCATION
+.SH "RESOURCE ALLOCATION"
 
 .B lbzip2
 needs various kinds of system resources to operate. Those include memory,
@@ -370,10 +370,6 @@ if some blocks are destroyed.
 .SH BUGS
 Separate input files don't share worker threads; at most one input file is
 worked on at any moment.
-
-During decompression and testing highly compressed files large amounts of
-memory may be allocated; currently there is no way of limiting memory
-allocation other than limiting number of worker threads.
 
 
 .SH AUTHORS
