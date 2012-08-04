@@ -1,4 +1,64 @@
+2012-08-04  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Add THANKS
+
+	Document bugs fixed
+
+	Explicitly license auxiliary programs under GPLv3+
+	* tests/minbzcat.c: Relicense under GPLv3+.
+	* tests/timeout.c: Add explicit license terms.
+
+	Rebase to the newest version of yambi
+	* ALGORITHM: Fix a typo.
+	* Makefile.am: Remove yambi subdirectory.
+	* build-aux/autogen.sh: Implement new directory structure layout.
+	* build-aux/make-crctab.pl: Likewise.
+	* build-aux/style-check.pl: Likewise.
+	* configure.ac: Lower autoconf requirement. Optimize runtime by adding
+	  gl_ASSERT_NO_GNULIB_TESTS and gl_ASSERT_NO_GNULIB_POSIXCHECK. Add
+	  new compiler warnings. Implement new option "--enable-tracing".
+	  Implement new directory structure layout.
+	* src/Makefile.am: Import from newer version of yambi.
+	* src/common.h: Likewise.
+	* src/compress.c: Likewise.
+	* src/decode.c: Likewise.
+	* src/decode.h: Likewise.
+	* src/divbwt.c: Likewise.
+	* src/encode.c: Likewise.
+	* src/encode.h: Likewise.
+	* src/expand.c: Likewise.
+	* src/main.c: Likewise.
+	* src/main.h: Likewise.
+	* src/parse.c: Likewise.
+	* src/process.c: Likewise.
+	* src/process.h: Likewise.
+	* src/signals.c: Likewise.
+	* src/signals.h: Likewise.
+	* tests/Makefile.am: Likewise.
+	* tests/cve2.bz2: Likewise.
+	* src/lbunzip2.c: Remove file.
+	* src/lbunzip2.h: Likewise.
+	* src/lbzip2.c: Likewise.
+	* src/lbzip2.h: Likewise.
+	* src/pqueue.c: Likewise.
+	* src/pqueue.h: Likewise.
+	* yambi/Makefile.am: Likewise.
+	* yambi/collect.c: Likewise.
+	* yambi/decode.c: Likewise.
+	* yambi/decode.h: Likewise.
+	* yambi/divsufsort.c: Likewise.
+	* yambi/emit.c: Likewise.
+	* yambi/encode.c: Likewise.
+	* yambi/encode.h: Likewise.
+	* yambi/prefix.c: Likewise.
+	* yambi/private.h: Likewise.
+	* yambi/retrieve.c: Likewise.
+	* yambi/transmit.c: Likewise.
+	* yambi/yambi.h: Likewise.
+
 2012-06-23  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Update ChangeLog
 
 	Bump version to 2.2
 
