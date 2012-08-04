@@ -789,14 +789,19 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
   for (a = 0, t = 0; t < nt; t++) {
     /* Find a range of symbols which total count is roughly proportional to one
        nt-th of all values. */
-    for (c = 0, b = a; c < nm / (nt - t); b++)
+    for (c = 0, b = a; c * (nt-t) < nm; b++)
       c += s->lookup[0][b];
+    assert(a < b);
+    if (a < b-1 && (2*c - s->lookup[0][b-1]) * (nt-t) > 2*nm) {
+      c -= s->lookup[0][--b];
+    }
     nm -= c;
 
     /* Now [a,b) is our range -- assign it to equivalence class t. */
     bzero(&s->length[t][a], b - a);
     a = b;
   }
+  assert(nm == 0);
 }
 
 /* Find the tree which takes the least number of bits to encode current group.

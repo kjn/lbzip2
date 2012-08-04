@@ -1,4 +1,10 @@
-2012-08-04  Mikolaj Izdebski  <zurgunt@gmail.com>
+2012-08-06  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Improve initial tree generation
+	* src/encode.c (generate_initial_trees): During initial set
+	  paritioning round set cardinalities to the nearest instead of
+	  rounding up. This decreases standard deviation of the size of trees
+	  and thus improves compression.
 
 	Add THANKS
 
