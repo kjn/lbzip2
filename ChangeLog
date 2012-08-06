@@ -1,5 +1,8 @@
 2012-08-06  Mikolaj Izdebski  <zurgunt@gmail.com>
 
+	Ignore --small
+	src/main.c (main): Reset small to zero.
+
 	Improve initial tree generation
 	* src/encode.c (generate_initial_trees): During initial set
 	  paritioning round set cardinalities to the nearest instead of

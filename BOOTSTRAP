@@ -6,7 +6,7 @@ these files must be generated first (the process is called bootstrapping).
 To bootstrap lbzip2 you need:
  * perl
  * Gnulib
- * Autoconf 2.67 or newer
+ * Autoconf 2.63 or newer
  * Automake 1.11 or newer
 
 To bootstrap lbzip2 simply run `./build-aux/autogen.sh' from top source

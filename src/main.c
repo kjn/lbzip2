@@ -900,6 +900,11 @@ main(int argc, char **argv)
   setup_signals();
   opts_setup(&operands, argc, argv);
 
+  /* TODO: For now --small is ignored as it wasn't tested enough...
+     Test it, enable, and document (in manpage and usage string)
+  */
+  small = 0;
+
   do {
     /* Process operand. */
     {
