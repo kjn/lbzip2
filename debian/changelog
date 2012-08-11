@@ -11,6 +11,7 @@ lbzip2 (2.2-1) unstable; urgency=low
     - remove comment about maintainers involved in creation of the package,
     - update to reflect new upstream version.
   * debian/rules: execute Bourne shell scripts with sh instead of perl.
+  * debian/compat: Bump to 9.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 11 Aug 2012 14:03:34 +0200
 
