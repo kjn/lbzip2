@@ -2,8 +2,7 @@ Source: lbzip2
 Section: utils
 Priority: extra
 Maintainer: Mikolaj Izdebski <zurgunt@gmail.com>
-Build-Depends: debhelper (>= 8), gnulib (>= 20110908), autoconf (>= 2.67),
- automake (>= 1.11)
+Build-Depends: debhelper (>= 8), gnulib (>= 20110908), autoconf, automake
 Standards-Version: 3.9.2
 Homepage: https://github.com/kjn/lbzip2
 Vcs-Git: git://github.com/kjn/lbzip2.git
