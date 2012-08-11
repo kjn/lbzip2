@@ -9,12 +9,12 @@ export DH_OPTIONS
 
 
 build:
-	perl build-aux/autogen.sh
+	sh build-aux/autogen.sh
 	dh $@
 
 clean:
 	dh $@
-	perl build-aux/autogen.sh -r
+	sh build-aux/autogen.sh -r
 
 # Enable as many compiler warnings as possible.
 override_dh_auto_configure:
