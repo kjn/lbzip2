@@ -1,4 +1,4 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: lbzip2
 Upstream-Contact: Mikolaj Izdebski <zurgunt@gmail.com>
 Source: https://github.com/kjn/lbzip2
@@ -7,8 +7,8 @@ Files: *
 Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
 License: GPL-3+
 
-Files: build-aux/pretty-usage.pl debian/changelog debian/control src/lbunzip2.c
- src/lbunzip2.h src/lbzip2.c src/lbzip2.h src/main.c src/main.h
+Files: build-aux/pretty-usage.pl debian/changelog debian/copyright
+ src/signals.c src/compress.c src/main.c src/main.h
 Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
  2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
 License: GPL-3+
@@ -19,15 +19,10 @@ Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
  1996 Julian Seward <sewardj@cs.man.ac.uk>
 License: GPL-3+
 
-Files: yambi/prefix.c
-Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
- 1996-2005 Julian R Seward <jseward@acm.org>
-License: GPL-3+ and bzip2
-
-Files: yambi/divsufsort.c
+Files: src/divbwt.c
 Copyright: 2012 Mikolaj Izdebski <zurgunt@gmail.com>
- 2012 Yuta Mori All Rights Reserved
-License: GPL-3+ and Expat
+ 2012 Yuta Mori <yuta.256@gmail.com>
+License: GPL-3+
 
 Files: ChangeLog.old
 Copyright: 2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
@@ -49,27 +44,6 @@ License: GPL-2+
  On Debian systems, the full text of the GNU General Public License
  can be found in the file `/usr/share/common-licenses/GPL-2'.
 
-Files: tests/minbzcat.c
-Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>
-License: ISC
- Permission to use, copy, modify, and/or distribute this software for any
- purpose with or without fee is hereby granted, provided that the above
- copyright notice and this permission notice appear in all copies.
- .
- THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-Files: COPYING
-Copyright: 2007 Free Software Foundation, Inc. <http://fsf.org/>
-License: verbatim
- Everyone is permitted to copy and distribute verbatim copies
- of this license document, but changing it is not allowed.
-
 License: GPL-3+
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -83,31 +57,3 @@ License: GPL-3+
  .
  On Debian systems, the full text of the GNU General Public License
  can be found in the file `/usr/share/common-licenses/GPL-3'.
-
-License: bzip2
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
-  1. Redistributions of source code must retain the above copyright
-     notice, this list of conditions and the following disclaimer.
-  2. The origin of this software must not be misrepresented; you must
-     not claim that you wrote the original software.  If you use this
-     software in a product, an acknowledgment in the product
-     documentation would be appreciated but is not required.
-  3. Altered source versions must be plainly marked as such, and must
-     not be misrepresented as being the original software.
-  4. The name of the author may not be used to endorse or promote
-     products derived from this software without specific prior written
-     permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
- OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

@@ -8,7 +8,8 @@ lbzip2 (2.2-1) unstable; urgency=low
     - drop version requirements on autotools,
     - bump Standards-Version to 3.9.3.
   * debian/copyright:
-    - remove comment about maintainers involved in creation of the package.
+    - remove comment about maintainers involved in creation of the package,
+    - update to reflect new upstream version.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 11 Aug 2012 14:03:34 +0200
 
