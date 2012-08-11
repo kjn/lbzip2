@@ -2,8 +2,6 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0
 Upstream-Name: lbzip2
 Upstream-Contact: Mikolaj Izdebski <zurgunt@gmail.com>
 Source: https://github.com/kjn/lbzip2
-Comment: This package was debianized by Laszlo Ersek <lacos@caesar.elte.hu>.
- It's currently maintained by Mikolaj Izdebski <zurgunt@gmail.com>.
 
 Files: *
 Copyright: 2011, 2012 Mikolaj Izdebski <zurgunt@gmail.com>

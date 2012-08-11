@@ -4,7 +4,11 @@ lbzip2 (2.2-1) unstable; urgency=low
     - limited memory allocation, closes: #645999,
     - improved bzip2 compatibility, closes: #582476,
     - fixed several other minor bugs, closes: #673378.
-  * debian/control: Drop version requirements on autotools.
+  * debian/control:
+    - drop version requirements on autotools,
+    - bump Standards-Version to 3.9.3.
+  * debian/copyright:
+    - remove comment about maintainers involved in creation of the package.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 11 Aug 2012 14:03:34 +0200
 
