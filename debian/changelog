@@ -1,3 +1,12 @@
+lbzip2 (2.2-1) unstable; urgency=low
+
+  * New upstream release:
+    - limited memory allocation, closes: #645999,
+    - improved bzip2 compatibility, closes: #582476,
+    - fixed several other minor bugs, closes: #673378.
+
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 11 Aug 2012 14:03:34 +0200
+
 lbzip2 (2.1-2) unstable; urgency=low
 
   * debian/control: add Vcs-Git and Vcs-Browser.
