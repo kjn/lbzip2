@@ -1,7 +1,7 @@
 /*-
   main.h -- main module header
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -20,143 +20,12 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef MAIN_H
-#define MAIN_H
-
-#include <limits.h>    /* CHAR_BIT */
-#include <stddef.h>    /* size_t */
-#include <stdlib.h>    /* _Noreturn */
-#include <pthread.h>   /* pthread_mutex_t */
-#include <inttypes.h>  /* intmax_t */
-
-#include "timespec.h"  /* gettime() */
+#include <limits.h>             /* CHAR_BIT */
 
 #if 8 != CHAR_BIT
-# error "Environments where 8 != CHAR_BIT are not supported."
+#error "Environments where 8 != CHAR_BIT are not supported."
 #endif
 
-
-/* Utilities that can be called/accessed from multiple threads. */
-
-/*
-  (I) The treatment for fatal errors.
-
-  bailout() doesn't need to be extern.
-
-  If called from the main thread, remove any current output file and bail out.
-  Primarily by unblocking any pending SIGPIPE/SIGXFSZ signals; both those
-  forwarded by any sub-thread to the process level, and those generated for the
-  main thread specifically, in response to an EPIPE/EFBIG write() condition. If
-  no such signal is pending, or SIG_IGN was inherited through exec() as their
-  actions, then bail out with the failure exit status.
-
-  If called (indirectly) from any other thread, resignal the process with any
-  pending SIGPIPE/SIGXFSZ. This will promote any such signal to the process
-  level, if it was originally generated for the calling thread, accompanying an
-  EPIPE/EFBIG write() condition. If the pending signal was already pending on
-  the whole process, this will result in an idempotent kill(). Thereafter, send
-  SIGUSR1 to the process, in order to signal the fatal error in the sub-thread.
-  Finally, terminate the thread.
-*/
-
-
-/* (II) Logging utilities. */
-
-/*
-  Name of the executable, for logging purposes. Set up by the main thread
-  before starting any threads.
-*/
-extern const char *pname;
-
-/*
-  Return a static string corresponding to the error number. strerror_r() is not
-  SUSv2.
-*/
-const char *
-err2str(int err);
-
-/*
-  Format a message to standard error. If the underlying vfprintf() fails, call
-  bailout().
-*/
-void
-log_info(const char *fmt, ...)
-#ifdef __GNUC__
-__attribute__((format(printf, 1, 2)))
-#endif
-;
-
-/* Same as log_info(), but always call bailout(). */
-void _Noreturn
-log_fatal(const char *fmt, ...)
-#ifdef __GNUC__
-__attribute__((format(printf, 1, 2)))
-#endif
-;
-
-struct progress {
-  int enabled;
-  uintmax_t size;
-  uintmax_t processed;
-  struct timespec start_time,
-      next_time;
-};
-
-void
-progress_init(struct progress *p, int verbose, uintmax_t file_size);
-
-void
-progress_update(struct progress *p, uintmax_t chunk_size);
-
-void
-progress_finish(struct progress *p);
-
-
-/* (III) Threading utilities. If they fail, they call log_fatal(). */
-
-struct cond
-{
-  pthread_mutex_t lock; /* Lock this to protect shared resource. */
-  pthread_cond_t cond;  /* Trigger this if predicate becomes true. */
-  long unsigned ccount, /* Increment this when checking predicate. */
-      wcount;           /* Increment this when waiting is necessary. */
-};
-
-void
-xinit(struct cond *cond);
-
-void
-xdestroy(struct cond *cond);
-
-void
-xlock(struct cond *cond);
-
-void
-xlock_pred(struct cond *cond);
-
-void
-xunlock(struct cond *cond);
-
-void
-xwait(struct cond *cond);
-
-void
-xsignal(struct cond *cond);
-
-void
-xbroadcast(struct cond *cond);
-
-void
-xcreate(pthread_t *thread, void *(*routine)(void *), void *arg);
-
-void
-xjoin(pthread_t thread);
-
-void
-xraise(int sig);
-
-
-/* (IV) File I/O utilities. If they fail, they call log_fatal(). */
 
 /*
   The file specifier.
@@ -166,20 +35,53 @@ xraise(int sig);
   These are prepared solely for logging. This is why the pointed to chars
   are qualified as const.
 */
-struct filespec
-{
-  int fd;           /* the file descriptor; may be -1 if discarding output */
-  const char *sep,  /* name separator; either "" or "\"" */
-      *fmt;         /* either file name or a special name, like stdin */
-  uintmax_t total;  /* total number of bytes transferred from/to this file */
-  uintmax_t size;   /* file size or 0 if unknown */
+struct filespec {
+  int fd;                       /* the file descriptor; -1 if none */
+  const char *sep;              /* name separator; either "" or "\"" */
+  const char *fmt;              /* either file name or a special name */
+  uintmax_t total;              /* total number of bytes transferred */
+  uintmax_t size;               /* file size or 0 if unknown */
 };
 
-void
-xread(struct filespec *ispec, char unsigned *buffer, size_t *vacant);
 
-void
-xwrite(struct filespec *ospec, const char unsigned *buffer, size_t size);
+extern unsigned num_worker;     /* -n */
+extern size_t max_mem;          /* -m */
+extern bool decompress;         /* -d */
+extern unsigned bs100k;         /* -1..-9 */
+extern bool force;              /* -f */
+extern bool keep;               /* -k */
+extern bool verbose;            /* -v */
+extern bool print_cctrs;        /* -S */
+extern bool small;              /* -s */
+extern struct filespec ispec;
+extern struct filespec ospec;
 
 
-#endif
+void info(const char *fmt, ...)
+  __attribute__((format(printf, 1, 2)));
+void infof(const struct filespec *f, const char *fmt, ...)
+  __attribute__((format(printf, 2, 3)));
+void infox(int x, const char *fmt, ...)
+  __attribute__((format(printf, 2, 3)));
+void infofx(const struct filespec *f, int x, const char *fmt, ...)
+  __attribute__((format(printf, 3, 4)));
+void warn(const char *fmt, ...)
+  __attribute__((format(printf, 1, 2)));
+void warnf(const struct filespec *f, const char *fmt, ...)
+  __attribute__((format(printf, 2, 3)));
+void warnx(int x, const char *fmt, ...)
+  __attribute__((format(printf, 2, 3)));
+void warnfx(const struct filespec *f, int x, const char *fmt, ...)
+  __attribute__((format(printf, 3, 4)));
+void _Noreturn fail(const char *fmt, ...)
+  __attribute__((format(printf, 1, 2)));
+void _Noreturn failf(const struct filespec *f, const char *fmt, ...)
+  __attribute__((format(printf, 2, 3)));
+void _Noreturn failx(int x, const char *fmt, ...)
+  __attribute__((format(printf, 2, 3)));
+void _Noreturn failfx(const struct filespec *f, int x, const char *fmt, ...)
+  __attribute__((format(printf, 3, 4)));
+void display(const char *fmt, ...)
+  __attribute__((format(printf, 1, 2)));
+
+void work(void);

@@ -1,5 +1,5 @@
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = yambi lib src man tests
+SUBDIRS = lib src man tests
 ACLOCAL_AMFLAGS = -Im4
 EXTRA_DIST = build-aux/autogen.sh build-aux/make-scantab.pl ChangeLog.old \
     build-aux/pretty-usage.pl build-aux/style-check.pl build-aux/make-crctab.pl

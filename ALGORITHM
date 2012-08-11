@@ -2,24 +2,14 @@ lbzip2 implements many different algorithms. Some of them were designed
 specially for use in lbzip2, but most of them were based on publicly available
 descriptions.
 
-The following is the list of papers describing many algorithms behind lbzip2,
-most of them are easily available online.
 
+The following is the list of publications describing many algorithms behind
+lbzip2, most of them are easily available online.
 
 Title: A Block-sorting Lossless Data Compression Algorithm
-Author: M. Burrows, M.
-Author: Wheeler, D.J.
+Author: Burrows, Michael
+Author: Wheeler, David John
 URL: ftp://gatekeeper.dec.com/pub/DEC/SRC/research-reports/SRC-124.pdf
-
-Title: An Incomplex Algorithm for Fast Suffix Array Construction
-Author: Schurmann, Klaus-Bernd
-Author: Stoye, Jens
-URL: http://techfak.uni-bielefeld.de/~stoye/cpublications/alenex2005final.pdf
-
-Title: Engineering a Lightweight Suffix Array Construction Algorithm
-Author: Manzini, Giovanni
-Author: Ferragina, Paolo
-URL: http://people.unipmn.it/manzini/papers/esa02.pdf
 
 Title: In-Place Calculation of Minimum-Redundancy Codes
 Author: Moffat, Alistair
@@ -34,16 +24,6 @@ URL: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.157.4015&rep=rep1&
 Title: The Art of Computer Programming, volume 3: Sorting and Searching
 Author: Knuth, Donald
 
-Title: Engineering a Sort Function
-Author: Bentley, Jon L.
-Author: McIlroy, Douglas M.
-URL: http://www.comp.nus.edu/~tanhuiyi/cs1102/2007-2008SEM2/spe862jb.pdf
-
-Title: Fast Algorithms for Sorting and Searching Strings
-Author: Sedgewick, Robert
-Aithor: Bentley, Jon L.
-URL: http://www.cs.tufts.edu/~nr/comp150fp/archive/bob-sedgewick/fast-strings.pdf
-
 Title: On the implementation of minimum-redundancy prefix codes
 Author: Moffat, Alistair
 Author: Turpin, Andrew
@@ -53,3 +33,54 @@ Title: Decoding prefix codes
 Author: Liddell, Mike
 Author: Moffat, Alistair
 URL: http://www.ece.iit.edu/~biitcomm/research/Variable-Length%20Codes/prefix%20codes%20decoding/Decoding%20prefix%20codes.pdf
+
+Title: Fast lightweight suffix array construction and checking
+Author: Burkhardt, Stefan
+Author: K"arkk"ainen, Juha
+URL: http://www.cs.ucr.edu/~stelo/cpm/cpm03/Juha.pdf
+
+Title: An Efficient Method for in Memory Construction of Suffix Arrays
+Author: Itoh, Hideo
+Author: Tanaka, Hozumi
+URL: http://web.iiit.ac.in/~abhishek_shukla/suffix/In%20Memory%20Suffix%20Array%20Construction.pdf
+
+Title: Space-efficient linear time construction of suffix arrays
+Author: Ko, Pang
+Author: Aluru, Srinivas
+URL: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.83.9781&rep=rep1&type=pdf
+
+Title: Faster suffix sorting
+Author: Larsson, Jesper
+Author: Sadakane, Kunihiko
+URL: http://www.larsson.dogma.net/ssrev-tr.pdf
+
+Title: MSufSort
+Author: Maniscalco, Michael
+URL: http://www.michael-maniscalco.com/msufsort.htm
+
+Title: Short description of improved two-stage suffix sorting algorithm
+Author: Mori, Yuta
+URL: http://homepage3.nifty.com/wpage/software/itssort.txt
+
+
+Former versions of lbzip2 also used to benefit from:
+
+Title: An Incomplex Algorithm for Fast Suffix Array Construction
+Author: Schurmann, Klaus-Bernd
+Author: Stoye, Jens
+URL: http://techfak.uni-bielefeld.de/~stoye/cpublications/alenex2005final.pdf
+
+Title: Engineering a Lightweight Suffix Array Construction Algorithm
+Author: Manzini, Giovanni
+Author: Ferragina, Paolo
+URL: http://people.unipmn.it/manzini/papers/esa02.pdf
+
+Title: Engineering a Sort Function
+Author: Bentley, Jon Louis
+Author: McIlroy, Douglas Malcolm
+URL: http://www.comp.nus.edu/~tanhuiyi/cs1102/2007-2008SEM2/spe862jb.pdf
+
+Title: Fast Algorithms for Sorting and Searching Strings
+Author: Sedgewick, Robert
+Aithor: Bentley, Jon Louis
+URL: http://www.cs.tufts.edu/~nr/comp150fp/archive/bob-sedgewick/fast-strings.pdf

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,27 +18,21 @@
 
 # Hardcoded files to consider.
 @ARGV=qw(
-yambi/encode.h
-yambi/yambi.h
-yambi/private.h
-yambi/decode.h
-yambi/transmit.c
-yambi/blocksort.c
-yambi/decode.c
-yambi/encode.c
-yambi/prefix.c
-yambi/collect.c
-yambi/retrieve.c
-yambi/emit.c
-src/lbzip2.h
-src/lbunzip2.h
-src/pqueue.h
-src/main.h
-src/pqueue.c
-src/lbunzip2.c
+src/common.h
+src/signals.c
+src/encode.h
+src/decode.c
+src/encode.c
+src/process.c
+src/compress.c
+src/expand.c
+src/parse.c
+src/signals.h
 src/main.c
-src/lbzip2.c
-tests/minbzcat.c
+src/divbwt.c
+src/decode.h
+src/process.h
+src/main.h
 ) if !@ARGV;  # The user knows better.
 
 sub msg { print "$f: @_\n"; ++$cnt }
@@ -56,9 +50,9 @@ for $f (@ARGV) {
   /\n[^\n]{80}/ and msg "has line longer than 79 chars";
 
   # C specific stuff.
-  m{^/\*-([^*]|\*[^/])*Copyright([^*]|\*[^/])*\*/}
-      or msg "has missing copyright block";
-  $f =~ /\.h$/ xor /\n *# *include *<config\.h>\n/
+  m{^/\*-([^*]|\*[^/])*Copyright[^*]+2012([^*]|\*[^/])*\*/}
+      or msg "has missing or outdated copyright notice";
+  $f ne "src/common.h" xor /\n *# *include *<config\.h>\n/
       or msg "missing or excessive #include <config.h>";
 }
 

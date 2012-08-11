@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 # Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 #
 # This program is free software: you can redistribute it and/or modify
@@ -136,10 +136,7 @@ savings. Display progress information if stderr is connected to a terminal.
 @-S
 Print condition variable statistics to stderr.
 
-@--exponential
-Use an alternative block-sorting algorithm.
-
-@-s, --small, -q, --quiet, --repetitive-fast, --repetitive-best
+@-s, --small, -q, --quiet, --repetitive-fast, --repetitive-best, --exponential
 Accepted for compatibility, otherwise ignored.
 
 @-h, --help

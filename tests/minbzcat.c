@@ -1,18 +1,20 @@
 /*-
   minbzcat - minimalistic bzcat
-  Copyright (C) 2011 Mikolaj Izdebski
 
-  Permission to use, copy, modify, and/or distribute this software for any
-  purpose with or without fee is hereby granted, provided that the above
-  copyright notice and this permission notice appear in all copies.
+  Copyright (C) 2011, 2012 Mikolaj Izdebski
 
-  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /* `minbzcat' reads compressed data in bzip2 format, decompresses it and
@@ -406,10 +408,10 @@ void expand(void) {
   unsigned long t = 0, c;
   init_crc();
   if (get(24) != 0x425A68) bad();
+  t = get(8) - 0x31;
+  if (t >= 9) bad();
   do {
     c = 0;
-    t = get(8) - 0x31;
-    if (t >= 9) bad();
     mbs = 100000 * (t+1);
     while ((t = get(16)) == 0x3141) {
       if (get(32) != 0x59265359) bad();
@@ -427,5 +429,6 @@ void expand(void) {
     if (get(32) != 0x45385090) bad();
     if (get(32) != c) bad();
     bk = 0;
-  } while (read() == 0x42 && read() == 0x5A && read() == 0x68);
+  } while (read() == 0x42 && read() == 0x5A && read() == 0x68 &&
+      (t = get(8) - 0x31) < 9);
 }

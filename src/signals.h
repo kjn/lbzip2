@@ -1,7 +1,7 @@
 /*-
-  pqueue.h -- priority queue implementation header
+  signals.h -- signal handling header
 
-  Copyright (C) 2011 Mikolaj Izdebski
+  Copyright (C) 2012 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -19,37 +19,11 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef PQUEUE_H
-#define PQUEUE_H
+void setup_signals(void);
+void cli(void);
+void sti(void);
+void halt(void);
+void xraise(int sig);
+void _Noreturn bailout(void);
 
-#include <sys/types.h>  /* size_t */
-
-
-struct pqueue
-{
-  void **root;
-  size_t size;
-  size_t alloc;
-  int (*cmp)(const void *lhs, const void *rhs);
-};
-
-
-void
-pqueue_init(struct pqueue *pqueue,
-    int (*cmp)(const void *lhs, const void *rhs));
-
-void
-pqueue_uninit(struct pqueue *pqueue);
-
-#define pqueue_empty(pq) ((pq)->size == 0)
-
-#define pqueue_peek(pq)  (*(pq)->root)
-
-void
-pqueue_insert(struct pqueue *pqueue, void *element);
-
-void
-pqueue_pop(struct pqueue *pqueue);
-
-
-#endif
+void cleanup(void);

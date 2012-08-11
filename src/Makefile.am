@@ -1,5 +1,5 @@
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,14 +15,33 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CPPFLAGS = -I$(top_srcdir)/yambi -I$(top_srcdir)/lib
+AM_CPPFLAGS = -I$(top_srcdir)/lib
 AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 
 bin_PROGRAMS = lbzip2
-noinst_HEADERS = main.h lbzip2.h lbunzip2.h pqueue.h scantab.h
-lbzip2_SOURCES = main.c lbzip2.c lbunzip2.c pqueue.c
-lbzip2_LDADD = $(top_builddir)/lib/libgnu.a $(top_builddir)/yambi/libyambi.a \
-    $(LIB_CLOCK_GETTIME) $(LIB_PTHREAD)
+
+noinst_HEADERS = \
+    common.h     \
+    decode.h     \
+    encode.h     \
+    main.h       \
+    process.h    \
+    scantab.h    \
+    signals.h
+
+lbzip2_SOURCES = \
+    compress.c   \
+    crctab.c     \
+    decode.c     \
+    divbwt.c     \
+    encode.c     \
+    expand.c     \
+    main.c       \
+    parse.c      \
+    process.c    \
+    signals.c
+
+lbzip2_LDADD = $(top_builddir)/lib/libgnu.a $(LIB_CLOCK_GETTIME) $(LIB_PTHREAD)
 
 install-exec-hook:
 	@cd '$(DESTDIR)$(bindir)' && for prog in lbunzip2 lbzcat; do \

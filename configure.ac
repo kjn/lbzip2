@@ -1,5 +1,5 @@
 #-
-# Copyright (C) 2011 Mikolaj Izdebski
+# Copyright (C) 2011, 2012 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,38 +16,85 @@
 
 dnl TODO: check for GCC builtins: expect, prefetch, ctz, ctzl, ctzll
 
-AC_PREREQ([2.67])
-AC_INIT([lbzip2], [2.1])
+AC_PREREQ([2.63])
+AC_INIT([lbzip2], [2.2])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([lib/config.h])
 
 AM_INIT_AUTOMAKE([1.11 color-tests])
-AM_MAINTAINER_MODE
 AM_SILENT_RULES([yes])
 
 AC_PROG_LN_S
 AC_PROG_RANLIB
 AC_PROG_CC_C89
+
+gl_ASSERT_NO_GNULIB_TESTS
+gl_ASSERT_NO_GNULIB_POSIXCHECK
 gl_EARLY
 
+
+AC_ARG_ENABLE([tracing],
+  [AS_HELP_STRING([--enable-tracing],
+      [enable tracing])],
+      [AS_VAR_IF([enableval], [yes], [
+
+    AC_DEFINE([ENABLE_TRACING], [1], [Define to enable tracing])
+  ])
+])
 
 AC_ARG_ENABLE([warnings],
   [AS_HELP_STRING([--enable-warnings],
       [try to enable many C compiler warnings])],
       [AS_VAR_IF([enableval], [yes], [
-    m4_foreach([warn], [format-y2k, format-nonliteral, format-security, vla,
-        init-self, missing-include-dirs, switch-default, switch-enum, unused,
-        unknown-pragmas, strict-aliasing, float-equal, shadow, pointer-arith,
-        declaration-after-statement, bad-function-cast, cast-qual, cast-align,
-        write-strings, logical-op, strict-prototypes, extra,
-        old-style-definition, missing-prototypes, missing-declarations, inline,
-        missing-noreturn, missing-format-attribute, packed, redundant-decls,
-        nested-externs, invalid-pch, long-long, multichar,
-        volatile-register-var, disabled-optimization, stack-protector, mudflap,
-        overlength-strings, builtin-macro-redefined, packed-bitfield-compat,
-        sync-nand, attributes, coverage-mismatch, unused-macros, extra-tokens],
+    m4_foreach([warn], [attributes,
+                        bad-function-cast,
+                        builtin-macro-redefined,
+                        cast-align,
+                        cast-qual,
+                        coverage-mismatch,
+                        declaration-after-statement,
+                        disabled-optimization,
+                        extra,
+                        extra-tokens,
+                        float-equal,
+                        format-nonliteral,
+                        format-security,
+                        format-y2k,
+                        init-self,
+                        inline,
+                        invalid-pch,
+                        logical-op,
+                        long-long,
+                        missing-declarations,
+                        missing-format-attribute,
+                        missing-include-dirs,
+                        missing-noreturn,
+                        missing-prototypes,
+                        mudflap,
+                        multichar,
+                        nested-externs,
+                        old-style-definition,
+                        overlength-strings,
+                        packed,
+                        packed-bitfield-compat,
+                        pointer-arith,
+                        redundant-decls,
+                        shadow,
+                        stack-protector,
+                        strict-aliasing,
+                        strict-prototypes,
+                        switch-default,
+                        switch-enum,
+                        sync-nand,
+                        unknown-pragmas,
+                        unused,
+                        unused-local-typedefs,
+                        unused-macros,
+                        vla,
+                        volatile-register-var,
+                        write-strings],
         [m4_set_add([kjn_warn_set], warn)])
 
     AC_TRY_COMPILE([#ifndef __clang__
@@ -64,12 +111,12 @@ AC_ARG_ENABLE([warnings],
 
 gl_INIT
 
-AC_CONFIG_FILES([Makefile src/Makefile yambi/Makefile lib/Makefile
-    man/Makefile tests/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile lib/Makefile man/Makefile
+    tests/Makefile])
 AC_OUTPUT
 
 
-AC_COPYRIGHT([Copyright (C) 2011 Mikolaj Izdebski
+AC_COPYRIGHT([Copyright (C) 2011, 2012 Mikolaj Izdebski
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
