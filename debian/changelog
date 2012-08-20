@@ -1,3 +1,9 @@
+lbzip2 (2.2-2) unstable; urgency=low
+
+  * debian/rules: Add a working build-arch target, closes: #685418.
+
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Mon, 20 Aug 2012 18:59:20 +0200
+
 lbzip2 (2.2-1) unstable; urgency=low
 
   * New upstream release:
