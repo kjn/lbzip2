@@ -12,8 +12,9 @@ lbzip2 (2.2-1) unstable; urgency=low
     - update to reflect new upstream version.
   * debian/rules: execute Bourne shell scripts with sh instead of perl.
   * debian/compat: Bump to 9.
+  * debian/watch: Use github.com directly instead of githubredir.
 
- -- Mikolaj Izdebski <zurgunt@gmail.com>  Sat, 11 Aug 2012 14:03:34 +0200
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Mon, 20 Aug 2012 07:29:04 +0200
 
 lbzip2 (2.1-2) unstable; urgency=low
 

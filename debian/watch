@@ -1,2 +1,3 @@
 version=3
-http://githubredir.debian.net/github/kjn/lbzip2 /v(.*)\.tar\.gz
+opts="filenamemangle=s/.*v(.*)$/lbzip2-$1\.tar\.gz/" \
+https://github.com/kjn/lbzip2/tags .*/tarball/v(.*)
