@@ -1097,7 +1097,7 @@ transmit(struct encoder_state *s, void *buf)
 
   /* Transmit prefix codes. */
   for (gr = 0; gr < ns; gr++) {
-    unsigned i = t = s->selector[gr];
+    unsigned i, t = s->selector[gr];
     uint32_t *L = s->lookup[t];
     uint8_t *B = s->length[t];
 
