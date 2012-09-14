@@ -1,5 +1,5 @@
 /*-
-  signal.c -- signal handling
+  signals.c -- signal handling
 
   Copyright (C) 2011, 2012 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
@@ -64,6 +64,7 @@ xmember(const sigset_t *set, int sig)
 {
   unsigned rv;
 
+  /* Cast return value to unsigned to save one comparison. */
   rv = sigismember(set, sig);
   if (rv > 1)
     abort();

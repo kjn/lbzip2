@@ -98,9 +98,6 @@ encoder_init(unsigned long max_block_size, unsigned cluster_factor)
 {
   struct encoder_state *s = XMALLOC(struct encoder_state);
 
-  /* Using assertions to guard parameters is fine because the documentation
-     states explicitly states that passing illegal arguments causes undefined
-     behaviour. */
   assert(s != 0);
   assert(max_block_size > 0 && max_block_size <= MAX_BLOCK_SIZE);
   assert(cluster_factor > 0 && cluster_factor <= 65535);
@@ -258,9 +255,8 @@ do_mtf(uint16_t *mtfv, uint32_t *mtffreq, uint8_t *cmap, int32_t nblock,
   int32_t t;
   uint8_t c;
   uint8_t u;
-  uint32_t *bwt = (void *) mtfv;
+  uint32_t *bwt = (void *)mtfv;
   const uint16_t *mtfv0 = mtfv;
-
 
   for (i = 0; i <= EOB; i++)
     mtffreq[i] = 0;
@@ -275,7 +271,7 @@ do_mtf(uint16_t *mtfv, uint32_t *mtffreq, uint8_t *cmap, int32_t nblock,
     do {                                        \
       mtffreq[*mtfv++ = --k & 1]++;             \
       k >>= 1;                                  \
-    } while (k);                                \
+    } while (k)                                 \
 
 #define MTF()                                   \
   {                                             \
@@ -284,7 +280,7 @@ do_mtf(uint16_t *mtfv, uint32_t *mtffreq, uint8_t *cmap, int32_t nblock,
     *p = u;                                     \
     for (;;)                                    \
     {                                           \
-      if (c == t) {u=t;break;}                  \
+      if (c == t) { u = t; break; }             \
       u  = *++p;                                \
       *p = t;                                   \
       if (c == u) break;                        \
@@ -343,16 +339,16 @@ encode(struct encoder_state *s, uint32_t *crc)
   free(s->block);
   s->nmtf = do_mtf(s->mtfv, s->lookup[0], cmap, s->nblock, EOB);
 
-  cost = +48                    /* header */
-      + 32                      /* crc */
-      + 1                       /* rand bit */
-      + 24                      /* bwt index */
-      + 00                      /* {cmap} */
-      + 3                       /* nGroups */
-      + 15                      /* nSelectors */
-      + 00                      /* {sel} */
-      + 00                      /* {tree} */
-      + 00;                     /* {mtfv} */
+  cost = 48    /* header */
+       + 32    /* crc */
+       +  1    /* rand bit */
+       + 24    /* bwt index */
+       + 00    /* {cmap} */
+       +  3    /* nGroups */
+       + 15    /* nSelectors */
+       + 00    /* {sel} */
+       + 00    /* {tree} */
+       + 00;   /* {mtfv} */
 
   cost += generate_prefix_code(s);
 
@@ -372,7 +368,7 @@ encode(struct encoder_state *s, uint32_t *crc)
 
     c = s->tmap_old2new[c];
     assert(c < s->num_trees);
-    assert((size_t) (sp - s->selector) < s->num_selectors);
+    assert((size_t)(sp - s->selector) < s->num_selectors);
 
     v = p ^ (0x111111 * c);
     z = (v + 0xEEEEEF) & 0x888888;
@@ -383,7 +379,7 @@ encode(struct encoder_state *s, uint32_t *crc)
     j = (__builtin_ctz(h) >> 2) - 1;
 #else
     h &= -h;
-    j = ! !(h & 0x01010100);
+    j = !!(h & 0x01010100);
     h |= h >> 4;
     j |= h >> 11;
     j |= h >> 18;
@@ -411,7 +407,7 @@ encode(struct encoder_state *s, uint32_t *crc)
       pk |= s->cmap[16 * i + j];
     cost += pk << 4;
   }
-  cost += 16;                   /* Big bucket costs 16 bits on its own. */
+  cost += 16;  /* Big bucket costs 16 bits on its own. */
 
   /* Convert cost from bits to bytes. */
   assert(cost % 8 == 0);
@@ -486,7 +482,7 @@ build_tree(uint32_t *restrict T, uint64_t *restrict P, int32_t n)
     else
       w2 = P[s--];
 
-    w = (w1 + w2) & ~(uint64_t) 0xFF00FFFF;
+    w = (w1 + w2) & ~(uint64_t)0xFF00FFFF;
     w1 &= 0xFF000000;
     w2 &= 0xFF000000;
     if (w2 > w1)
@@ -552,7 +548,7 @@ struct package {
 static struct package
 package(uint64_t weight, unsigned depth)
 {
-  unsigned idx, sft;
+  unsigned index, shift;
   struct package out;
 
   assert(depth > 0);
@@ -563,9 +559,9 @@ package(uint64_t weight, unsigned depth)
   out.pack[2] = 0;
 
   depth--;
-  idx = depth / 7;
-  sft = depth % 7 * 9;
-  out.pack[idx] = (uint64_t) 1 << sft;
+  index = depth / 7;
+  shift = depth % 7 * 9;
+  out.pack[index] = (uint64_t)1 << shift;
 
   return out;
 }
@@ -664,7 +660,7 @@ package_merge(uint32_t *restrict C, const uint64_t *restrict Pr, uint32_t n)
     assert(szP < n);
   }
 
-  *C = 0;
+  C[0] = 0;
   C += 21;
 
   for (x = 0, i = 3; i--;)
@@ -699,9 +695,9 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
        000000000000FFFF - symbol
      */
     if (P0[i] == 0)
-      P[i] = ((uint64_t) 1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+      P[i] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
     else
-      P[i] = ((uint64_t) P0[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+      P[i] = ((uint64_t)P0[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
   }
 
   /* Sort weights and sequence numbers together. */
@@ -724,9 +720,9 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
   if (k != 0) {
     for (i = 0; i < n; i++) {
       if (P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] == 0)
-        P[i] = ((uint64_t) 1 << 32) | 0x10000 | (P[i] & 0xFFFF);
+        P[i] = ((uint64_t)1 << 32) | 0x10000 | (P[i] & 0xFFFF);
       else
-        P[i] = ((uint64_t) P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] << 32)
+        P[i] = ((uint64_t)P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] << 32)
             | 0x10000 | (P[i] & 0xFFFF);
     }
 
@@ -906,12 +902,12 @@ generate_prefix_code(struct encoder_state *s)
        50 codes, each code is at most 20 bit long, so each group is coded
        by at most 1000 bits.  We can store that in 10 bits. */
     for (v = 0; v < as; v++)
-      len_pack[v] = (((uint64_t) s->length[0][v]) +
-                     ((uint64_t) s->length[1][v] << 10) +
-                     ((uint64_t) s->length[2][v] << 20) +
-                     ((uint64_t) s->length[3][v] << 30) +
-                     ((uint64_t) s->length[4][v] << 40) +
-                     ((uint64_t) s->length[5][v] << 50));
+      len_pack[v] = (((uint64_t)s->length[0][v]      ) +
+                     ((uint64_t)s->length[1][v] << 10) +
+                     ((uint64_t)s->length[2][v] << 20) +
+                     ((uint64_t)s->length[3][v] << 30) +
+                     ((uint64_t)s->length[4][v] << 40) +
+                     ((uint64_t)s->length[5][v] << 50));
     len_pack[as] = 0;
 
     sp = s->selector;
@@ -929,7 +925,7 @@ generate_prefix_code(struct encoder_state *s)
         s->rfreq[t][gs[i]]++;
     }
 
-    assert((size_t) (sp - s->selector) == s->num_selectors);
+    assert((size_t)(sp - s->selector) == s->num_selectors);
     *sp = MAX_TREES;  /* sentinel */
 
     /* (M): Maximization step -- maximize expectations. */
@@ -1003,11 +999,10 @@ generate_prefix_code(struct encoder_state *s)
 
 #define SEND(n,v)                               \
   b = (b << (n)) | (v);                         \
-  if ((k += (n)) >= 32)                         \
-    {                                           \
-      uint32_t w = (uint32_t)(b >> (k -= 32));  \
-      *p++ = htonl (w);                         \
-    }
+  if ((k += (n)) >= 32) {                       \
+    uint32_t w = (uint32_t)(b >> (k -= 32));    \
+    *p++ = htonl(w);                            \
+  }
 
 void
 transmit(struct encoder_state *s, void *buf)
@@ -1049,7 +1044,7 @@ transmit(struct encoder_state *s, void *buf)
       for (j = 0; j < 16; j++)
         pk = (pk << 1) + s->cmap[16 * i + j];
       pack[i] = pk;
-      big = (big << 1) + ! !pk;
+      big = (big << 1) + !!pk;
     }
 
     SEND(16, big);

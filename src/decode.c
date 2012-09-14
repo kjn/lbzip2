@@ -189,7 +189,7 @@ make_tree(struct retriever_internal_state *rs)
   /* Check if Kraft's inequality is satisfied. */
   sofar = 0;
   for (k = MIN_CODE_LENGTH; k <= MAX_CODE_LENGTH; k++)
-    sofar += (uint64_t) C[k] << (20 - k);
+    sofar += (uint64_t)C[k] << (20 - k);
   if (sofar != (1 << 20)) {
     rs->mtf[rs->t] = sofar < (1 << 20) ? ERR_INCOMPLT : ERR_PREFIX;
     return;
@@ -198,7 +198,7 @@ make_tree(struct retriever_internal_state *rs)
   /* Create left-justified base table. */
   sofar = 0;
   for (k = MIN_CODE_LENGTH; k <= MAX_CODE_LENGTH; k++) {
-    next = sofar + ((uint64_t) C[k] << (64 - k));
+    next = sofar + ((uint64_t)C[k] << (64 - k));
     assert(next == 0 || next >= sofar);
     B[k] = sofar;
     sofar = next;
@@ -252,13 +252,13 @@ make_tree(struct retriever_internal_state *rs)
 
   /* Fill remaining, incomplete start entries. */
   assert(k == HUFF_START_WIDTH + 1);
-  sofar = (uint64_t) code << (64 - HUFF_START_WIDTH);
+  sofar = (uint64_t)code << (64 - HUFF_START_WIDTH);
   while (code < (1 << HUFF_START_WIDTH)) {
     while (sofar >= B[k + 1])
       k++;
     S[code] = k;
     code++;
-    sofar += (uint64_t) 1 << (64 - HUFF_START_WIDTH);
+    sofar += (uint64_t)1 << (64 - HUFF_START_WIDTH);
   }
   assert(sofar == 0);
 
@@ -310,7 +310,7 @@ static const uint8_t table[64] = {
    111110   6  -1
    111111   6  -3
 
-   The ancual R[] entries are biased (3 is added).
+   The actual R[] entries are biased (3 is added).
 */
 static const uint8_t L[64] = {
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -338,29 +338,28 @@ static const uint8_t R[64] = {
 #define NEED_FAST()                                             \
   {                                                             \
     if (w < 32u) {                                              \
-      v |= (uint64_t) ntohl (*next) << (64u - (w += 32u));      \
+      v |= (uint64_t)ntohl (*next) << (64u - (w += 32u));       \
       next++;                                                   \
     }                                                           \
   }
 #define NEED(s)                                                 \
   {                                                             \
     if (w < 32u) {                                              \
-      if (unlikely (next == limit))                             \
-        {                                                       \
-          SAVE();                                               \
-          if (bs->eof)                                          \
-            return ERR_EOF;                                     \
-          rs->state = (s);                                      \
-          return MORE;                                          \
-        case (s):                                               \
-          if (unlikely(bs->data == bs->limit)) {                \
-            assert(bs->eof);                                    \
-            return ERR_EOF;                                     \
-          }                                                     \
-          RESTORE();                                            \
-          assert (w < 32u);                                     \
+      if (unlikely(next == limit)) {                            \
+        SAVE();                                                 \
+        if (bs->eof)                                            \
+          return ERR_EOF;                                       \
+        rs->state = (s);                                        \
+        return MORE;                                            \
+      case (s):                                                 \
+        if (unlikely(bs->data == bs->limit)) {                  \
+          assert(bs->eof);                                      \
+          return ERR_EOF;                                       \
         }                                                       \
-      v |= (uint64_t) ntohl (*next) << (64u - (w += 32u));      \
+        RESTORE();                                              \
+        assert (w < 32u);                                       \
+      }                                                         \
+      v |= (uint64_t)ntohl(*next) << (64u - (w += 32u));        \
       next++;                                                   \
     }                                                           \
   }
@@ -407,7 +406,7 @@ mtf_one(uint8_t **imtf_row, uint8_t *imtf_slide, uint8_t c)
     }
 #endif
   }
-  else {                        /* A general case for indices >= ROW_WIDTH. */
+  else {  /* A general case for indices >= ROW_WIDTH. */
 
     /* If the sliding list already reached the bottom of memory pool
        allocated for it, we need to rebuild it. */
@@ -563,7 +562,7 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
        codebooks, the group's codebook number (called selector) is a value
        from 0 to 5.  A selector of 6 or 7 means oversubscribed or incomplete
        codebook.  If such selector is encountered, decoding is aborted.
-     */
+    */
 
     /* Bound selectors at 18001. */
     if (rs->num_selectors > 18001)
@@ -860,11 +859,11 @@ decode(struct decoder_state *ds)
 int
 emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
 {
-  uint32_t p;                   /* IBWT linked list pointer */
-  uint32_t a;                   /* available input bytes */
-  uint32_t s;                   /* crc checksum */
-  uint8_t c;                    /* current character */
-  uint8_t d;                    /* next character */
+  uint32_t p;      /* IBWT linked list pointer */
+  uint32_t a;      /* available input bytes */
+  uint32_t s;      /* CRC checksum */
+  uint8_t c;       /* current character */
+  uint8_t d;       /* next character */
   const uint32_t *t;
   uint8_t *b;
   uint32_t m;
