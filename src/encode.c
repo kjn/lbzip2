@@ -763,40 +763,75 @@ assign_codes(uint32_t C[], uint32_t L[], uint8_t B[], uint32_t n)
 
 /* Create initial mapping of symbols to trees.
 
-   The goal is to divide all as symbols [0,as) into nt equivalence classes
+   The goal is to divide all as symbols [0,as) into nt equivalence classes (EC)
    [0,nt) such that standard deviation of symbol frequencies in classes is
    minimal. We use a kind of a heuristic to achieve that. There might exist a
    better way to achieve that, but this one seems to be good (and fast) enough.
 
    If the symbol v belongs to the equivalence class t then set s->length[t][v]
    to zero. Otherwise set it to 1.
-
-   TODO: This piece of code really needs some R&D...
 */
 static void
 generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
 {
-  unsigned a, b, c, t;
+  unsigned a, b;   /* range [a,b) of symbols forming current EC */
+  unsigned freq;   /* symbol frequency */
+  unsigned cum;    /* cumulative frequency */
+  unsigned as;     /* effective alphabet size (alphabet size minus number
+                      of symbols with frequency equal to zero) */
+  unsigned t;      /* current tree */
 
-  /* Equivalence classes are empty. */
+  /* Equivalence classes are initially empty. */
   memset(s->length, 1, sizeof(s->length));
 
+  /* Determine effective alphabet size. */
+  as = 0;
+  for (a = 0, cum = 0; cum < nm; a++) {
+    freq = s->lookup[0][a];
+    cum += freq;
+    as += min(freq, 1);
+  }
+  assert(cum == nm);
+
+  /* Bound number of EC by number of symbols. Each EC is non-empty, so number
+     of symbol EC must be <= number of symbols. */
+  nt = min(nt, as);
+
   /* For each equivalence class: */
-  for (a = 0, t = 0; t < nt; t++) {
+  a = 0;
+  for (t = 0; nt > 0; t++, nt--) {
+    assert(nm > 0);
+    assert(as >= nt);
+
     /* Find a range of symbols which total count is roughly proportional to one
        nt-th of all values. */
-    for (c = 0, b = a; c * (nt-t) < nm; b++)
-      c += s->lookup[0][b];
-    assert(a < b);
-    if (a < b-1 && (2*c - s->lookup[0][b-1]) * (nt-t) > 2*nm) {
-      c -= s->lookup[0][--b];
+    freq = s->lookup[0][a];
+    cum = freq;
+    as -= min(freq, 1);
+    b = a+1;
+    while (as > nt-1 && cum * nt < nm) {
+      freq = s->lookup[0][b];
+      cum += freq;
+      as -= min(freq, 1);
+      b++;
     }
-    nm -= c;
+    if (cum > freq && (2*cum - freq) * nt > 2*nm) {
+      cum -= freq;
+      as += min(freq, 1);
+      b--;
+    }
+    assert(a < b);
+    assert(cum > 0);
+    assert(cum <= nm);
+    assert(as >= nt-1);
+    Trace(("Tree %u: EC=[%3u,%3u), |EC|=%3u, cum=%6u", t, a, b, b-a, cum));
 
     /* Now [a,b) is our range -- assign it to equivalence class t. */
     bzero(&s->length[t][a], b - a);
     a = b;
+    nm -= cum;
   }
+  assert(as == 0);
   assert(nm == 0);
 }
 
