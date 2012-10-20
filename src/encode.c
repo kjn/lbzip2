@@ -1127,13 +1127,17 @@ transmit(struct encoder_state *s, void *buf)
 
   /* Transmit prefix codes. */
   for (gr = 0; gr < ns; gr++) {
-    unsigned i, t = s->selector[gr];
-    uint32_t *L = s->lookup[t];
-    uint8_t *B = s->length[t];
+    unsigned i;          /* symbol index in group */
+    const uint32_t *L;   /* symbol-to-code lookup table */
+    const uint8_t *B;    /* code lengths */
+    unsigned mv;         /* symbol (MTF value) */
+
+    t = s->selector[gr];
+    L = s->lookup[t];
+    B = s->length[t];
 
     for (i = 0; i < GROUP_SIZE; i++) {
-      unsigned mv = *mtfv++;
-
+      mv = *mtfv++;
       SEND(B[mv], L[mv]);
     }
   }
