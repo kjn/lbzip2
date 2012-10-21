@@ -535,6 +535,10 @@ primary_thread(void)
 static void
 copy_on_input_avail(void *buffer, size_t size)
 {
+  sched_lock();
+  out_slots--;
+  sched_unlock();
+
   sink_write_buffer(buffer, size, size);
 }
 
@@ -544,14 +548,18 @@ copy_on_write_complete(void *buffer)
 {
   source_release_buffer(buffer);
 
-  if (eof && empty(output_q))
-    xraise(SIGUSR2);
+  sched_lock();
+  out_slots++;
+  sched_unlock();
 }
 
 
 static bool
-never(void)
+copy_terminate(void)
 {
+  if (eof && out_slots == total_out_slots)
+    xraise(SIGUSR2);
+
   return false;
 }
 
@@ -564,7 +572,7 @@ copy(void)
     &null_task,
     NULL,
     NULL,
-    never,
+    copy_terminate,
     copy_on_input_avail,
     copy_on_write_complete,
   };
@@ -572,6 +580,7 @@ copy(void)
   eof = false;
   in_slots = 2;
   out_slots = 2;
+  total_out_slots = 2;
   in_granul = 65536;
 
   process = &pseudo_process;
@@ -645,10 +654,7 @@ work(void)
       bs100k = ntohl(header) - MAGIC(0);
       schedule(&expansion);
     }
-    /* XXX copying with -f is disabled because of a deadlock:
-       $ echo foo | lbzip2 -df
-       (this should be easy to fix) */
-    else if (force && false) {
+    else if (force) {
       xwrite(&header, sizeof(header) - vacant);
       copy();
     }
