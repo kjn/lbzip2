@@ -363,6 +363,9 @@ encode(struct encoder_state *s, uint32_t *crc)
   /* Set up initial MTF state. */
   p = 0x543210;
 
+  assert(*sp < MAX_TREES);
+  assert(s->tmap_old2new[*sp] == 0);
+
   while ((c = *sp) != MAX_TREES) {
     uint32_t v, z, l, h;
 
