@@ -654,7 +654,7 @@ work(void)
       bs100k = ntohl(header) - MAGIC(0);
       schedule(&expansion);
     }
-    else if (force) {
+    else if (force && ospec.fd == STDOUT_FILENO) {
       xwrite(&header, sizeof(header) - vacant);
       copy();
     }
