@@ -1,6 +1,20 @@
 NEWS for lbzip2                                                 -*- outline -*-
 
 
+* What's new in lbzip2 2.3
+
+** Bug fixes
+
+   Version 2.3 fixes an assertion failure bug that could cause core dumps when
+   compressing some kind of data.
+
+** New features
+
+   When decompressing with both --force and --stdout options given lbzip2 2.3
+   will simply copy files that are not in bzip2 format (instead of reporting
+   invalid file format), but will still reject files that appear to be in bzip2
+   format but are damaged or malformed somehow. This mimics behavior of gzip.
+
 * What's new in lbzip2 2.2
 
 ** Bug fixes
