@@ -15,7 +15,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 lbzip2. If not, see <http://www.gnu.org/licenses/>.
 ..
-.TH LBZIP2 1 "04 August 2012" "lbzip2-2.2" "User commands"
+.TH LBZIP2 1 "28 October 2012" "lbzip2-2.3" "User commands"
 
 .SH NAME
 lbzip2 \- parallel bzip2 utility
@@ -148,6 +148,14 @@ By default
 will not overwrite existing files; if you want this to happen, you should
 specify
 .BR \-f .
+If
+.B \-c
+and
+.B \-d
+are also given don't reject files not in bzip2 format, just copy them without
+change; without
+.B \-f lbzip2
+would stop after reaching a file that is not in bzip2 format.
 
 .TP
 .BR \-v ", " \-\-verbose

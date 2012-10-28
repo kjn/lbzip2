@@ -127,7 +127,8 @@ Alias for `-9'. This is the default.
 
 @-f, --force
 Open non-regular input files. Open input files with more than one link. Try to
-remove each output file before opening it.
+remove each output file before opening it. With `-cd' copy files not in bzip2
+format.
 
 @-v, --verbose
 Log each (de)compression start to stderr. Display compression ratio and space
