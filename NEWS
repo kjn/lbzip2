@@ -8,6 +8,10 @@ NEWS for lbzip2                                                 -*- outline -*-
    Version 2.3 fixes an assertion failure bug that could cause core dumps when
    compressing some kind of data.
 
+   A bug which prevented symbolic links to be opened in some situations (when
+   compressing or decompressing files to stdout or when discarding output) was
+   fixed.
+
 ** New features
 
    When decompressing with both --force and --stdout options given lbzip2 2.3
