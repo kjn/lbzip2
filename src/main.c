@@ -702,7 +702,7 @@ input_init(const struct arg *operand, struct stat *sbuf)
       return -1;
     }
 
-    if (!S_ISREG(sbuf->st_mode)) {
+    if (OM_REGF == outmode && !S_ISREG(sbuf->st_mode)) {
       warn("skipping \"%s\": not a regular file", operand->val);
       return -1;
     }
