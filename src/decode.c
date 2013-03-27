@@ -189,9 +189,10 @@ make_tree(struct retriever_internal_state *rs)
   /* Check if Kraft's inequality is satisfied. */
   sofar = 0;
   for (k = MIN_CODE_LENGTH; k <= MAX_CODE_LENGTH; k++)
-    sofar += (uint64_t)C[k] << (20 - k);
-  if (sofar != (1 << 20)) {
-    rs->mtf[rs->t] = sofar < (1 << 20) ? ERR_INCOMPLT : ERR_PREFIX;
+    sofar += (uint64_t)C[k] << (MAX_CODE_LENGTH - k);
+  if (sofar != (1 << MAX_CODE_LENGTH)) {
+    rs->mtf[rs->t] =
+      sofar < (1 << MAX_CODE_LENGTH) ? ERR_INCOMPLT : ERR_PREFIX;
     return;
   }
 
