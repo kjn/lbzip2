@@ -12,6 +12,9 @@ NEWS for lbzip2                                                 -*- outline -*-
    compressing or decompressing files to stdout or when discarding output) was
    fixed.
 
+   Version 2.3 fixes a bug that caused SIGXFSZ to be handled incorrectly on
+   32-bit systems.
+
 ** New features
 
    When decompressing with both --force and --stdout options given lbzip2 2.3
