@@ -1,7 +1,7 @@
 /*-
   encode.c -- low-level compressor
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -536,139 +536,86 @@ compute_depths(uint32_t *restrict C, uint32_t *restrict T, uint32_t n)
    finding an optimal length-limited prefix-free codeset.
 */
 
-/* This structure holds packages of coins.  Single coins are treated as
-   singleton packages, so they can be held in this structure as well. */
-struct package {
-  uint64_t weight;
-  uint64_t pack[3];
-};
-
-/* An empty package. */
-#define EMPTY {0,{0,0,0}}
-
-/* Create a singleton package consisting of a single coin of specified weight
-   and width equal to 2^-depth. */
-static struct package
-package(uint64_t weight, unsigned depth)
-{
-  unsigned index, shift;
-  struct package out;
-
-  assert(depth > 0);
-
-  out.weight = weight;
-  out.pack[0] = 0;
-  out.pack[1] = 0;
-  out.pack[2] = 0;
-
-  depth--;
-  index = depth / 7;
-  shift = depth % 7 * 9;
-  out.pack[index] = (uint64_t)1 << shift;
-
-  return out;
-}
-
-/* Merge two packages. */
-static struct package
-merge(const struct package left, const struct package right)
-{
-  struct package out;
-
-  out.weight = left.weight + right.weight;
-  out.pack[0] = left.pack[0] + right.pack[0];
-  out.pack[1] = left.pack[1] + right.pack[1];
-  out.pack[2] = left.pack[2] + right.pack[2];
-
-  return out;
-}
-
 static void
 package_merge(uint32_t *restrict C, const uint64_t *restrict Pr, uint32_t n)
 {
-  struct package arr1[258];
-  struct package arr2[258];
-  struct package t1;
-  struct package t2;
-  struct package S = EMPTY;
+#define BITS_PER_SYMBOL 9       /* ceil(log2(MAX_ALPHA_SIZE)) */
+#define SYMBOLS_PER_WORD 7      /* floor(64 / BITS_PER_SYMBOL) */
+#define VECTOR_SIZE 3           /* ceil(MAX_CODE_LENGTH / SYMBOLS_PER_WORD) */
+#define QUEUE_SIZE (MAX_ALPHA_SIZE - 1)
+/* It can be easily proved by induction that number of elemnts stored
+   in the queue is always stricly less elements than alphabet size. */
 
-  unsigned x;
-  unsigned i;
-  unsigned d;
-  unsigned jP;
-  unsigned szP;
-  unsigned szL;
-  struct package *P;
-  struct package *L;
-  struct package *T;
+  uint64_t W[2*QUEUE_SIZE];     /* internal node weights */
+  uint64_t P[2*QUEUE_SIZE][VECTOR_SIZE];
 
-  P = arr1;
-  L = arr2;
+  unsigned x;                   /* number of unprocessed singleton nodes */
+  unsigned i;                   /* general purpose index */
+  unsigned k;                   /* vector index */
+  unsigned d;                   /* current node depth */
+  unsigned jP;                  /* current index in queue P */
+  unsigned jL;                  /* current index in queue L */
+  unsigned szP;                 /* current size of queue P */
+  unsigned iP;                  /* current offset of head of queue P */
+  uint64_t dw;                  /* symbol weight at current depth */
+
+  iP = MAX_CODE_LENGTH % 2 * (MAX_ALPHA_SIZE - 1);
   szP = 0;
 
-  for (d = MAX_CODE_LENGTH; d > 0; d--) {
-    i = 0;
-    jP = 0;
-    szL = 0;
+  d = VECTOR_SIZE - 1;
+  dw = (uint64_t)1 << (MAX_CODE_LENGTH % SYMBOLS_PER_WORD * BITS_PER_SYMBOL);
+  while (1) {
+    dw >>= BITS_PER_SYMBOL;
+    d += -!dw;
+    if (d+1 == 0)
+      break;
+    dw += -!dw & ((uint64_t)1 << ((SYMBOLS_PER_WORD - 1) * BITS_PER_SYMBOL));
 
-    while ((n - i) + (szP - jP) >= 2) {
-      if (jP == szP || (i < n && Pr[n - 1 - i] < P[jP].weight)) {
-        assert(i < n);
-        t1 = package(Pr[n - 1 - i], d);
-        i++;
+    x = n;
+    jP = iP;
+    iP ^= MAX_ALPHA_SIZE - 1;
+    jL = iP;
+
+    for (jL = iP; x + szP > 1; jL++) {
+      if (szP == 0 || (x > 1 && Pr[x-2] < W[jP])) {
+        W[jL] = Pr[x-1] + Pr[x-2];
+        for (k = 0; k < VECTOR_SIZE; k++)
+          P[jL][k] = 0;
+        P[jL][d] += 2 * dw;
+        x -= 2;
+      }
+      else if (x == 0 || (szP > 1 && W[jP+1] <= Pr[x-1])) {
+        W[jL] = W[jP] + W[jP+1];
+        for (k = 0; k < VECTOR_SIZE; k++)
+          P[jL][k] = P[jP][k] + P[jP+1][k];
+        jP += 2;
+        szP -= 2;
       }
       else {
-        assert(jP < szP);
-        t1 = P[jP++];
+        W[jL] = W[jP] + Pr[x-1];
+        for (k = 0; k < VECTOR_SIZE; k++)
+          P[jL][k] = P[jP][k];
+        P[jL][d] += dw;
+        jP++;
+        x--;
+        szP--;
       }
-
-      if (jP == szP || (i < n && Pr[n - 1 - i] < P[jP].weight)) {
-        assert(i < n);
-        t2 = package(Pr[n - 1 - i], d);
-        i++;
-      }
-      else {
-        assert(jP < szP);
-        t2 = P[jP++];
-      }
-
-      L[szL++] = merge(t1, t2);
     }
 
-    T = P, P = L, L = T;
-    szP = szL;
-    assert(szP > 0);
+    szP = jL - iP;
+    assert(szP >= n/2);
     assert(szP < n);
   }
+  assert(iP == 0);
+  assert(szP == n-1);
 
-  /* Width of a full binary tree with n leaves is equal to n-1. */
-  x = n - 1;
-
-  while (x > 0) {
-    jP = x & 1;
-    x >>= 1;
-
-    if (jP)
-      S = merge(S, *P);
-
-    /* Inplace merge consecutive pairs. Discard the last unpaired element. */
-    szL = 0;
-    while (szP - jP >= 2) {
-      P[szL++] = merge(P[jP], P[jP + 1]);
-      jP += 2;
-    }
-
-    szP = szL;
-    assert((x == 0) == (szP == 0));
-    assert(szP < n);
+  k = VECTOR_SIZE * SYMBOLS_PER_WORD;
+  for (i = VECTOR_SIZE; i--;) {
+    dw = P[szP-1][i];
+    for (d = SYMBOLS_PER_WORD * BITS_PER_SYMBOL; d;)
+      C[k--] = (dw >> (d -= BITS_PER_SYMBOL)) & 0x1ff;
   }
-
   C[0] = 0;
-  C += 21;
-
-  for (x = 0, i = 3; i--;)
-    for (d = 7 * 9; d;)
-      x += (*C-- = ((S.pack[i] >> (d -= 9)) & 0x1ff) - x);
 }
 
 
