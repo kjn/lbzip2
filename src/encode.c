@@ -821,6 +821,36 @@ find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len)
 }
 
 
+/* Compute bit cost of transmitting a single tree and all symbols it codes. */
+static uint32_t
+transmission_cost(const uint8_t *length, const uint32_t *rfreq, uint32_t as)
+{
+  unsigned v;
+  unsigned p;
+  uint32_t cost;
+
+  /* Compute cost of transmiting RUNA symbols. */
+  cost = 6;  /* fixed code length (5bits) and delta code (1bit) */
+  p = length[0];
+  cost += rfreq[0] * p;  /* cost of transmitting prefix codes */
+
+  /* Compute cost of transmiting all other symbols, from RUNB to EOB. */
+  for (v = 1; v < as; v++) {
+    int c, d;
+    c = length[v];
+    assert(c >= 1 && c <= 20);
+    d = p - c;
+    if (d < 0)
+      d = -d;
+    cost += 1 + 2 * d;  /* cost of transmitting delta code ... */
+    p = c;
+    cost += rfreq[v] * length[v];  /* ... and prefix codes */
+  }
+
+  return cost;
+}
+
+
 /* The main function generating prefix code for the whole block.
 
    Input: MTF values
@@ -924,7 +954,7 @@ generate_prefix_code(struct encoder_state *s)
     /* Only lowest nt bits are used, from 0 to nt-1. If i-th bit is set then
        i-th tree exists but hasn't been seen yet. */
     unsigned not_seen = (1 << nt) - 1;
-    unsigned t, v, p;
+    unsigned t, v;
     uint8_t *sp = s->selector;
 
     nt = 0;
@@ -941,23 +971,8 @@ generate_prefix_code(struct encoder_state *s)
         s->lookup[t][as] = 0;
         s->length[t][as] = 0;
 
-        /* Compute cost of transmiting RUNA symbols. */
-        cost += 6;  /* fixed code length (5bits) and delta code (1bit) */
-        p = s->length[t][0];
-        cost += s->rfreq[t][0] * p;  /* cost of transmitting prefix codes */
-
-        /* Compute cost of transmiting all other symbols, from RUNB to EOB. */
-        for (v = 1; v < as; v++) {
-          int c, d;
-          c = s->length[t][v];
-          assert(c >= 1 && c <= 20);
-          d = p - c;
-          if (d < 0)
-            d = -d;
-          cost += 1 + 2 * d;  /* cost of transmitting delta code ... */
-          p = c;
-          cost += s->rfreq[t][v] * s->length[t][v];  /* ... and prefix codes */
-        }
+        /* Compute cost of transmiting the tree and all symbols it codes. */
+        cost += transmission_cost(s->length[t], s->rfreq[t], as);
       }
     }
 
