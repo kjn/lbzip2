@@ -625,7 +625,7 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
   uint32_t i;
   int32_t k;
   int32_t d;
-  int32_t c = 0;
+  int32_t c;
   uint64_t P[MAX_ALPHA_SIZE];
   uint32_t V[MAX_ALPHA_SIZE];
 
@@ -682,11 +682,12 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
 
   /* Generate code lengths and transform counts into base codes. */
   i = 0;
+  c = 0;
   for (d = 0; d <= MAX_CODE_LENGTH; d++) {
     k = C[d];
 
     C[d] = c;
-    c = ((c + k) << 1);
+    c = (c + k) << 1;
 
     while (k != 0) {
       assert(i < n);
@@ -695,7 +696,7 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
       k--;
     }
   }
-
+  assert(c == (1UL << (MAX_CODE_LENGTH + 1)));
   assert(i == n);
 }
 
