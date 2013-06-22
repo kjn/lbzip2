@@ -564,7 +564,7 @@ package_merge(uint32_t *restrict C, const uint64_t *restrict Pr, uint32_t n)
 
   d = VECTOR_SIZE - 1;
   dw = (uint64_t)1 << (MAX_CODE_LENGTH % SYMBOLS_PER_WORD * BITS_PER_SYMBOL);
-  while (1) {
+  for (;;) {
     dw >>= BITS_PER_SYMBOL;
     d += -!dw;
     if (d+1 == 0)
@@ -627,7 +627,6 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
   int32_t d;
   int32_t c;
   uint64_t P[MAX_ALPHA_SIZE];
-  uint32_t V[MAX_ALPHA_SIZE];
 
   assert(n >= MIN_ALPHA_SIZE);
   assert(n <= MAX_ALPHA_SIZE);
@@ -653,14 +652,13 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
   /* Sort weights and sequence numbers together. */
   sort_alphabet(P, P + n);
 
-#ifdef PACKAGE_MERGE
-  package_merge(C, P, n);
-#else
-  /* Build a Huffman tree. */
-  build_tree(V, P, n);
+  {
+#ifndef PACKAGE_MERGE
+    uint32_t V[MAX_ALPHA_SIZE];
 
-  /* Traverse the Huffman tree and generate counts. */
-  compute_depths(C, V, n);
+    build_tree(V, P, n);
+    compute_depths(C, V, n);
+  }
 
   k = 0;
   for (d = MAX_CODE_LENGTH + 1; d < 32; d++)
@@ -675,10 +673,10 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
         P[i] = ((uint64_t)P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] << 32)
             | 0x10000 | (P[i] & 0xFFFF);
     }
+#endif
 
     package_merge(C, P, n);
   }
-#endif
 
   /* Generate code lengths and transform counts into base codes. */
   i = 0;
