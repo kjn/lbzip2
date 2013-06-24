@@ -454,45 +454,44 @@ sort_alphabet(uint64_t *first, uint64_t *last)
 static void
 build_tree(uint32_t *restrict T, uint64_t *restrict P, int32_t n)
 {
-  int32_t r;   /* index of the next tree in the queue */
-  int32_t s;   /* index of the next singleton leaf */
-  int32_t t;   /**/
-  uint64_t w1, w2, w;
+  unsigned r;  /* index of the next tree in the queue */
+  unsigned s;  /* index of the next singleton leaf */
+  unsigned t;  /**/
+  uint64_t w1, w2;
 
-  r = n - 1;
-  s = n - 1;   /* Start with the last singleton tree. */
-  t = n - 1;
+  r = n;
+  s = n;       /* Start with the last singleton tree. */
 
-  while (t > 0) {
-    /* If it's not the first iteration then r < t and  */
-    assert(t == n - 1 || (r > t && s < t));
-
-    /* Select the first node to be merged. */
-    if (s < 0 || P[r] < P[s]) {
-      /* Select an internal node. */
-      T[r] = t;
-      w1 = P[r--];
+  for (t = n-1; t > 0; t--) {
+    if (s < 1 || (r > t+2 && P[r-2] < P[s-1])) {
+      /* Select two internal nodes. */
+      T[r-1] = t;
+      T[r-2] = t;
+      w1 = P[r-1];
+      w2 = P[r-2];
+      r -= 2;
     }
-    else
-      /* Select a singleton leaf node. */
-      w1 = P[s--];
-
-    /* Select the second node to be merged. */
-    if (s < 0 || (r > t && P[r] < P[s])) {
-      T[r] = t;
-      w2 = P[r--];
+    else if (r < t+2 || (s > 1 && P[s-2] <= P[r-1])) {
+      /* Select two singleton leaf nodes. */
+      w1 = P[s-1];
+      w2 = P[s-2];
+      s -= 2;
     }
-    else
-      w2 = P[s--];
+    else {
+      /* Select one internal node and one singleton leaf node. */
+      T[r-1] = t;
+      w1 = P[r-1];
+      w2 = P[s-1];
+      s--;
+      r--;
+    }
 
-    w = (w1 + w2) & ~(uint64_t)0xFF00FFFF;
-    w1 &= 0xFF000000;
-    w2 &= 0xFF000000;
-    if (w2 > w1)
-      w1 = w2;
-    w2 = P[t] & 0xFFFF;
-    P[t--] = w + w1 + 0x01000000 + w2;
+    P[t] = (P[t] & 0xFFFF) + ((w1 + w2) & ~(uint64_t)0xFF00FFFF) +
+      max(w1 & 0xFF000000, w2 & 0xFF000000) + 0x01000000;
   }
+  assert(r == 1);
+  assert(s == 0);
+  assert(t == 0);
 }
 
 
