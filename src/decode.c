@@ -146,7 +146,6 @@ enum {
   S_SELECTOR_MTF,
   S_DELTA_TAG,
   S_PREFIX,
-  S_TRAILER,
 };
 
 
