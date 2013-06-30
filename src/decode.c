@@ -27,7 +27,7 @@
 #include "decode.h"
 
 
-/* Prefix code decoding is performed using a multi-level table lookup.
+/* Prefix code decoding is performed using a multilevel table lookup.
    The fastest way to decode is to simply build a lookup table whose size
    is determined by the longest code.  However, the time it takes to build
    this table can also be a factor if the data being decoded is not very
@@ -66,15 +66,15 @@
       serves as a reference implementation, accepts malformed trees as
       long as nonexistent codes don't appear in compressed stream.
       Neither bzip2 nor any alternative implementation I know produces
-      such trees, so this behaviour seems sane.
+      such trees, so this behavior seems sane.
 
    2) When held in variables, codes are usually in left-justified
-      form, meaning that they occupy consecutive most signifficant
+      form, meaning that they occupy consecutive most significant
       bits of the variable they are stored in, while less significant
       bits of variable are padded with zeroes.
 
       Such form allows for easy lexicographical comparison of codes
-      using unsigned arithmetic comparision operators, without the
+      using unsigned arithmetic comparison operators, without the
       need for normalization.
  */
 
@@ -89,7 +89,7 @@ struct tree {
 /* start[] - decoding start point.  `k = start[c] & 0x1F' is code
    length.  If k <= HUFF_START_WIDTH then `s = start[c] >> 5' is the
    immediate symbol value.  If k > HUFF_START_WIDTH then s is
-   undefined, but code starting with c is guarranteed to be at least k
+   undefined, but code starting with c is guaranteed to be at least k
    bits long.
 
    base[] - base codes.  For k in 1..20, base[k] is either the first
@@ -103,7 +103,7 @@ struct tree {
 
    perm[] - sorting permutation.  The rules of canonical prefix coding
    require that the source alphabet is sorted stably by ascending code
-   length (the order of symbols of the same code legth is preserved).
+   length (the order of symbols of the same code length is preserved).
    The perm table holds the sorting permutation.
 */
 
