@@ -52,7 +52,7 @@ struct decoder_state {
   bool rand;                    /* block randomized */
   unsigned bwt_idx;             /* BWT primary index */
   unsigned block_size;          /* compressed block size */
-  uint32_t crc;
+  uint32_t crc;                 /* expected block CRC */
   uint32_t ftab[256];           /* frequency table used in counting sort */
   uint32_t *tt;
 
@@ -61,7 +61,7 @@ struct decoder_state {
   uint32_t rle_index;           /* IBWT linked list pointer */
   uint32_t rle_avail;           /* available input bytes */
   uint8_t rle_char;             /* current character */
-  uint8_t rle_prev;             /* next character */
+  uint8_t rle_prev;             /* prevoius character */
 };
 
 
