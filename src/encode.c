@@ -489,7 +489,7 @@ build_tree(uint32_t *restrict T, uint64_t *restrict P, int32_t n)
     P[t] = (P[t] & 0xFFFF) + ((w1 + w2) & ~(uint64_t)0xFF00FFFF) +
       max(w1 & 0xFF000000, w2 & 0xFF000000) + 0x01000000;
   }
-  assert(r == 1);
+  assert(r == 2);
   assert(s == 0);
   assert(t == 0);
 }
