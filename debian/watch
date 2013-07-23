@@ -1,3 +1,2 @@
 version=3
-opts="filenamemangle=s/.*v(.*)$/lbzip2-$1\.tar\.gz/" \
-https://github.com/kjn/lbzip2/tags .*/tarball/v(.*)
+http://lbzip2.org/download .*/lbzip2-(.*)\.tar\.bz2

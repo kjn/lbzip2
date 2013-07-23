@@ -5,6 +5,7 @@ lbzip2 (2.2-3) unstable; urgency=low
     - add link to new upstream home site.
   * debian/rules: Enable verbose make output to silence the
     "compiler-flags-hidden" warning.
+  * debian/watch: Point to new upstream website.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Tue, 23 Jul 2013 22:34:44 +0200
 
