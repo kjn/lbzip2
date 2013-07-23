@@ -1,6 +1,8 @@
 lbzip2 (2.2-3) unstable; urgency=low
 
   * debian/control: Bump Standards-Version to 3.9.4.
+  * debian/rules: Enable verbose make output to silence the
+    "compiler-flags-hidden" warning.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Tue, 23 Jul 2013 22:34:44 +0200
 
