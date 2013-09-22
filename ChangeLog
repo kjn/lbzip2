@@ -1,3 +1,116 @@
+2013-09-22  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Add Serhii Khilinich to THANKS
+
+	Add website link to --version report
+
+	Add website link to manual page
+
+	Add website link to README
+
+2013-07-21  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Fix assertion
+	* src/encode.c (package_merge): Fix assertion about remaining number
+	of non-singleton trees uppon Package Merge completion.
+
+	Small comment improvements
+
+2013-06-30  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Fix typos in prefix decoder code
+
+2013-06-29  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Remove unused retriever FSM state
+	* src/decode.c: Remove S_TRAILER enum.
+
+2013-06-26  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Optimize Huffman algorithm
+	* src/encode.c (build_tree): Rewrite loop body to minimize number of
+	  comparisons and branches.
+
+	Extract transmission cost computation as a separate function
+	* src/encode.c (transmission_cost): New function.
+
+2013-06-23  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Fix a typo in ALGORITHM
+
+	Avoid compiler warnings in Package Merge mode
+	* src/encode.c (make_code_lengths): Define V only when it's used.
+
+	Add prefix coder sanity check
+	* src/encode.c (make_code_lengths): Verify if Kraft's inequality is
+	  satisfied.
+
+	Reimplement Package Merge algorithm
+	* src/encode.c (package_merge): Rewrite from scratch.
+
+2013-06-22  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	During cleanup remove all files genared by autotools
+	build-aux/autogen.sh: Remove test-driver during cleanup.
+
+2013-03-30  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Fix incorrect usage of foreach() macro
+	src/signals.c (pending): Call foreach() macro with second argument
+	as array, not pointer to array.
+
+2013-03-28  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Improve comments in decode.c
+
+2013-03-27  Mikołaj Izdebski  <zurgunt@gmail.com>
+
+	Don't hardcode MAX_CODE_LENGTH
+	* src/deocde.c (make_tree): Use constant MAX_CODE_LENGTH instead of
+	hardcoding its value.
+
+2013-03-02  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Add release note for Debian bug 700680
+
+	Fix Debian bug 700680
+	src/main.c (input_init): Allow input files not to be regular files when
+	outputting to stdout or to the bit bucket.
+
+2012-10-28  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Document copying with -cdf
+
+	Copy files only with --stdout
+	process.c (work): Allow copying files only when output fd is stdout.
+
+	Add NEWS entry for v2.3
+
+2012-10-21  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Assert that the first group is always coded by the first tree
+
+	Fix a deadlock and enable file copying with -d -f
+	src/process.c (copy_on_input_avail): Decrement out_slots semaphore.
+	(copy_on_write_complete): Increment out_slots semaphore.
+	(copy_terminate): Rename from never; raise SIGUSR2 if terminal
+	condition is met.
+
+2012-10-20  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Avoid shadowing auto variable
+
+	Fix assertion failure, closes #8
+	src/encode.c (generate_initial_trees): Rewrite from scratch.
+
+2012-09-14  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Minor comment improvements and whitespace changes
+
+2012-09-11  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Fix dead initialization bug
+
 2012-08-06  Mikolaj Izdebski  <zurgunt@gmail.com>
 
 	Ignore --small
