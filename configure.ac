@@ -21,7 +21,6 @@ AC_INIT([lbzip2], [2.3])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_HEADERS([lib/config.h])
 
 AM_INIT_AUTOMAKE([1.11 color-tests])
 AM_SILENT_RULES([yes])
@@ -111,8 +110,7 @@ AC_ARG_ENABLE([warnings],
 
 gl_INIT
 
-AC_CONFIG_FILES([Makefile src/Makefile lib/Makefile man/Makefile
-    tests/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile man/Makefile tests/Makefile])
 AC_OUTPUT
 
 
