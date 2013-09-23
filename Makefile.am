@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = lib src man tests
-ACLOCAL_AMFLAGS = -Im4
+SUBDIRS = src man tests
 EXTRA_DIST = build-aux/autogen.sh build-aux/make-scantab.pl ChangeLog.old \
     build-aux/pretty-usage.pl build-aux/style-check.pl build-aux/make-crctab.pl
