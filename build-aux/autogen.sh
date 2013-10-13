@@ -30,7 +30,7 @@ if test x"$1" = x-r; then
   rm -Rf lib m4 build-aux/snippet autom4te.cache
 
   for f in config.guess config.sub depcomp install-sh missing \
-      gitlog-to-changelog .gitignore
+      gitlog-to-changelog test-driver .gitignore
     do rm -f build-aux/$f; done
 
   rm -f configure aclocal.m4 INSTALL

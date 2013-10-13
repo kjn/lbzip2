@@ -31,6 +31,9 @@ trap representation" bug
 
 - Yuta Mori for creating divsufsort and porting it to support cyclic strings;
 
+- Serhii Khilinich for helping with creation of lbzip2 logo and motivating
+me to create lbzip2 web page;
+
 They would also like to thank the Department of Electrical and Information
 Engineering at the University of Oulu, for making available their invaluable
 PROTOS Genome Test Suite c10-archive under the GPL.

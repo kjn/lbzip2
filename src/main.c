@@ -217,25 +217,25 @@ G.\n  -z, --compress     : Force compression over the selection by PROG.\n  -1\
            : Alias for `-1'.\n  --best             : Alias for `-9'. This is t\
 he default.\n  -f, --force        : Open non-regular input files. Open input f\
 iles with more\n                       than one", " link. Try to remove each o\
-utput file before\n                       opening it.\n  -v, --verbose      : \
-Log each (de)compression start to stderr. Display\n                       comp\
-ression ratio and space savings. Display progress\n                       info\
-rmation if stderr is connected to a terminal.\n  -S                 : Print co\
-ndition variable statistics to stderr.\n  -s, --small, -q,\n  --quiet,\n  --re\
-petitive-fast,\n  --repetitive-best,\n  --exponential      : Accepted for comp\
-atibility, otherwise ign", "ored.\n  -h, --help         : Print this help to s\
-tdout and exit.\n  -L, --license, -V,\n  --version          : Print version in\
-formation to stdout and exit.\n\nOperands:\n\n  FILE               : Specify f\
-iles to compress or decompress. If no FILE is\n                       given, w\
-ork as a filter. FILEs with `.bz2', `.tbz',\n                       `.tbz2' an\
-d `.tz2' name suffixes will be skipped when\n                       compressin\
-g. When decompressing, `.bz2' suffixes will be\n                       removed\
- i", "n output filenames; `.tbz', `.tbz2' and `.tz2'\n                       s\
-uffixes will be replaced by `.tar'; other filenames\n                       wi\
-ll be suffixed with `.out'.\n"
+utput file before\n                       opening it. With `-cd' copy files no\
+t in bzip2 format.\n  -v, --verbose      : Log each (de)compression start to s\
+tderr. Display\n                       compression ratio and space savings. Di\
+splay progress\n                       information if stderr is connected to a\
+ terminal.\n  -S                 : Print condition variable statistics to stde\
+rr.\n  -s, --small, -q,\n  --quiet,\n  --repetitive-fast,\n  --repetitive-best\
+,\n  --exponential      ", ": Accepted for compatibility, otherwise ignored.\n\
+  -h, --help         : Print this help to stdout and exit.\n  -L, --license, -\
+V,\n  --version          : Print version information to stdout and exit.\n\nOp\
+erands:\n\n  FILE               : Specify files to compress or decompress. If \
+no FILE is\n                       given, work as a filter. FILEs with `.bz2',\
+ `.tbz',\n                       `.tbz2' and `.tz2' name suffixes will be skip\
+ped when\n                       compressing. When decompressing, `.bz2' suffi\
+x", "es will be\n                       removed in output filenames; `.tbz', `\
+.tbz2' and `.tz2'\n                       suffixes will be replaced by `.tar';\
+ other filenames\n                       will be suffixed with `.out'.\n"
 
-#define HELP_STRING "%s version %s\n\n%s%s",                            \
-    PACKAGE_NAME, PACKAGE_VERSION,                                      \
+#define HELP_STRING "%s version %s\n%s\n\n%s%s",                        \
+    PACKAGE_NAME, PACKAGE_VERSION, "http://lbzip2.org/",                \
     "Copyright (C) 2011, 2012 Mikolaj Izdebski\n"                       \
     "Copyright (C) 2008, 2009, 2010 Laszlo Ersek\n"                     \
     "\n"                                                                \
@@ -702,7 +702,7 @@ input_init(const struct arg *operand, struct stat *sbuf)
       return -1;
     }
 
-    if (!S_ISREG(sbuf->st_mode)) {
+    if (OM_REGF == outmode && !S_ISREG(sbuf->st_mode)) {
       warn("skipping \"%s\": not a regular file", operand->val);
       return -1;
     }

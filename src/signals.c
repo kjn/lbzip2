@@ -1,7 +1,7 @@
 /*-
-  signal.c -- signal handling
+  signals.c -- signal handling
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -64,6 +64,7 @@ xmember(const sigset_t *set, int sig)
 {
   unsigned rv;
 
+  /* Cast return value to unsigned to save one comparison. */
   rv = sigismember(set, sig);
   if (rv > 1)
     abort();
@@ -260,7 +261,7 @@ xraise(int sig)
 
 /* Promote signals pending on current thread to the process level. */
 static void
-promote(const int *signals)
+promote(void)
 {
   const int *sig;
   sigset_t pending;
@@ -268,7 +269,7 @@ promote(const int *signals)
   xempty(&pending);
   xpending(&pending);
 
-  foreach (sig, signals)
+  foreach (sig, blocked_signals)
     if (xmember(&pending, *sig))
       xraise(*sig);
 }
@@ -301,7 +302,7 @@ bailout(void)
     _exit(EX_FAIL);
   }
 
-  promote(blocked_signals);
+  promote();
   xraise(SIGUSR1);
   pthread_exit(NULL);
 }

@@ -1,7 +1,7 @@
 /*-
   decode.c -- low-level decompressor
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -27,7 +27,7 @@
 #include "decode.h"
 
 
-/* Prefix code decoding is performed using a multi-level table lookup.
+/* Prefix code decoding is performed using a multilevel table lookup.
    The fastest way to decode is to simply build a lookup table whose size
    is determined by the longest code.  However, the time it takes to build
    this table can also be a factor if the data being decoded is not very
@@ -48,31 +48,64 @@
 #define HUFF_START_WIDTH 10
 
 
-/*
-  Notes on prefix code decoding:
+/* Notes on prefix code decoding:
 
-  1) Width of a tree node is defined as 2^-d, where d is depth of that node.
-  A prefix tree is said to be full iff all leaf widths sum to 1.  If this sum
-  is less (greater) than 1, we say the tree is incomplete (oversubscribed).
-  See also: Kraft's inequality
+   1) Width of a tree node is defined as 2^-d, where d is depth of
+      that node.  A prefix tree is said to be complete iff all leaf
+      widths sum to 1.  If this sum is less (greater) than 1, we say
+      the tree is incomplete (oversubscribed).  See also: Kraft's
+      inequality.
 
-  2) In this implementation, malformed trees (oversubscribed or incomplete)
-  aren't rejected directly at creation (that's the moment when both bad cases
-  are detected).  Instead, invalid trees cause decode error only when they are
-  actually used to decode a group.  This is nonconforming behavior -- the
-  original bzip2, which serves as a reference implementation, accepts
-  malformed trees as long as nonexistent codes don't appear in compressed
-  stream.  Neither bzip2 nor any alternative implementation I know produces
-  such trees, so this behaviour seems sane.
-*/
+      In this implementation, malformed trees (oversubscribed or
+      incomplete) aren't rejected directly at creation (that's the
+      moment when both bad cases are detected).  Instead, invalid
+      trees cause decode error only when they are actually used to
+      decode a group.
+
+      This is nonconforming behavior -- the original bzip2, which
+      serves as a reference implementation, accepts malformed trees as
+      long as nonexistent codes don't appear in compressed stream.
+      Neither bzip2 nor any alternative implementation I know produces
+      such trees, so this behavior seems sane.
+
+   2) When held in variables, codes are usually in left-justified
+      form, meaning that they occupy consecutive most significant
+      bits of the variable they are stored in, while less significant
+      bits of variable are padded with zeroes.
+
+      Such form allows for easy lexicographical comparison of codes
+      using unsigned arithmetic comparison operators, without the
+      need for normalization.
+ */
 
 
+/* Structure used for quick decoding of prefix codes. */
 struct tree {
   uint16_t start[1 << HUFF_START_WIDTH];
   uint64_t base[MAX_CODE_LENGTH + 2];   /* 2 sentinels (first and last pos) */
   unsigned count[MAX_CODE_LENGTH + 1];  /* 1 sentinel (first pos) */
   uint16_t perm[MAX_ALPHA_SIZE];
 };
+/* start[] - decoding start point.  `k = start[c] & 0x1F' is code
+   length.  If k <= HUFF_START_WIDTH then `s = start[c] >> 5' is the
+   immediate symbol value.  If k > HUFF_START_WIDTH then s is
+   undefined, but code starting with c is guaranteed to be at least k
+   bits long.
+
+   base[] - base codes.  For k in 1..20, base[k] is either the first
+   code of length k or it is equal to base[k+1] if there are no codes
+   of length k.  The other 2 elements are sentinels: base[0] is always
+   zero, base[21] is plus infinity (represented as UINT64_MAX).
+
+   count[] - cumulative code length counts.  For k in 1..20, count[k]
+   is the number of symbols which codes are shorter than k bits;
+   count[0] is a sentinel (always zero).
+
+   perm[] - sorting permutation.  The rules of canonical prefix coding
+   require that the source alphabet is sorted stably by ascending code
+   length (the order of symbols of the same code length is preserved).
+   The perm table holds the sorting permutation.
+*/
 
 
 #define ROW_WIDTH 16u
@@ -81,14 +114,14 @@ struct tree {
 #define CMAP_BASE (SLIDE_LENGTH - 256)
 
 struct retriever_internal_state {
-  unsigned state;
-  uint8_t selector[MAX_SELECTORS];
-  unsigned num_trees;
-  unsigned num_selectors;
+  unsigned state;               /* current state of retriever FSA */
+  uint8_t selector[MAX_SELECTORS];  /* coding tree selectors */
+  unsigned num_trees;           /* number of prefix trees used */
+  unsigned num_selectors;       /* number of tree selectors present */
   unsigned alpha_size;          /* number of distinct prefix codes */
   uint8_t code_len[MAX_ALPHA_SIZE];
-  unsigned mtf[MAX_TREES];
-  struct tree tree[MAX_TREES];
+  unsigned mtf[MAX_TREES];      /* current state of inverse MTF FSA */
+  struct tree tree[MAX_TREES];  /* coding trees */
 
   uint16_t big;                 /* big descriptor of the bitmap */
   uint16_t small;               /* small descriptor of the bitmap */
@@ -104,6 +137,7 @@ struct retriever_internal_state {
 };
 
 
+/* FSM states from which retriever can be started or resumed. */
 enum {
   S_INIT,
   S_BWT_IDX,
@@ -112,7 +146,6 @@ enum {
   S_SELECTOR_MTF,
   S_DELTA_TAG,
   S_PREFIX,
-  S_TRAILER,
 };
 
 
@@ -129,25 +162,30 @@ enum {
 #define IS_RUN(s) ((s) >= 256)
 #define IS_EOB(s) ((s) == EOB)
 
-/* Given a list of code lengths, make a set of tables to decode that set of
-   codes.  Return zero on success (the tables are built only in this case), 7
-   if the given code set is incomplete, 6 if the input is invalid (an
-   oversubscribed set of lengths).
 
-   Because the alphabet size is always less or equal to 258 (2 RUN symbols, at
-   most 255 MFV values and 1 EOB symbol) the average code length is strictly
-   less than 9. Hence the probability of decoding code is quite small (usually
-   < 0.2).
+/* Given a list of code lengths, make a set of tables to decode that
+   set of codes.  Return value is passed in mtf array of the decoder
+   state.  On success value from zero to five is passed (the tables
+   are built only in this case), but also error codes ERR_INCOMPLT or
+   ERR_PREFIX may be returned, which means that given code set is
+   incomplete or (respectively) the code is invalid (an oversubscribed
+   set of lengths).
 
-   lbzi2 utilises this fact by implementing a hybrid algorithm for prefix
-   decoding. For codes of length <= 10 lbzip2 maintains a LUT (look-up table)
-   that maps codes directly to corresponding symbol values. Codes longer than
-   10 bits are not mapped by the LUT are decoded using cannonical prefix
-   decoding algorithm.
+   Because the alphabet size is always less or equal to 258 (2 RUN
+   symbols, at most 255 MFV values and 1 EOB symbol) the average code
+   length is strictly less than 9.  Hence the probability of decoding
+   code longer than 10 bits is quite small (usually < 0.2).
 
-   The above value of 10 bits was determined using a series of benchmarks. It's
-   not hardcoded but instead it is defined as a constant in the lbzip2 code. If
-   on some system another value works better, it can be advusted freely.
+   lbzip2 utilises this fact by implementing a hybrid algorithm for
+   prefix decoding.  For codes of length <= 10 lbzip2 maintains a LUT
+   (look-up table) that maps codes directly to corresponding symbol
+   values.  Codes longer than 10 bits are not mapped by the LUT are
+   decoded using cannonical prefix decoding algorithm.
+
+   The above value of 10 bits was determined using a series of
+   benchmarks.  It's not hardcoded but instead it is defined as a
+   constant HUFF_START_WIDTH (see the comment above).  If on some
+   system a different value works better, it can be adjusted freely.
 */
 static void
 make_tree(struct retriever_internal_state *rs)
@@ -189,16 +227,17 @@ make_tree(struct retriever_internal_state *rs)
   /* Check if Kraft's inequality is satisfied. */
   sofar = 0;
   for (k = MIN_CODE_LENGTH; k <= MAX_CODE_LENGTH; k++)
-    sofar += (uint64_t) C[k] << (20 - k);
-  if (sofar != (1 << 20)) {
-    rs->mtf[rs->t] = sofar < (1 << 20) ? ERR_INCOMPLT : ERR_PREFIX;
+    sofar += (uint64_t)C[k] << (MAX_CODE_LENGTH - k);
+  if (sofar != (1 << MAX_CODE_LENGTH)) {
+    rs->mtf[rs->t] =
+      sofar < (1 << MAX_CODE_LENGTH) ? ERR_INCOMPLT : ERR_PREFIX;
     return;
   }
 
   /* Create left-justified base table. */
   sofar = 0;
   for (k = MIN_CODE_LENGTH; k <= MAX_CODE_LENGTH; k++) {
-    next = sofar + ((uint64_t) C[k] << (64 - k));
+    next = sofar + ((uint64_t)C[k] << (64 - k));
     assert(next == 0 || next >= sofar);
     B[k] = sofar;
     sofar = next;
@@ -222,7 +261,6 @@ make_tree(struct retriever_internal_state *rs)
   cum = 0;
   for (k = MIN_CODE_LENGTH; k <= MAX_CODE_LENGTH; k++) {
     uint32_t t1 = C[k];
-
     C[k] = cum;
     cum += t1;
   }
@@ -241,7 +279,6 @@ make_tree(struct retriever_internal_state *rs)
   for (k = 1; k <= HUFF_START_WIDTH; k++) {
     for (s = C[k - 1]; s < C[k]; s++) {
       uint16_t x = (P[s] << 5) | k;
-
       v = code;
       code += inc;
       while (v < code)
@@ -252,13 +289,13 @@ make_tree(struct retriever_internal_state *rs)
 
   /* Fill remaining, incomplete start entries. */
   assert(k == HUFF_START_WIDTH + 1);
-  sofar = (uint64_t) code << (64 - HUFF_START_WIDTH);
+  sofar = (uint64_t)code << (64 - HUFF_START_WIDTH);
   while (code < (1 << HUFF_START_WIDTH)) {
     while (sofar >= B[k + 1])
       k++;
     S[code] = k;
     code++;
-    sofar += (uint64_t) 1 << (64 - HUFF_START_WIDTH);
+    sofar += (uint64_t)1 << (64 - HUFF_START_WIDTH);
   }
   assert(sofar == 0);
 
@@ -310,7 +347,7 @@ static const uint8_t table[64] = {
    111110   6  -1
    111111   6  -3
 
-   The ancual R[] entries are biased (3 is added).
+   The actual R[] entries are biased (3 is added).
 */
 static const uint8_t L[64] = {
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -335,45 +372,69 @@ static const uint8_t R[64] = {
                    limit = bs->limit, tt = ds->tt + ds->block_size, \
                    tt_limit = ds->tt + MAX_BLOCK_SIZE)
 
-#define NEED_FAST()                                             \
-  {                                                             \
-    if (w < 32u) {                                              \
-      v |= (uint64_t) ntohl (*next) << (64u - (w += 32u));      \
-      next++;                                                   \
-    }                                                           \
-  }
+/* Make sure that bit buffer v holds at least 32 bits, but no more
+   than 63.
+
+   If there buffer contains from 0 to 31 bits then an attempt to
+   append next 32 bits is made.  If there is not enough input
+   available then current state is saved (including FSM state, which
+   is saved as s) and the function returns.
+
+   Note that it would be wrong to put more than 63 bits (i.e. 64 bits)
+   in v as a potential value of UINT64_MAX could be misrepresented as
+   plus infinity.
+*/
 #define NEED(s)                                                 \
   {                                                             \
     if (w < 32u) {                                              \
-      if (unlikely (next == limit))                             \
-        {                                                       \
-          SAVE();                                               \
-          if (bs->eof)                                          \
-            return ERR_EOF;                                     \
-          rs->state = (s);                                      \
-          return MORE;                                          \
-        case (s):                                               \
-          if (unlikely(bs->data == bs->limit)) {                \
-            assert(bs->eof);                                    \
-            return ERR_EOF;                                     \
-          }                                                     \
-          RESTORE();                                            \
-          assert (w < 32u);                                     \
+      if (unlikely(next == limit)) {                            \
+        SAVE();                                                 \
+        if (bs->eof)                                            \
+          return ERR_EOF;                                       \
+        rs->state = (s);                                        \
+        return MORE;                                            \
+      case (s):                                                 \
+        if (unlikely(bs->data == bs->limit)) {                  \
+          assert(bs->eof);                                      \
+          return ERR_EOF;                                       \
         }                                                       \
-      v |= (uint64_t) ntohl (*next) << (64u - (w += 32u));      \
+        RESTORE();                                              \
+        assert (w < 32u);                                       \
+      }                                                         \
+      v |= (uint64_t)ntohl(*next) << (64u - (w += 32u));        \
       next++;                                                   \
     }                                                           \
   }
+
+/* Same as NEED(), but assumes that there is at least one 32-bit word
+   of input available.  */
+#define NEED_FAST()                                             \
+  {                                                             \
+    if (w < 32u) {                                              \
+      v |= (uint64_t)ntohl (*next) << (64u - (w += 32u));       \
+      next++;                                                   \
+    }                                                           \
+  }
+
+/* Return k most significant bits of bit buffer v.  */
 #define PEEK(k) (v >> (64u - (k)))
-#define DUMP(k) (v <<= (k), w -= (k))
+
+/* Remove k most significant bits of bit buffer v.  */
+#define DUMP(k) (v <<= (k), w -= (k), (void)0)
+
+/* Remove and return k most significant bits of bit buffer v.  */
 #define TAKE(x,k) ((x) = PEEK(k), DUMP(k))
 
 
-/* Implementation of Sliding Lists algorithm for doing Inverse Move-To-Front
-   (IMTF) transformation in O(n) space and amortized O(sqrt(n)) time.
-   The naive IMTF algorithm does the same in both O(n) space and time.
-   Generally IMTF can be done in O(log(n)) time, but a quite big constant
-   factor makes such algorithms impractical for MTF of 256 items.
+/* Implementation of Sliding Lists algorithm for doing Inverse
+   Move-To-Front (IMTF) transformation in O(n) space and amortized
+   O(sqrt(n)) time.  The naive IMTF algorithm does the same in both
+   O(n) space and time.
+
+   IMTF could be done in O(log(n)) time using algorithms based on
+   (quite) complex data structures such as self-balancing binary
+   search trees, but these algorithms have quite big constant factor
+   which makes them impractical for MTF of 256 items.
 */
 static uint8_t
 mtf_one(uint8_t **imtf_row, uint8_t *imtf_slide, uint8_t c)
@@ -407,7 +468,7 @@ mtf_one(uint8_t **imtf_row, uint8_t *imtf_slide, uint8_t c)
     }
 #endif
   }
-  else {                        /* A general case for indices >= ROW_WIDTH. */
+  else {  /* A general case for indices >= ROW_WIDTH. */
 
     /* If the sliding list already reached the bottom of memory pool
        allocated for it, we need to rebuild it. */
@@ -563,7 +624,7 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
        codebooks, the group's codebook number (called selector) is a value
        from 0 to 5.  A selector of 6 or 7 means oversubscribed or incomplete
        codebook.  If such selector is encountered, decoding is aborted.
-     */
+    */
 
     /* Bound selectors at 18001. */
     if (rs->num_selectors > 18001)
@@ -583,6 +644,20 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
         rs->mtf[i] = rs->mtf[i - 1];
       rs->mtf[0] = rs->t;
 
+      /* In one coding group we can have at most 50 codes, 20 bits
+         each, so the largest possible group size is 1000 bits.  If
+         there are at least 1000 bits of input available then we can
+         safely assume that the whole group can be decoded without
+         asking for more input.
+
+         There are two code paths.  The first one is executed when
+         there is at least 1024 bits of input available (i.e. 32
+         words, 32 bits each).  In this case we can apply several
+         optimizations, most notably we are allowed to keep state in
+         local variables and we can use NEED_FAST() - faster version
+         of NEED().  The second code path is executed when there is
+         not enough input to for fast decoding.
+      */
       if (likely((limit - next) >= 32)) {
         struct tree *T = &rs->tree[rs->t];
         unsigned j;
@@ -590,7 +665,6 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
         unsigned runChar = rs->runChar;
         unsigned shift = rs->shift;
 
-        /* There are up to GROUP_SIZE codes in any group. */
         for (j = 0; j < GROUP_SIZE; j++) {
           NEED_FAST();
           x = T->start[PEEK(HUFF_START_WIDTH)];
@@ -647,9 +721,12 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
           k = x & 0x1F;
 
           if (likely(k <= HUFF_START_WIDTH)) {
+            /* Use look-up table in average case. */
             s = x >> 5;
           }
           else {
+            /* Code length exceeds HUFF_START_WIDTH, use canonical
+               prefix decoding algorithm instead of look-up table.  */
             while (v >= T->base[k + 1])
               k++;
             s = T->perm[T->count[k] + ((v - T->base[k]) >> (64 - k))];
@@ -854,20 +931,24 @@ decode(struct decoder_state *ds)
 #define M1 0xFFFFFFFFu
 
 
-/* Returns bytes still remaining in output buffer (zero if all bytes were
-   exhausted).  Returns (uint32_t)-1 if data error was detected.
+/* Emit decoded block into buffer buf of size *buf_sz.  Buffer size is
+   updated to reflect the remaining space left in the buffer.
+
+   Returns OK if the block was completely emitted, MORE if more output
+   space is needed to fully emit the block or ERR_RUNLEN if data error
+   was detected (missing run length).
 */
 int
 emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
 {
   uint32_t p;                   /* IBWT linked list pointer */
   uint32_t a;                   /* available input bytes */
-  uint32_t s;                   /* crc checksum */
+  uint32_t s;                   /* CRC checksum */
   uint8_t c;                    /* current character */
   uint8_t d;                    /* next character */
-  const uint32_t *t;
-  uint8_t *b;
-  uint32_t m;
+  const uint32_t *t;            /* IBWT linked list base address */
+  uint8_t *b;                   /* next free byte in output buffer  */
+  uint32_t m;                   /* number of free output bytes available */
 
   assert(ds);
   assert(buf);
