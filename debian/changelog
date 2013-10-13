@@ -1,5 +1,9 @@
-lbzip2 (2.2-3) unstable; urgency=low
+lbzip2 (2.3-1) unstable; urgency=low
 
+  * New upstream release:
+    - fixed bug which prevented symbolic links to be opened in some
+      situations, closes: #700680,
+    - fixed several other minor bugs.
   * debian/patches/automake-1.14: Add patch fixing compatibility with
     GNU Automake 1.14; closes: #725516.
   * debian/control:
@@ -10,7 +14,7 @@ lbzip2 (2.2-3) unstable; urgency=low
     "compiler-flags-hidden" warning.
   * debian/watch: Point to new upstream website.
 
- -- Mikolaj Izdebski <zurgunt@gmail.com>  Tue, 23 Jul 2013 22:34:44 +0200
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Sun, 13 Oct 2013 23:57:18 +0200
 
 lbzip2 (2.2-2) unstable; urgency=low
 
