@@ -23,7 +23,8 @@ minbzcat_LDADD = $(top_builddir)/lib/libgnu.a
 timeout_SOURCES = timeout.c
 timeout_LDADD = $(top_builddir)/lib/libgnu.a
 
-TESTS_ENVIRONMENT = $(SHELL) $(srcdir)/Tester
+LOG_COMPILER = $(SHELL)
+AM_LOG_FLAGS = $(srcdir)/Tester
 
 TESTS = \
     32767.bz2 \
