@@ -1,2 +1,3 @@
 version=3
-http://lbzip2.org/download .*/lbzip2-(.*)\.tar\.bz2
+opts="filenamemangle=s/.*v(.*)\.tar\.gz$/lbzip2-$1\.tar\.gz/" \
+https://github.com/kjn/lbzip2/tags .*/archive/v(.*)\.tar\.gz
