@@ -1,7 +1,10 @@
 lbzip2 (2.2-3) unstable; urgency=low
 
+  * debian/patches/automake-1.14: Add patch fixing compatibility with
+    GNU Automake 1.14; closes: #725516.
   * debian/control:
     - bump Standards-Version to 3.9.4,
+    - bump automake build-dependency version to 1.14,
     - add link to new upstream home site.
   * debian/rules: Enable verbose make output to silence the
     "compiler-flags-hidden" warning.
