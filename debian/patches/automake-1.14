@@ -26,7 +26,7 @@ index c74050e..ac6dda2 100755
    rm -Rf lib m4 build-aux/snippet autom4te.cache
  
    for f in config.guess config.sub depcomp install-sh missing \
--      gitlog-to-changelog .gitignore
+-      gitlog-to-changelog test-driver .gitignore
 +      gitlog-to-changelog compile test-driver .gitignore
      do rm -f build-aux/$f; done
  
