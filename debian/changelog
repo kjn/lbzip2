@@ -14,6 +14,7 @@ lbzip2 (2.3-1) unstable; urgency=low
   * debian/rules: Enable verbose make output to silence the
     "compiler-flags-hidden" warning.
   * debian/watch: Update to reflect upstream website changes.
+  * debian/copyright: Update copyright to new upstream release.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Sun, 13 Oct 2013 23:57:18 +0200
 
