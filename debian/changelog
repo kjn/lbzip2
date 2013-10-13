@@ -9,6 +9,7 @@ lbzip2 (2.3-1) unstable; urgency=low
   * debian/control:
     - bump Standards-Version to 3.9.4,
     - bump automake build-dependency version to 1.14,
+    - bump gnulib build-dependency version to prevent FTBFS,
     - add link to new upstream home site.
   * debian/rules: Enable verbose make output to silence the
     "compiler-flags-hidden" warning.
