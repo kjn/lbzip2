@@ -29,6 +29,7 @@ AM_LOG_FLAGS = $(srcdir)/Tester
 TESTS = \
     32767.bz2 \
     ch255.bz2 \
+    codelen20.bz2 \
     concat.bz2 \
     crc1.bz2 \
     crc2.bz2 \
