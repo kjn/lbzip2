@@ -14,7 +14,7 @@ pb(b) { p(b,8); }
 /*
   Alphabet used:
 
-  288 symbols (2 RUN, 255 MTFV, 1 EOB)
+  258 symbols (2 RUN, 255 MTFV, 1 EOB)
 
   symbol  code_len
   0-126     7
