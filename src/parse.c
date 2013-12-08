@@ -136,9 +136,6 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
       struct bitstream *bs, unsigned *garbage)
 {
   assert(ps->state != ACCEPT);
-  if (ps->state == ACCEPT) {
-    return FINISH;
-  }
 
   while (OK == bits_need(bs, 16)) {
     unsigned word = bits_peek(bs, 16);
