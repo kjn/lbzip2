@@ -1,7 +1,7 @@
 /*-
-  parse.c -- find block boundraries
+  parse.c -- find block boundaries
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -17,6 +17,55 @@
 
   You should have received a copy of the GNU General Public License
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+/*
+  This file contains implementations of two different algorithms for finding
+  boundaries of compressed block -- deterministic "parsing" and probabilistic
+  "scanning".  Both are based on deterministic finite state automatons.
+
+  Parsing is a deterministic algorithm used to find location of next block,
+  given location of the end of previous block.  It processes and validates
+  block and stream metadata.  Its main disadvantage is that it has to be ran
+  sequentially only -- all preceding blocks must be fully decoded before
+  attempting to find the location of any block.
+
+  Scanning is another way of finding locations where compressed blocks are
+  likely to begin.  It can be ran in parallel by multiple threads to discover
+  locations which with high probability start compressed blocks.
+
+  The two ways of finding block boundaries can be nicely combined together.
+  First scanning can be used to determine likely candidates for blocks, which
+  can be later confirmed or rejected after parsing block headers.
+
+  The probability of finding false positives when scanning for block headers is
+  usually very small (below 1e-14).  However it is possible to create
+  compressed files which would cause large number of false positives, so lbzip2
+  had to be designed to behave correctly even in cases with high ratios of
+  false positives.  There is also some small probability of not discovering
+  existing block header in the scanning phase.  This can happen if block magic
+  pattern, which is used to identify block headers, crosses boundaries of two
+  I/O blocks.  Such headers will not be recognized by scanner threads.  The
+  probability of missing magic pattern is low -- the magic is only 6 bytes long
+  and I/O blocks are 1 MiB each.  This is not a big problem as deterministic
+  parser will will eventually find all missed blocks, but it is possible to
+  construct a compressed file in a way which will prevent scanner from finding
+  some blocks.  Both above cases of specially hand-crafted compressed files may
+  affect decompression performance, but they should not affect correctness.
+
+  lbzip2 was constructed in the way that worst-case decompression time using
+  more than one thread is the same as decompression using one thread, minus the
+  time spent for thread synchronization, which is usually low.  (Simply
+  speaking, a n-thread decompressor can be thought of as a single sequential
+  decompressor with n-1 helper workers, which try to predict what will need to
+  be done in future and prepare that work in advance so that when sequential
+  decompressor reaches that point it will be able to simply take the work done
+  by helper worker.  The predictions are usually close to be perfect, which
+  means that the sequential worker can take advantage of them, which results in
+  performance gains.  But if some evil force tries to mislead helper workers,
+  the worst that can happen is complete waste of resources used by the n-1
+  helper threads -- the deterministic sequential decompressor will still be
+  able to complete the decompression job, without any help from other workers.)
 */
 
 
