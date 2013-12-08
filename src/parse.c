@@ -131,6 +131,19 @@ parser_init(struct parser_state *ps, int my_bs100k)
 }
 
 
+/* Parse stream headers until a compressed block or end of stream is reached.
+
+   Possible return codes:
+     OK          - a compressed block was found
+     FINISH      - end of stream was reached
+     MORE        - more input is need, parsing was suspended
+     ERR_HEADER  - invalid stream header
+     ERR_STRMCRC - stream CRC does not match
+     ERR_EOF     - unterminated stream (EOF reached before end of stream)
+
+   garbage is set only when returning FINISH.  It is number of garbage bits
+   consumed after end of stream was reached.
+*/
 int
 parse(struct parser_state *restrict ps, struct header *restrict hd,
       struct bitstream *bs, unsigned *garbage)
@@ -254,6 +267,13 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
 }
 
 
+/* Scan for magic bit sequence which presence indicates probable start of
+   compressed block.
+
+   Possible return codes:
+     OK   - the magic sequence was found
+     MORE - block header magic was not found
+*/
 int
 scan(struct bitstream *bs, unsigned skip)
 {
