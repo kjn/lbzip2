@@ -42,6 +42,7 @@ TESTS = \
     incomp-2.bz2 \
     load0.bz2 \
     overrun.bz2 \
+    overrun2.bz2 \
     rand.bz2 \
     repet.bz2 \
     trash.bz2 \
