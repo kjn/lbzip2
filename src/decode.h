@@ -28,7 +28,6 @@ struct header {
 struct parser_state {
   int state;
   int bs100k;
-  int prev_bs100k;
   uint32_t stored_crc;
   uint32_t computed_crc;
 };

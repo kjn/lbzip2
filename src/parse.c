@@ -125,8 +125,7 @@ void
 parser_init(struct parser_state *ps, int my_bs100k)
 {
   ps->state = BLOCK_MAGIC_1;
-  ps->prev_bs100k = my_bs100k;
-  ps->bs100k = -1;
+  ps->bs100k = my_bs100k;
   ps->computed_crc = 0u;
 }
 
@@ -175,8 +174,7 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
         *garbage = 32;
         return FINISH;
       }
-      ps->prev_bs100k = word & 15u;
-      ps->bs100k = -1;
+      ps->bs100k = word & 15u;
       ps->state = BLOCK_MAGIC_1;
       continue;
 
@@ -209,10 +207,9 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
 
     case BLOCK_CRC_2:
       hd->crc = (ps->stored_crc << 16) | word;
-      hd->bs100k = ps->prev_bs100k;
+      hd->bs100k = ps->bs100k;
       ps->computed_crc =
           (ps->computed_crc << 1) ^ (ps->computed_crc >> 31) ^ hd->crc;
-      ps->prev_bs100k = ps->bs100k;
       ps->state = BLOCK_MAGIC_1;
       return OK;
 
