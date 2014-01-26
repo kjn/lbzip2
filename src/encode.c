@@ -531,90 +531,57 @@ compute_depths(uint32_t *restrict C, uint32_t *restrict T, uint32_t n)
 #endif /*!PACKAGE_MERGE */
 
 
+#define weight_add(w1,w2) ((((w1) + (w2)) & ~(uint64_t)0xFFFFFFFF) + \
+                           max((w1) & 0xFF000000, (w2) & 0xFF000000) + 0x01000000)
+
 /* The following is an implementation of the Package-Merge algorithm for
    finding an optimal length-limited prefix-free codeset.
 */
 
 static void
-package_merge(uint32_t *restrict C, const uint64_t *restrict Pr, uint32_t n)
+package_merge(uint32_t *restrict C, const uint64_t *restrict P, uint32_t n)
 {
-#define BITS_PER_SYMBOL 9       /* ceil(log2(MAX_ALPHA_SIZE)) */
-#define SYMBOLS_PER_WORD 7      /* floor(64 / BITS_PER_SYMBOL) */
-#define VECTOR_SIZE 3           /* ceil(MAX_CODE_LENGTH / SYMBOLS_PER_WORD) */
-#define QUEUE_SIZE (MAX_ALPHA_SIZE - 1)
-/* It can be easily proved by induction that number of elemnts stored
-   in the queue is always stricly less elements than alphabet size. */
+  unsigned m = MAX_CODE_LENGTH;
+  uint16_t T[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH];
+  uint64_t U[MAX_CODE_LENGTH + 1];
+  uint64_t V[MAX_CODE_LENGTH + 1];
+  unsigned i, j, k, t;
 
-  uint64_t W[2*QUEUE_SIZE];     /* internal node weights */
-  uint64_t P[2*QUEUE_SIZE][VECTOR_SIZE];
+  U[0] = -1;
+  bzero(T, sizeof(T));
 
-  unsigned x;                   /* number of unprocessed singleton nodes */
-  unsigned i;                   /* general purpose index */
-  unsigned k;                   /* vector index */
-  unsigned d;                   /* current node depth */
-  unsigned jP;                  /* current index in queue P */
-  unsigned jL;                  /* current index in queue L */
-  unsigned szP;                 /* current size of queue P */
-  unsigned iP;                  /* current offset of head of queue P */
-  uint64_t dw;                  /* symbol weight at current depth */
+  for (k = 1; k <= m; k++) {
+    T[k][0] = 2;
+    U[k] = weight_add(P[n-1], P[n-2]);
+    V[k] = P[n-2];
+  }
 
-  iP = MAX_CODE_LENGTH % 2 * (MAX_ALPHA_SIZE - 1);
-  szP = 0;
-
-  d = VECTOR_SIZE - 1;
-  dw = (uint64_t)1 << (MAX_CODE_LENGTH % SYMBOLS_PER_WORD * BITS_PER_SYMBOL);
-  for (;;) {
-    dw >>= BITS_PER_SYMBOL;
-    d += -!dw;
-    if (d+1 == 0)
-      break;
-    dw += -!dw & ((uint64_t)1 << ((SYMBOLS_PER_WORD - 1) * BITS_PER_SYMBOL));
-
-    x = n;
-    jP = iP;
-    iP ^= MAX_ALPHA_SIZE - 1;
-    jL = iP;
-
-    for (jL = iP; x + szP > 1; jL++) {
-      if (szP == 0 || (x > 1 && Pr[x-2] < W[jP])) {
-        W[jL] = Pr[x-1] + Pr[x-2];
-        for (k = 0; k < VECTOR_SIZE; k++)
-          P[jL][k] = 0;
-        P[jL][d] += 2 * dw;
-        x -= 2;
+  for (i = 2; i < n; i++) {
+    C[0] = m;
+    C[1] = m;
+    for (j = 2; j > 0;) {
+      k = C[--j];
+      t = n - T[k][0];
+      if (t > 0 && U[k - 1] > P[t-1]) {
+        T[k][0]++;
+        U[k] = weight_add(V[k], P[t-1]);
+        V[k] = P[t-1];
       }
-      else if (x == 0 || (szP > 1 && W[jP+1] <= Pr[x-1])) {
-        W[jL] = W[jP] + W[jP+1];
-        for (k = 0; k < VECTOR_SIZE; k++)
-          P[jL][k] = P[jP][k] + P[jP+1][k];
-        jP += 2;
-        szP -= 2;
-      }
-      else {
-        W[jL] = W[jP] + Pr[x-1];
-        for (k = 0; k < VECTOR_SIZE; k++)
-          P[jL][k] = P[jP][k];
-        P[jL][d] += dw;
-        jP++;
-        x--;
-        szP--;
+      else if (k != 1) {
+        bcopy(&T[k - 1][0], &T[k][1],  (k - 1) * sizeof(uint16_t));
+        U[k] = weight_add(V[k], U[k - 1]);
+        V[k] = U[k - 1];
+        k--;
+        C[j++] = k;
+        C[j++] = k;
       }
     }
-
-    szP = jL - iP;
-    assert(szP >= n/2);
-    assert(szP < n);
   }
-  assert(iP == 0);
-  assert(szP == n-1);
 
-  k = VECTOR_SIZE * SYMBOLS_PER_WORD;
-  for (i = VECTOR_SIZE; i--;) {
-    dw = P[szP-1][i];
-    for (d = SYMBOLS_PER_WORD * BITS_PER_SYMBOL; d;)
-      C[k--] = (dw >> (d -= BITS_PER_SYMBOL)) & 0x1ff;
-  }
-  C[0] = 0;
+  bzero(C, (MAX_CODE_LENGTH + 2) * sizeof(*C));
+  for (k = 1; k < m; k++)
+    C[k] = T[m][k - 1] - T[m][k];
+  C[m] = T[m][m - 1];
 }
 
 
