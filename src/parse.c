@@ -1,7 +1,7 @@
 /*-
   parse.c -- find block boundaries
 
-  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013, 2014 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
