@@ -551,14 +551,14 @@ package_merge(uint32_t *restrict count, const uint64_t *restrict leaf_weight, ui
   uint32_t width;
   int32_t next_depth;
   uint32_t depth;
-  int32_t symbol;
+  int32_t leaf;
 
   pkg_weight[0] = -1;
   bzero(tree, sizeof(tree));
 
   for (depth = 1; depth <= max_depth; depth++) {
     tree[depth][0] = 2;
-    pkg_weight[depth] = leaf_weight[as - 1] + leaf_weight[as - 2];
+    pkg_weight[depth] = weight_add(leaf_weight[as - 1], leaf_weight[as - 2]);
     prev_weight[depth] = leaf_weight[as - 2];
   }
 
@@ -567,15 +567,15 @@ package_merge(uint32_t *restrict count, const uint64_t *restrict leaf_weight, ui
     count[1] = max_depth;
     for (next_depth = 1; next_depth >= 0; next_depth--) {
       depth = count[next_depth];
-      symbol = as - tree[depth][0] - 1;
-      if (symbol >= 0 && pkg_weight[depth - 1] > leaf_weight[symbol]) {
+      leaf = as - tree[depth][0] - 1;
+      if (leaf >= 0 && pkg_weight[depth - 1] > leaf_weight[leaf]) {
         tree[depth][0]++;
-        pkg_weight[depth] = prev_weight[depth] + leaf_weight[symbol];
-        prev_weight[depth] = leaf_weight[symbol];
+        pkg_weight[depth] = weight_add(prev_weight[depth], leaf_weight[leaf]);
+        prev_weight[depth] = leaf_weight[leaf];
       }
       else if (depth != 1) {
         bcopy(&tree[depth - 1][0], &tree[depth][1], (depth - 1) * sizeof(uint16_t));
-        pkg_weight[depth] = prev_weight[depth] + pkg_weight[depth - 1];
+        pkg_weight[depth] = weight_add(prev_weight[depth], pkg_weight[depth - 1]);
         prev_weight[depth] = pkg_weight[depth - 1];
         depth--;
         count[next_depth++] = depth;
@@ -794,48 +794,65 @@ transmission_cost(const uint8_t *length, const uint32_t *frequency, uint32_t as)
 /* Assign prefix-free codes.  Return cost of transmiting the tree and
    all symbols it codes. */
 static uint32_t
-assign_codes(uint32_t count[], uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t n)
+assign_codes(uint32_t count[], uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t as)
 {
-  uint32_t i;
-  uint32_t k;
-  uint32_t d;
-  uint32_t c;
+  uint32_t leaf;
+  uint32_t avail;
+  uint32_t depth;
+  uint32_t next_code;
+  uint32_t symbol;
   uint64_t weight[MAX_ALPHA_SIZE];
 
   /* FIXME: this is copied from make_code_lengths() */
-  for (i = 0; i < n; i++) {
-    if (frequency[i] == 0)
-      weight[i] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+  for (leaf = 0; leaf < as; leaf++) {
+    if (frequency[leaf] == 0)
+      weight[leaf] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - leaf);
     else
-      weight[i] = ((uint64_t)frequency[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+      weight[leaf] = ((uint64_t)frequency[leaf] << 32) | 0x10000 | (MAX_ALPHA_SIZE - leaf);
   }
-  sort_alphabet(weight, weight + n);
+  sort_alphabet(weight, weight + as);
 
-  package_merge(count, weight, n, MAX_CODE_LENGTH);
+  package_merge(count, weight, as, MAX_CODE_LENGTH);
 
-  /* FIXME: this is copied from make_code_lengths() */
-  i = 0;
-  c = 0;
-  for (d = 0; d <= MAX_CODE_LENGTH; d++) {
-    k = count[d];
+  /* Generate code lengths and transform counts into base codes. */
+  leaf = 0;
+  next_code = 0;
+  for (depth = 1; depth <= MAX_CODE_LENGTH; depth++) {
+    avail = count[depth];
+    count[depth] = next_code;
+    next_code = (next_code + avail) << 1;
 
-    count[d] = c;
-    c = (c + k) << 1;
-
-    while (k != 0) {
-      assert(i < n);
-      length[MAX_ALPHA_SIZE - (weight[i] & 0xFFFF)] = d;
-      i++;
-      k--;
+    while (avail > 0) {
+      assert(leaf < as);
+      symbol = MAX_ALPHA_SIZE - (weight[leaf] & 0xFFFF);
+      length[symbol] = depth;
+      leaf++;
+      avail--;
     }
   }
-  assert(c == (1UL << (MAX_CODE_LENGTH + 1)));
-  assert(i == n);
+  assert(next_code == (1UL << (MAX_CODE_LENGTH + 1)));
+  assert(leaf == as);
 
-  for (i = 0; i < n; i++)
-    code[i] = count[length[i]]++;
+  /* Assign prefix-free codes. */
+  for (symbol = 0; symbol < as; symbol++)
+    code[symbol] = count[length[symbol]]++;
 
-  return transmission_cost(length, frequency, n);
+#ifdef ENABLE_TRACING
+  Trace(("  Prefix code dump:"));
+  for (symbol = 0; symbol < as; symbol++) {
+    static char buffer[MAX_HUFF_CODE_LENGTH+2];
+    char *p = buffer;
+    unsigned len = length[symbol];
+
+    while (len-- > 0)
+      *p++ = (code[symbol] & (1UL << len)) ? '1' : '0';
+    *p = 0;
+
+    Trace(("    symbol %3u has code %s", symbol, buffer));
+  }
+#endif
+
+  return transmission_cost(length, frequency, as);
 }
 
 
