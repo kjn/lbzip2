@@ -511,13 +511,13 @@ compute_depths(uint32_t *restrict count, uint32_t *restrict tree, uint32_t as)
 
   tree[1] = 0;     /* The root always has depth of 0. */
   count[0] = 0;    /* There are no zero-length codes in bzip2. */
-  node = 2;        /* The root is done, advance to the next node (of index 2). */
+  node = 2;        /* The root is done, advance to the next node (index 2). */
   depth = 1;       /* The root was the last node at depth 0, go deeper. */
   avail = 2;       /* At depth of 1 there are always exactly 2 nodes. */
 
   /* Repeat while we have more nodes. */
   while (depth <= MAX_HUFF_CODE_LENGTH) {
-    used = 0;      /* So far we haven't seen any internal nodes at this level. */
+    used = 0;    /* So far we haven't seen any internal nodes at this level. */
 
     while (node < as && tree[tree[node]] + 1 == depth) {
       assert(avail > used);
@@ -535,7 +535,8 @@ compute_depths(uint32_t *restrict count, uint32_t *restrict tree, uint32_t as)
 
 
 #define weight_add(w1,w2) ((((w1) + (w2)) & ~(uint64_t)0xFFFFFFFF) + \
-                           max((w1) & 0xFF000000, (w2) & 0xFF000000) + 0x01000000)
+                           max((w1) & 0xFF000000,                    \
+                               (w2) & 0xFF000000) + 0x01000000)
 
 /* The following is an implementation of the Package-Merge algorithm for
    finding an optimal length-limited prefix-free codeset.
@@ -573,8 +574,10 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
         prev_weight[depth] = leaf_weight[leaf];
       }
       else if (depth != 1) {
-        bcopy(&tree[depth - 1][0], &tree[depth][1], (depth - 1) * sizeof(uint16_t));
-        pkg_weight[depth] = weight_add(prev_weight[depth], pkg_weight[depth - 1]);
+        bcopy(&tree[depth - 1][0], &tree[depth][1],
+              (depth - 1) * sizeof(uint16_t));
+        pkg_weight[depth] = weight_add(prev_weight[depth],
+                                       pkg_weight[depth - 1]);
         prev_weight[depth] = pkg_weight[depth - 1];
         depth--;
         count[next_depth++] = depth;
@@ -611,10 +614,8 @@ make_code_lengths(uint8_t length[], uint32_t frequency[], uint32_t as)
        0000000000FF0000 - initially one
        000000000000FFFF - symbol
      */
-    if (frequency[i] == 0)
-      weight[i] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
-    else
-      weight[i] = ((uint64_t)frequency[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+    weight[i] = (((uint64_t)max(frequency[i], 1u) << 32) |
+                 0x10000 | (MAX_ALPHA_SIZE - i));
   }
 
   /* Sort weights and sequence numbers together. */
@@ -757,7 +758,8 @@ find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len_pack)
 /* Assign prefix-free codes.  Return cost of transmitting the tree and
    all symbols it codes. */
 static uint32_t
-assign_codes(uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t as)
+assign_codes(uint32_t *code, uint8_t *length,
+             const uint32_t *frequency, uint32_t as)
 {
   uint32_t leaf;
   uint32_t avail;
@@ -774,7 +776,8 @@ assign_codes(uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t a
   uint32_t cost;
 
   for (leaf = 0; leaf < as; leaf++)
-    leaf_weight[leaf] = ((uint64_t)frequency[leaf] << 32) | 0x10000 | (MAX_ALPHA_SIZE - leaf);
+    leaf_weight[leaf] = (((uint64_t)frequency[leaf] << 32) |
+                         0x10000 | (MAX_ALPHA_SIZE - leaf));
 
   sort_alphabet(leaf_weight, leaf_weight + as);
 
@@ -788,14 +791,16 @@ assign_codes(uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t a
     if ((1UL << height) < as)
       continue;
     if (tree[height][height - 1] == 0) {
-      Trace(("      (for heights >%u costs is the same as for height=%u)", height-1, height-1));
+      Trace(("      (for heights >%u costs is the same as for height=%u)",
+             height - 1, height - 1));
       break;
     }
 
     cost = 0;
     leaf = 0;
     for (depth = 1; depth <= height; depth++) {
-      for (avail = tree[height][depth - 1] - tree[height][depth]; avail > 0; avail--) {
+      for (avail = tree[height][depth - 1] - tree[height][depth];
+           avail > 0; avail--) {
         assert(leaf < as);
         symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf] & 0xFFFF);
         length[symbol] = depth;
