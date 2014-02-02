@@ -81,7 +81,6 @@ struct encoder_state {
   uint8_t *selectorMTF;
   uint32_t num_selectors;
   uint32_t num_trees;
-  uint32_t count[MAX_TREES][MAX_HUFF_CODE_LENGTH + 2];
   /* There is a sentinel symbol added at the end of each alphabet,
      hence the +1s below. */
   uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
@@ -593,7 +592,7 @@ package_merge(uint32_t *restrict count, const uint64_t *restrict leaf_weight, ui
 
 
 static void
-make_code_lengths(uint32_t count[], uint8_t length[], uint32_t frequency[], uint32_t as)
+make_code_lengths(uint8_t length[], uint32_t frequency[], uint32_t as)
 {
   uint32_t i;
   uint32_t k;
@@ -601,6 +600,7 @@ make_code_lengths(uint32_t count[], uint8_t length[], uint32_t frequency[], uint
   uint32_t c;
   uint64_t weight[MAX_ALPHA_SIZE];
   uint32_t V[MAX_ALPHA_SIZE];
+  uint32_t count[MAX_HUFF_CODE_LENGTH + 2];
 
   assert(as >= MIN_ALPHA_SIZE);
   assert(as <= MAX_ALPHA_SIZE);
@@ -629,13 +629,12 @@ make_code_lengths(uint32_t count[], uint8_t length[], uint32_t frequency[], uint
   build_tree(V, weight, as);
   compute_depths(count, V, as);
 
-  /* Generate code lengths and transform counts into base codes. */
+  /* Generate code lengths. */
   i = 0;
   c = 0;
   for (d = 0; d <= MAX_HUFF_CODE_LENGTH; d++) {
     k = count[d];
 
-    count[d] = c;
     c = (c + k) << 1;
 
     while (k != 0) {
@@ -794,7 +793,7 @@ transmission_cost(const uint8_t *length, const uint32_t *frequency, uint32_t as)
 /* Assign prefix-free codes.  Return cost of transmiting the tree and
    all symbols it codes. */
 static uint32_t
-assign_codes(uint32_t count[], uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t as)
+assign_codes(uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t as)
 {
   uint32_t leaf;
   uint32_t avail;
@@ -802,6 +801,7 @@ assign_codes(uint32_t count[], uint32_t code[], uint8_t length[], uint32_t frequ
   uint32_t next_code;
   uint32_t symbol;
   uint64_t weight[MAX_ALPHA_SIZE];
+  uint32_t count[MAX_HUFF_CODE_LENGTH + 2];
 
   /* FIXME: this is copied from make_code_lengths() */
   for (leaf = 0; leaf < as; leaf++) {
@@ -949,7 +949,7 @@ generate_prefix_code(struct encoder_state *s)
 
     /* (M): Maximization step -- maximize expectations. */
     for (t = 0; t < nt; t++)
-      make_code_lengths(s->count[t], s->length[t], s->frequency[t], as);
+      make_code_lengths(s->length[t], s->frequency[t], as);
   }
 
   cost = 0;
@@ -972,8 +972,7 @@ generate_prefix_code(struct encoder_state *s)
 
         /* Create lookup tables for this tree. These tables are used by the
            transmiter to quickly send codes for MTF values. */
-        cost += assign_codes(s->count[t], s->code[t], s->length[t],
-                             s->frequency[t], as);
+        cost += assign_codes(s->code[t], s->length[t], s->frequency[t], as);
         s->code[t][as] = 0;
         s->length[t][as] = 0;
       }
