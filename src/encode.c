@@ -53,6 +53,13 @@
 */
 
 
+/* Maximal code length that can possibly be generated using simple Huffman
+   algorighm is limited by maximal block size.  Generated codes should never be
+   longer than 30 bits because Fib(30+1) > MAX_BLOCK_SIZE+1.  (Huffman codes
+   are closely connected with the Fibonacci numbers.)  */
+#define MAX_HUFF_CODE_LENGTH 30
+
+
 struct encoder_state {
   bool cmap[256];
 
@@ -74,7 +81,7 @@ struct encoder_state {
   uint8_t *selectorMTF;
   uint32_t num_selectors;
   uint32_t num_trees;
-  uint32_t count[MAX_TREES][32];
+  uint32_t count[MAX_TREES][MAX_HUFF_CODE_LENGTH + 2];
   /* There is a sentinel symbol added at the end of each alphabet,
      hence the +1s below. */
   uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
@@ -445,7 +452,6 @@ sort_alphabet(uint64_t *first, uint64_t *last)
   }
 }
 
-#ifndef PACKAGE_MERGE
 
 /* Build a prefix-free tree.  Because the source alphabet is already sorted,
    we need not to maintain a priority queue -- two normal FIFO queues
@@ -528,8 +534,6 @@ compute_depths(uint32_t *restrict C, uint32_t *restrict T, uint32_t n)
   assert(a == 0);
 }
 
-#endif /*!PACKAGE_MERGE */
-
 
 #define weight_add(w1,w2) ((((w1) + (w2)) & ~(uint64_t)0xFFFFFFFF) + \
                            max((w1) & 0xFF000000, (w2) & 0xFF000000) + 0x01000000)
@@ -541,47 +545,7 @@ compute_depths(uint32_t *restrict C, uint32_t *restrict T, uint32_t n)
 static void
 package_merge(uint32_t *restrict C, const uint64_t *restrict P, uint32_t n)
 {
-  unsigned m = MAX_CODE_LENGTH;
-  uint16_t T[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH];
-  uint64_t U[MAX_CODE_LENGTH + 1];
-  uint64_t V[MAX_CODE_LENGTH + 1];
-  unsigned i, j, k, t;
-
-  U[0] = -1;
-  bzero(T, sizeof(T));
-
-  for (k = 1; k <= m; k++) {
-    T[k][0] = 2;
-    U[k] = weight_add(P[n-1], P[n-2]);
-    V[k] = P[n-2];
-  }
-
-  for (i = 2; i < n; i++) {
-    C[0] = m;
-    C[1] = m;
-    for (j = 2; j > 0;) {
-      k = C[--j];
-      t = n - T[k][0];
-      if (t > 0 && U[k - 1] > P[t-1]) {
-        T[k][0]++;
-        U[k] = weight_add(V[k], P[t-1]);
-        V[k] = P[t-1];
-      }
-      else if (k != 1) {
-        bcopy(&T[k - 1][0], &T[k][1],  (k - 1) * sizeof(uint16_t));
-        U[k] = weight_add(V[k], U[k - 1]);
-        V[k] = U[k - 1];
-        k--;
-        C[j++] = k;
-        C[j++] = k;
-      }
-    }
-  }
-
-  bzero(C, (MAX_CODE_LENGTH + 2) * sizeof(*C));
-  for (k = 1; k < m; k++)
-    C[k] = T[m][k - 1] - T[m][k];
-  C[m] = T[m][m - 1];
+  abort();
 }
 
 
@@ -589,10 +553,11 @@ static void
 make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
 {
   uint32_t i;
-  int32_t k;
-  int32_t d;
-  int32_t c;
+  uint32_t k;
+  uint32_t d;
+  uint32_t c;
   uint64_t P[MAX_ALPHA_SIZE];
+  uint32_t V[MAX_ALPHA_SIZE];
 
   assert(n >= MIN_ALPHA_SIZE);
   assert(n <= MAX_ALPHA_SIZE);
@@ -618,36 +583,13 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
   /* Sort weights and sequence numbers together. */
   sort_alphabet(P, P + n);
 
-  {
-#ifndef PACKAGE_MERGE
-    uint32_t V[MAX_ALPHA_SIZE];
-
-    build_tree(V, P, n);
-    compute_depths(C, V, n);
-  }
-
-  k = 0;
-  for (d = MAX_CODE_LENGTH + 1; d < 32; d++)
-    k += C[d];
-
-  /* If any code exceeds length limit, fallback to package-merge algorithm. */
-  if (k != 0) {
-    for (i = 0; i < n; i++) {
-      if (P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] == 0)
-        P[i] = ((uint64_t)1 << 32) | 0x10000 | (P[i] & 0xFFFF);
-      else
-        P[i] = ((uint64_t)P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] << 32)
-            | 0x10000 | (P[i] & 0xFFFF);
-    }
-#endif
-
-    package_merge(C, P, n);
-  }
+  build_tree(V, P, n);
+  compute_depths(C, V, n);
 
   /* Generate code lengths and transform counts into base codes. */
   i = 0;
   c = 0;
-  for (d = 0; d <= MAX_CODE_LENGTH; d++) {
+  for (d = 0; d <= MAX_HUFF_CODE_LENGTH; d++) {
     k = C[d];
 
     C[d] = c;
@@ -660,7 +602,7 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
       k--;
     }
   }
-  assert(c == (1UL << (MAX_CODE_LENGTH + 1)));
+  assert(c == (1UL << (MAX_HUFF_CODE_LENGTH + 1)));
   assert(i == n);
 }
 
