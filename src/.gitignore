@@ -1,0 +1,9 @@
+*.o
+*~
+.deps
+Makefile
+Makefile.in
+core
+crctab.c
+lbzip2
+scantab.h
