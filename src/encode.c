@@ -607,17 +607,6 @@ make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
 }
 
 
-static void
-assign_codes(uint32_t C[], uint32_t L[], uint8_t B[], uint32_t n)
-{
-  /* Assign prefix-free codes. */
-  uint32_t i;
-
-  for (i = 0; i < n; i++)
-    L[i] = C[B[i]]++;
-}
-
-
 /* Create initial mapping of symbols to trees.
 
    The goal is to divide all as symbols [0,as) into nt equivalence classes (EC)
@@ -759,6 +748,20 @@ transmission_cost(const uint8_t *length, const uint32_t *rfreq, uint32_t as)
 }
 
 
+/* Assign prefix-free codes.  Return cost of transmiting the tree and
+   all symbols it codes. */
+static uint32_t
+assign_codes(uint32_t C[], uint32_t L[], uint8_t B[], uint32_t P0[], uint32_t n)
+{
+  uint32_t i;
+
+  for (i = 0; i < n; i++)
+    L[i] = C[B[i]]++;
+
+  return transmission_cost(B, P0, n);
+}
+
+
 /* The main function generating prefix code for the whole block.
 
    Input: MTF values
@@ -875,12 +878,10 @@ generate_prefix_code(struct encoder_state *s)
 
         /* Create lookup tables for this tree. These tables are used by the
            transmiter to quickly send codes for MTF values. */
-        assign_codes(s->count[t], s->lookup[t], s->length[t], as);
+        cost += assign_codes(s->count[t], s->lookup[t], s->length[t],
+                             s->rfreq[t], as);
         s->lookup[t][as] = 0;
         s->length[t][as] = 0;
-
-        /* Compute cost of transmiting the tree and all symbols it codes. */
-        cost += transmission_cost(s->length[t], s->rfreq[t], as);
       }
     }
 
