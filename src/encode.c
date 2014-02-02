@@ -85,7 +85,7 @@ struct encoder_state {
   /* There is a sentinel symbol added at the end of each alphabet,
      hence the +1s below. */
   uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
-  uint32_t lookup[MAX_TREES][MAX_ALPHA_SIZE + 1];
+  uint32_t code[MAX_TREES][MAX_ALPHA_SIZE + 1];
   uint32_t frequency[MAX_TREES][MAX_ALPHA_SIZE + 1];
 
   unsigned tmap_old2new[MAX_TREES];
@@ -344,7 +344,7 @@ encode(struct encoder_state *s, uint32_t *crc)
 
   s->bwt_idx = divbwt(s->block, s->mtfv, s->nblock);
   free(s->block);
-  s->nmtf = do_mtf(s->mtfv, s->lookup[0], cmap, s->nblock, EOB);
+  s->nmtf = do_mtf(s->mtfv, s->code[0], cmap, s->nblock, EOB);
 
   cost = 48    /* header */
        + 32    /* crc */
@@ -676,7 +676,7 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
   /* Determine effective alphabet size. */
   as = 0;
   for (a = 0, cum = 0; cum < nm; a++) {
-    freq = s->lookup[0][a];
+    freq = s->code[0][a];
     cum += freq;
     as += min(freq, 1);
   }
@@ -694,12 +694,12 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
 
     /* Find a range of symbols which total count is roughly proportional to one
        nt-th of all values. */
-    freq = s->lookup[0][a];
+    freq = s->code[0][a];
     cum = freq;
     as -= min(freq, 1);
     b = a+1;
     while (as > nt-1 && cum * nt < nm) {
-      freq = s->lookup[0][b];
+      freq = s->code[0][b];
       cum += freq;
       as -= min(freq, 1);
       b++;
@@ -794,7 +794,7 @@ transmission_cost(const uint8_t *length, const uint32_t *frequency, uint32_t as)
 /* Assign prefix-free codes.  Return cost of transmiting the tree and
    all symbols it codes. */
 static uint32_t
-assign_codes(uint32_t count[], uint32_t lookup[], uint8_t length[], uint32_t frequency[], uint32_t n)
+assign_codes(uint32_t count[], uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t n)
 {
   uint32_t i;
   uint32_t k;
@@ -833,7 +833,7 @@ assign_codes(uint32_t count[], uint32_t lookup[], uint8_t length[], uint32_t fre
   assert(i == n);
 
   for (i = 0; i < n; i++)
-    lookup[i] = count[length[i]]++;
+    code[i] = count[length[i]]++;
 
   return transmission_cost(length, frequency, n);
 }
@@ -955,9 +955,9 @@ generate_prefix_code(struct encoder_state *s)
 
         /* Create lookup tables for this tree. These tables are used by the
            transmiter to quickly send codes for MTF values. */
-        cost += assign_codes(s->count[t], s->lookup[t], s->length[t],
+        cost += assign_codes(s->count[t], s->code[t], s->length[t],
                              s->frequency[t], as);
-        s->lookup[t][as] = 0;
+        s->code[t][as] = 0;
         s->length[t][as] = 0;
       }
     }
@@ -1083,7 +1083,7 @@ transmit(struct encoder_state *s, void *buf)
     unsigned mv;         /* symbol (MTF value) */
 
     t = s->selector[gr];
-    L = s->lookup[t];
+    L = s->code[t];
     B = s->length[t];
 
     for (i = 0; i < GROUP_SIZE; i++) {
