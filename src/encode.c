@@ -542,9 +542,10 @@ compute_depths(uint32_t *restrict count, uint32_t *restrict tree, uint32_t as)
 */
 
 static void
-package_merge(uint32_t *restrict count, const uint64_t *restrict leaf_weight, uint32_t as, uint32_t max_depth)
+package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
+              uint32_t *restrict count, const uint64_t *restrict leaf_weight,
+              uint32_t as, uint32_t max_depth)
 {
-  uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH];
   uint64_t pkg_weight[MAX_CODE_LENGTH + 1];
   uint64_t prev_weight[MAX_CODE_LENGTH + 1];
   uint32_t width;
@@ -553,7 +554,6 @@ package_merge(uint32_t *restrict count, const uint64_t *restrict leaf_weight, ui
   int32_t leaf;
 
   pkg_weight[0] = -1;
-  bzero(tree, sizeof(tree));
 
   for (depth = 1; depth <= max_depth; depth++) {
     tree[depth][0] = 2;
@@ -582,12 +582,6 @@ package_merge(uint32_t *restrict count, const uint64_t *restrict leaf_weight, ui
       }
     }
   }
-
-  count[0] = 0;
-  for (depth = 1; depth <= max_depth; depth++)
-    count[depth] = tree[max_depth][depth - 1] - tree[max_depth][depth];
-  count[max_depth] = tree[max_depth][max_depth - 1];
-  count[max_depth + 1] = 0;
 }
 
 
@@ -760,82 +754,91 @@ find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len_pack)
 }
 
 
-/* Compute bit cost of transmitting a single tree and all symbols it codes. */
-static uint32_t
-transmission_cost(const uint8_t *length, const uint32_t *frequency, uint32_t as)
-{
-  unsigned v;
-  unsigned p;
-  uint32_t cost;
-
-  /* Compute cost of transmiting RUNA symbols. */
-  cost = 6;  /* fixed code length (5bits) and delta code (1bit) */
-  p = length[0];
-  cost += frequency[0] * p;  /* cost of transmitting prefix codes */
-
-  /* Compute cost of transmiting all other symbols, from RUNB to EOB. */
-  for (v = 1; v < as; v++) {
-    int c, d;
-    c = length[v];
-    assert(c >= 1 && c <= 20);
-    d = p - c;
-    if (d < 0)
-      d = -d;
-    cost += 1 + 2 * d;  /* cost of transmitting delta code ... */
-    p = c;
-    cost += frequency[v] * length[v];  /* ... and prefix codes */
-  }
-
-  return cost;
-}
-
-
-/* Assign prefix-free codes.  Return cost of transmiting the tree and
+/* Assign prefix-free codes.  Return cost of transmitting the tree and
    all symbols it codes. */
 static uint32_t
 assign_codes(uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t as)
 {
   uint32_t leaf;
   uint32_t avail;
-  uint32_t depth;
+  uint32_t height;
   uint32_t next_code;
   uint32_t symbol;
-  uint64_t weight[MAX_ALPHA_SIZE];
+  uint64_t leaf_weight[MAX_ALPHA_SIZE];
   uint32_t count[MAX_HUFF_CODE_LENGTH + 2];
+  uint32_t base_code[MAX_CODE_LENGTH + 1];
+  uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1];
+  uint32_t best_cost;
+  uint32_t best_height;
+  uint32_t depth;
+  uint32_t cost;
 
-  /* FIXME: this is copied from make_code_lengths() */
-  for (leaf = 0; leaf < as; leaf++) {
-    if (frequency[leaf] == 0)
-      weight[leaf] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - leaf);
-    else
-      weight[leaf] = ((uint64_t)frequency[leaf] << 32) | 0x10000 | (MAX_ALPHA_SIZE - leaf);
+  for (leaf = 0; leaf < as; leaf++)
+    leaf_weight[leaf] = ((uint64_t)frequency[leaf] << 32) | 0x10000 | (MAX_ALPHA_SIZE - leaf);
+
+  sort_alphabet(leaf_weight, leaf_weight + as);
+
+  bzero(tree, sizeof(tree));
+  package_merge(tree, count, leaf_weight, as, MAX_CODE_LENGTH);
+
+  best_cost = -1;
+  best_height = MAX_CODE_LENGTH;
+
+  for (height = 2; height <= MAX_CODE_LENGTH; height++) {
+    if ((1UL << height) < as)
+      continue;
+    if (tree[height][height - 1] == 0) {
+      Trace(("      (for heights >%u costs is the same as for height=%u)", height-1, height-1));
+      break;
+    }
+
+    cost = 0;
+    leaf = 0;
+    for (depth = 1; depth <= height; depth++) {
+      for (avail = tree[height][depth - 1] - tree[height][depth]; avail > 0; avail--) {
+        assert(leaf < as);
+        symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf] & 0xFFFF);
+        length[symbol] = depth;
+        cost += (unsigned)(leaf_weight[leaf] >> 32) * depth;
+        leaf++;
+      }
+    }
+
+    for (symbol = 1; symbol < as; symbol++)
+      cost += 2 * max((int)length[symbol - 1] - (int)length[symbol],
+                      (int)length[symbol] - (int)length[symbol - 1]);
+    cost += 5 + as;
+
+    Trace(("    for height=%2u transmission cost is %7u", height, cost));
+    if (cost < best_cost) {
+      best_cost = cost;
+      best_height = height;
+    }
   }
-  sort_alphabet(weight, weight + as);
+  Trace(("  best tree height is %u", best_height));
 
-  package_merge(count, weight, as, MAX_CODE_LENGTH);
-
-  /* Generate code lengths and transform counts into base codes. */
+  /* Generate code lengths and base codes. */
   leaf = 0;
   next_code = 0;
-  for (depth = 1; depth <= MAX_CODE_LENGTH; depth++) {
-    avail = count[depth];
-    count[depth] = next_code;
+  for (depth = 1; depth <= best_height; depth++) {
+    avail = tree[best_height][depth - 1] - tree[best_height][depth];
+    base_code[depth] = next_code;
     next_code = (next_code + avail) << 1;
 
     while (avail > 0) {
       assert(leaf < as);
-      symbol = MAX_ALPHA_SIZE - (weight[leaf] & 0xFFFF);
+      symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf] & 0xFFFF);
       length[symbol] = depth;
       leaf++;
       avail--;
     }
   }
-  assert(next_code == (1UL << (MAX_CODE_LENGTH + 1)));
+  assert(next_code == (1UL << (best_height + 1)));
   assert(leaf == as);
 
   /* Assign prefix-free codes. */
   for (symbol = 0; symbol < as; symbol++)
-    code[symbol] = count[length[symbol]]++;
+    code[symbol] = base_code[length[symbol]]++;
 
 #ifdef ENABLE_TRACING
   Trace(("  Prefix code dump:"));
@@ -852,7 +855,7 @@ assign_codes(uint32_t code[], uint8_t length[], uint32_t frequency[], uint32_t a
   }
 #endif
 
-  return transmission_cost(length, frequency, as);
+  return best_cost;
 }
 
 
