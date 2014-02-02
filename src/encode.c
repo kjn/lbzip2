@@ -797,6 +797,40 @@ static uint32_t
 assign_codes(uint32_t C[], uint32_t L[], uint8_t B[], uint32_t P0[], uint32_t n)
 {
   uint32_t i;
+  uint32_t k;
+  uint32_t d;
+  uint32_t c;
+  uint64_t P[MAX_ALPHA_SIZE];
+
+  /* FIXME: this is copied from make_code_lengths() */
+  for (i = 0; i < n; i++) {
+    if (P0[i] == 0)
+      P[i] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+    else
+      P[i] = ((uint64_t)P0[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+  }
+  sort_alphabet(P, P + n);
+
+  package_merge(C, P, n, MAX_CODE_LENGTH);
+
+  /* FIXME: this is copied from make_code_lengths() */
+  i = 0;
+  c = 0;
+  for (d = 0; d <= MAX_CODE_LENGTH; d++) {
+    k = C[d];
+
+    C[d] = c;
+    c = (c + k) << 1;
+
+    while (k != 0) {
+      assert(i < n);
+      B[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] = d;
+      i++;
+      k--;
+    }
+  }
+  assert(c == (1UL << (MAX_CODE_LENGTH + 1)));
+  assert(i == n);
 
   for (i = 0; i < n; i++)
     L[i] = C[B[i]]++;
