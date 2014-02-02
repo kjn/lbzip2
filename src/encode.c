@@ -543,9 +543,52 @@ compute_depths(uint32_t *restrict C, uint32_t *restrict T, uint32_t n)
 */
 
 static void
-package_merge(uint32_t *restrict C, const uint64_t *restrict P, uint32_t n)
+package_merge(uint32_t *restrict C, const uint64_t *restrict P, uint32_t n, uint32_t m)
 {
-  abort();
+  uint16_t T[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH];
+  uint64_t U[MAX_CODE_LENGTH + 1];
+  uint64_t V[MAX_CODE_LENGTH + 1];
+  uint32_t i;
+  int32_t j;
+  uint32_t k;
+  int32_t t;
+
+  U[0] = -1;
+  bzero(T, sizeof(T));
+
+  for (k = 1; k <= m; k++) {
+    T[k][0] = 2;
+    U[k] = P[n - 1] + P[n - 2];
+    V[k] = P[n - 2];
+  }
+
+  for (i = 2; i < n; i++) {
+    C[0] = m;
+    C[1] = m;
+    for (j = 1; j >= 0; j--) {
+      k = C[j];
+      t = n - T[k][0] - 1;
+      if (t >= 0 && U[k - 1] > P[t]) {
+	T[k][0]++;
+	U[k] = V[k] + P[t];
+	V[k] = P[t];
+      }
+      else if (k != 1) {
+	bcopy(&T[k - 1][0], &T[k][1], (k - 1) * sizeof(uint16_t));
+	U[k] = V[k] + U[k - 1];
+	V[k] = U[k - 1];
+	k--;
+	C[j++] = k;
+	C[j++] = k;
+      }
+    }
+  }
+
+  C[0] = 0;
+  for (k = 1; k <= m; k++)
+    C[k] = T[m][k - 1] - T[m][k];
+  C[m] = T[m][m - 1];
+  C[m + 1] = 0;
 }
 
 
