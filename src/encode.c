@@ -558,8 +558,8 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
 
   for (depth = 1; depth <= max_depth; depth++) {
     tree[depth][0] = 2;
-    pkg_weight[depth] = weight_add(leaf_weight[as - 1], leaf_weight[as - 2]);
-    prev_weight[depth] = leaf_weight[as - 2];
+    pkg_weight[depth] = weight_add(leaf_weight[as], leaf_weight[as - 1]);
+    prev_weight[depth] = leaf_weight[as - 1];
   }
 
   for (width = 2; width < as; width++) {
@@ -567,8 +567,8 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
     count[1] = max_depth;
     for (next_depth = 1; next_depth >= 0; next_depth--) {
       depth = count[next_depth];
-      leaf = as - tree[depth][0] - 1;
-      if (leaf >= 0 && pkg_weight[depth - 1] > leaf_weight[leaf]) {
+      leaf = as - tree[depth][0];
+      if (pkg_weight[depth - 1] > leaf_weight[leaf]) {
         tree[depth][0]++;
         pkg_weight[depth] = weight_add(prev_weight[depth], leaf_weight[leaf]);
         prev_weight[depth] = leaf_weight[leaf];
@@ -766,7 +766,7 @@ assign_codes(uint32_t *code, uint8_t *length,
   uint32_t height;
   uint32_t next_code;
   uint32_t symbol;
-  uint64_t leaf_weight[MAX_ALPHA_SIZE];
+  uint64_t leaf_weight[MAX_ALPHA_SIZE + 1];
   uint32_t count[MAX_HUFF_CODE_LENGTH + 2];
   uint32_t base_code[MAX_CODE_LENGTH + 1];
   uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1];
@@ -776,10 +776,11 @@ assign_codes(uint32_t *code, uint8_t *length,
   uint32_t cost;
 
   for (leaf = 0; leaf < as; leaf++)
-    leaf_weight[leaf] = (((uint64_t)frequency[leaf] << 32) |
-                         0x10000 | (MAX_ALPHA_SIZE - leaf));
+    leaf_weight[leaf + 1] = (((uint64_t)frequency[leaf] << 32) |
+                             0x10000 | (MAX_ALPHA_SIZE - leaf));
 
-  sort_alphabet(leaf_weight, leaf_weight + as);
+  sort_alphabet(leaf_weight + 1, leaf_weight + as + 1);
+  leaf_weight[0] = -1;
 
   bzero(tree, sizeof(tree));
   package_merge(tree, count, leaf_weight, as, MAX_CODE_LENGTH);
@@ -802,9 +803,9 @@ assign_codes(uint32_t *code, uint8_t *length,
       for (avail = tree[height][depth - 1] - tree[height][depth];
            avail > 0; avail--) {
         assert(leaf < as);
-        symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf] & 0xFFFF);
+        symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf + 1] & 0xFFFF);
         length[symbol] = depth;
-        cost += (unsigned)(leaf_weight[leaf] >> 32) * depth;
+        cost += (unsigned)(leaf_weight[leaf + 1] >> 32) * depth;
         leaf++;
       }
     }
@@ -832,7 +833,7 @@ assign_codes(uint32_t *code, uint8_t *length,
 
     while (avail > 0) {
       assert(leaf < as);
-      symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf] & 0xFFFF);
+      symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf + 1] & 0xFFFF);
       length[symbol] = depth;
       leaf++;
       avail--;
