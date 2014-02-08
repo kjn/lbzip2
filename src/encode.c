@@ -574,8 +574,8 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
         prev_weight[depth] = leaf_weight[leaf];
       }
       else if (depth != 1) {
-        bcopy(&tree[depth - 1][0], &tree[depth][1],
-              (depth - 1) * sizeof(uint16_t));
+        memcpy(&tree[depth][1], &tree[depth - 1][0],
+               MAX_CODE_LENGTH * sizeof(uint16_t));
         pkg_weight[depth] = weight_add(prev_weight[depth],
                                        pkg_weight[depth - 1]);
         prev_weight[depth] = pkg_weight[depth - 1];
