@@ -545,18 +545,18 @@ compute_depths(uint32_t *restrict count, uint32_t *restrict tree, uint32_t as)
 static void
 package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
               uint32_t *restrict count, const uint64_t *restrict leaf_weight,
-              uint32_t as, uint32_t max_depth)
+              uint_fast32_t as)
 {
   uint64_t pkg_weight[MAX_CODE_LENGTH + 1];
   uint64_t prev_weight[MAX_CODE_LENGTH + 1];
   uint64_t curr_weight[MAX_CODE_LENGTH + 1];
-  uint32_t width;
-  int32_t next_depth;
-  uint32_t depth;
+  uint_fast32_t width;
+  uint_fast32_t next_depth;
+  uint_fast32_t depth;
 
   pkg_weight[0] = -1;
 
-  for (depth = 1; depth <= max_depth; depth++) {
+  for (depth = 1; depth <= MAX_CODE_LENGTH; depth++) {
     tree[depth][0] = 2;
     pkg_weight[depth] = weight_add(leaf_weight[as], leaf_weight[as - 1]);
     prev_weight[depth] = leaf_weight[as - 1];
@@ -564,26 +564,32 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
   }
 
   for (width = 2; width < as; width++) {
-    count[0] = max_depth;
-    count[1] = max_depth;
-    for (next_depth = 1; next_depth >= 0; next_depth--) {
-      depth = count[next_depth];
-      if (pkg_weight[depth - 1] > curr_weight[depth]) {
+    count[0] = MAX_CODE_LENGTH;
+    depth = MAX_CODE_LENGTH;
+    next_depth = 1;
+    for (;;) {
+      if (pkg_weight[depth - 1] <= curr_weight[depth]) {
+        if (likely(depth != 1)) {
+          memcpy(&tree[depth][1], &tree[depth - 1][0],
+                 MAX_CODE_LENGTH * sizeof(uint16_t));
+          pkg_weight[depth] = weight_add(prev_weight[depth],
+                                         pkg_weight[depth - 1]);
+          prev_weight[depth] = pkg_weight[depth - 1];
+          depth--;
+          count[next_depth++] = depth;
+          continue;
+        }
+      }
+      else {
         tree[depth][0]++;
         pkg_weight[depth] = weight_add(prev_weight[depth], curr_weight[depth]);
         prev_weight[depth] = curr_weight[depth];
         curr_weight[depth] = leaf_weight[as - tree[depth][0]];
       }
-      else if (depth != 1) {
-        memcpy(&tree[depth][1], &tree[depth - 1][0],
-               MAX_CODE_LENGTH * sizeof(uint16_t));
-        pkg_weight[depth] = weight_add(prev_weight[depth],
-                                       pkg_weight[depth - 1]);
-        prev_weight[depth] = pkg_weight[depth - 1];
-        depth--;
-        count[next_depth++] = depth;
-        count[next_depth++] = depth;
-      }
+      if (unlikely(next_depth == 0))
+        break;
+      next_depth--;
+      depth = count[next_depth];
     }
   }
 }
@@ -784,7 +790,7 @@ assign_codes(uint32_t *code, uint8_t *length,
   leaf_weight[0] = -1;
 
   bzero(tree, sizeof(tree));
-  package_merge(tree, count, leaf_weight, as, MAX_CODE_LENGTH);
+  package_merge(tree, count, leaf_weight, as);
 
   best_cost = -1;
   best_height = MAX_CODE_LENGTH;
