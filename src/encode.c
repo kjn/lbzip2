@@ -549,10 +549,10 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
 {
   uint64_t pkg_weight[MAX_CODE_LENGTH + 1];
   uint64_t prev_weight[MAX_CODE_LENGTH + 1];
+  uint64_t curr_weight[MAX_CODE_LENGTH + 1];
   uint32_t width;
   int32_t next_depth;
   uint32_t depth;
-  int32_t leaf;
 
   pkg_weight[0] = -1;
 
@@ -560,6 +560,7 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
     tree[depth][0] = 2;
     pkg_weight[depth] = weight_add(leaf_weight[as], leaf_weight[as - 1]);
     prev_weight[depth] = leaf_weight[as - 1];
+    curr_weight[depth] = leaf_weight[as - 2];
   }
 
   for (width = 2; width < as; width++) {
@@ -567,11 +568,11 @@ package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
     count[1] = max_depth;
     for (next_depth = 1; next_depth >= 0; next_depth--) {
       depth = count[next_depth];
-      leaf = as - tree[depth][0];
-      if (pkg_weight[depth - 1] > leaf_weight[leaf]) {
+      if (pkg_weight[depth - 1] > curr_weight[depth]) {
         tree[depth][0]++;
-        pkg_weight[depth] = weight_add(prev_weight[depth], leaf_weight[leaf]);
-        prev_weight[depth] = leaf_weight[leaf];
+        pkg_weight[depth] = weight_add(prev_weight[depth], curr_weight[depth]);
+        prev_weight[depth] = curr_weight[depth];
+        curr_weight[depth] = leaf_weight[as - tree[depth][0]];
       }
       else if (depth != 1) {
         memcpy(&tree[depth][1], &tree[depth - 1][0],
