@@ -1,7 +1,7 @@
 /*-
   compress.c -- high-level compression routines
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2014 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -45,28 +45,17 @@ struct work_blk {
   struct position pos;
 
   struct encoder_state *enc;
-  size_t size;
-  uint32_t crc;
-  int last;
-  size_t weight;
-};
-
-
-struct out_blk {
-  struct position pos;
-
   void *buffer;
   size_t size;
   uint32_t crc;
-  int last;
   size_t weight;
 };
 
 
 static struct pqueue(struct in_blk *) coll_q;
 static struct pqueue(struct work_blk *) trans_q;
-static struct pqueue(struct out_blk *) reord_q;
-static struct position reord_pos;
+static struct pqueue(struct work_blk *) reord_q;
+static struct deque(struct work_blk *) order_q;
 static uintmax_t next_id;       /* next free input block sequence number */
 static uint32_t combined_crc;
 
@@ -102,14 +91,12 @@ do_collect(void)
   iblk->next += wblk->weight;
 
   if (0u < iblk->left) {
-    wblk->last = 0;
     ++iblk->pos.minor;
     sched_lock();
     enqueue(coll_q, iblk);
     sched_unlock();
   }
   else {
-    wblk->last = 1;
     source_release_buffer(iblk->buffer);
     free(iblk);
   }
@@ -119,6 +106,7 @@ do_collect(void)
 
   sched_lock();
   enqueue(trans_q, wblk);
+  push(order_q, wblk);
 }
 
 
@@ -126,8 +114,7 @@ static bool
 can_transmit(void)
 {
   return !empty(trans_q) && (out_slots > TRANSM_THRESH ||
-                             (out_slots > 0 && pos_eq(peek(trans_q)->pos,
-                                                      reord_pos)));
+                             (out_slots > 0 && peek(trans_q) == dq_get(order_q, 0)));
 }
 
 
@@ -135,59 +122,41 @@ static void
 do_transmit(void)
 {
   struct work_blk *wblk;
-  struct out_blk *oblk;
 
   wblk = dequeue(trans_q);
   --out_slots;
   sched_unlock();
 
-  oblk = XMALLOC(struct out_blk);
-
-  oblk->pos = wblk->pos;
-  oblk->crc = wblk->crc;
-  oblk->last = wblk->last;
-  oblk->size = wblk->size;
-  oblk->weight = wblk->weight;
-
   /* Allocate the output buffer and transmit the block into it. */
-  oblk->buffer = XNMALLOC((oblk->size + 3) / 4, uint32_t);
+  wblk->buffer = XNMALLOC((wblk->size + 3) / 4, uint32_t);
 
-  transmit(wblk->enc, oblk->buffer);
-  free(wblk);
+  transmit(wblk->enc, wblk->buffer);
 
   sched_lock();
   ++work_units;
-  enqueue(reord_q, oblk);
+  enqueue(reord_q, wblk);
 }
 
 
 static bool
 can_reorder(void)
 {
-  return !empty(reord_q) && pos_eq(peek(reord_q)->pos, reord_pos);
+  return !empty(reord_q) && peek(reord_q) == dq_get(order_q, 0);
 }
 
 
 static void
 do_reorder(void)
 {
-  struct out_blk *oblk;
-  int last;
+  struct work_blk *wblk;
 
-  oblk = dequeue(reord_q);
+  wblk = dequeue(reord_q);
+  (void)shift(order_q);
 
-  sink_write_buffer(oblk->buffer, oblk->size, oblk->weight);
-  combined_crc = combine_crc(combined_crc, oblk->crc);
-  last = oblk->last;
-  free(oblk);
+  sink_write_buffer(wblk->buffer, wblk->size, wblk->weight);
+  combined_crc = combine_crc(combined_crc, wblk->crc);
 
-  if (last) {
-    ++reord_pos.major;
-    reord_pos.minor = 0u;
-  }
-  else {
-    ++reord_pos.minor;
-  }
+  free(wblk);
 }
 
 
@@ -268,9 +237,8 @@ init(void)
   pqueue_init(coll_q, in_slots);
   pqueue_init(trans_q, work_units);
   pqueue_init(reord_q, out_slots);
+  deque_init(order_q, max(work_units, out_slots));
 
-  reord_pos.major = 0;
-  reord_pos.minor = 0;
   next_id = 0;
 
   assert(1 <= bs100k && bs100k <= 9);
@@ -288,6 +256,7 @@ uninit(void)
   pqueue_uninit(coll_q);
   pqueue_uninit(trans_q);
   pqueue_uninit(reord_q);
+  deque_uninit(order_q);
 }
 
 
