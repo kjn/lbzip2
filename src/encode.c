@@ -62,6 +62,8 @@
 
 struct encoder_state {
   bool cmap[256];
+  int rle_state;
+  unsigned rle_character;
 
   uint32_t block_crc;
 
@@ -116,6 +118,9 @@ encoder_init(unsigned long max_block_size, unsigned cluster_factor)
   s->block = XNMALLOC(max_block_size + 1, uint8_t);
 
   bzero(s->cmap, 256u * sizeof(bool));
+  s->rle_state = 0;
+  s->block_crc = -1;
+  s->nblock = 0;
 
   return s;
 }
@@ -128,29 +133,52 @@ collect(struct encoder_state *s, const uint8_t *inbuf, size_t *buf_sz)
   size_t avail = *buf_sz;
   const uint8_t *p = inbuf;
   const uint8_t *pLim = p + avail;
-  uint8_t *q = s->block;
+  uint8_t *q = s->block + s->nblock;
   uint8_t *qMax = s->block + s->max_block_size - 1;
   unsigned ch, last;
   uint32_t run;
   uint32_t save_crc;
-  uint32_t crc = -1;
+  uint32_t crc = s->block_crc;
+
+  /* State can't be equal to MAX_RUN_LENGTH because the run would have
+     already been dumped by the previous function call. */
+  assert(s->rle_state >= 0 && s->rle_state < MAX_RUN_LENGTH);
+
+  /* Finish any existing runs before starting a new one. */
+  if (unlikely(s->rle_state != 0)) {
+    ch = s->rle_character;
+    goto finish_run;
+  }
 
 state0:
   /*=== STATE 0 ===*/
-  if (unlikely(q > qMax || p == pLim))
+  if (unlikely(q > qMax)) {
+    s->rle_state = -1;
     goto done;
+  }
+  if (unlikely(p == pLim)) {
+    s->rle_state = 0;
+    goto done;
+  }
   ch = *p++;
   CRC(ch);
 
 #define S1                                      \
   s->cmap[ch] = true;                           \
   *q++ = ch;                                    \
-  if (unlikely (q > qMax || p == pLim))         \
+  if (unlikely(q > qMax)) {                     \
+    s->rle_state = -1;                          \
     goto done;                                  \
+  }                                             \
+  if (unlikely(p == pLim)) {                    \
+    s->rle_state = 1;                           \
+    s->rle_character = ch;                      \
+    goto done;                                  \
+  }                                             \
   last = ch;                                    \
   ch = *p++;                                    \
-  CRC (ch);                                     \
-  if (unlikely (ch == last))                    \
+  CRC(ch);                                      \
+  if (unlikely(ch == last))                     \
     goto state2
 
 state1:
@@ -164,8 +192,15 @@ state1:
 state2:
   /*=== STATE 2 ===*/
   *q++ = ch;
-  if (unlikely(q > qMax || p == pLim))
+  if (unlikely(q > qMax)) {
+    s->rle_state = -1;
     goto done;
+  }
+  if (unlikely(p == pLim)) {
+    s->rle_state = 2;
+    s->rle_character = ch;
+    goto done;
+  }
   ch = *p++;
   CRC(ch);
   if (ch != last)
@@ -173,10 +208,15 @@ state2:
 
   /*=== STATE 3 ===*/
   *q++ = ch;
-
-  if (unlikely((q >= qMax && (q > qMax || (p < pLim && *p == last))) ||
-               p == pLim))
+  if (unlikely(q >= qMax && (q > qMax || (p < pLim && *p == last)))) {
+    s->rle_state = -1;
     goto done;
+  }
+  if (unlikely(p == pLim)) {
+    s->rle_state = 3;
+    s->rle_character = ch;
+    goto done;
+  }
   ch = *p++;
   CRC(ch);
   if (ch != last)
@@ -191,8 +231,8 @@ state2:
   for (run = 4; run < MAX_RUN_LENGTH; run++) {
     /* Check for end of input buffer. */
     if (unlikely(p == pLim)) {
-      *q++ = run - 4;
-      s->cmap[run - 4] = true;
+      s->rle_state = run;
+      s->rle_character = ch;
       goto done;
     }
 
@@ -213,6 +253,7 @@ state2:
          Unget the last character and finish. */
       p--;
       crc = save_crc;
+      s->rle_state = -1;
       goto done;
     }
   }
@@ -222,6 +263,65 @@ state2:
   *q++ = MAX_RUN_LENGTH - 4;
   s->cmap[MAX_RUN_LENGTH - 4] = true;
   goto state0;
+
+finish_run:
+  /* There is an unfinished run from the previous call, try to finish it. */
+  if (q >= qMax && (q > qMax || (s->rle_state == 3 && p < pLim && *p == ch))) {
+    s->rle_state = -1;
+    goto done;
+  }
+
+  /* We have run out of input bytes before finishing the run. */
+  if (p == pLim)
+    goto done;
+
+  /* If the run is at least 4 characters long, treat it specifically. */
+  if (s->rle_state >= 4) {
+    /* Make sure we really have a long run. */
+    assert(s->rle_state >= 4);
+    assert(q <= qMax);
+
+    while (p < pLim) {
+      /* Lookahead the next character. Terminate current run
+         if lookahead character doesn't match. */
+      if (*p != ch) {
+        *q++ = s->rle_state - 4;
+        s->cmap[s->rle_state - 4] = true;
+        goto state0;
+      }
+
+      /* Lookahead character turned out to be continuation of the run.
+         Consume it and increase run length. */
+      p++;
+      CRC(ch);
+      s->rle_state++;
+
+      /* If the run has reached length of MAX_RUN_LENGTH,
+         we have to terminate it prematurely (i.e. now). */
+      if (s->rle_state == MAX_RUN_LENGTH) {
+        *q++ = MAX_RUN_LENGTH - 4;
+        s->cmap[MAX_RUN_LENGTH - 4] = true;
+        goto state0;
+      }
+    }
+
+    /* We have ran out of input bytes before finishing the run. */
+    goto done;
+  }
+
+  /* Lookahead the next character. Terminate current run
+     if lookahead character does not match. */
+  if (*p != ch)
+    goto state0;
+
+  /* Append the character to the run. */
+  p++;
+  CRC(ch);
+  s->rle_state++;
+  *q++ = ch;
+
+  /* We haven't finished the run yet, so keep going. */
+  goto finish_run;
 
 done:
   s->nblock = q - s->block;
@@ -332,6 +432,13 @@ encode(struct encoder_state *s, uint32_t *crc)
   uint32_t EOB;
   uint8_t cmap[256];
 
+  /* Finalize initial RLE. */
+  if (s->rle_state >= 4) {
+    assert(s->nblock < s->max_block_size);
+    s->block[s->nblock++] = s->rle_state - 4;
+    s->cmap[s->rle_state - 4] = true;
+  }
+  assert(s->nblock > 0);
 
   EOB = make_map_e(cmap, s->cmap) + 1;
   assert(EOB >= 2);
