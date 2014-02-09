@@ -58,12 +58,14 @@ static struct pqueue(struct work_blk *) reord_q;
 static struct deque(struct work_blk *) order_q;
 static uintmax_t next_id;       /* next free input block sequence number */
 static uint32_t combined_crc;
+static bool collect_token = true;
+static struct work_blk *unfinished_work;
 
 
 static bool
 can_collect(void)
 {
-  return !empty(coll_q) && work_units > 0;
+  return !ultra && !empty(coll_q) && work_units > 0;
 }
 
 
@@ -105,6 +107,77 @@ do_collect(void)
   wblk->size = encode(wblk->enc, &wblk->crc);
 
   sched_lock();
+  enqueue(trans_q, wblk);
+  push(order_q, wblk);
+}
+
+
+static bool
+can_collect_seq(void)
+{
+  return ultra && collect_token && (!empty(coll_q) || (eof && unfinished_work != NULL)) && (work_units > 0 || unfinished_work != NULL);
+}
+
+
+static void
+do_collect_seq(void)
+{
+  struct in_blk *iblk;
+  struct work_blk *wblk;
+  bool done = true;
+
+  wblk = unfinished_work;
+  unfinished_work = NULL;
+  if (wblk == NULL)
+    --work_units;
+
+  iblk = NULL;
+  if (!empty(coll_q))
+    iblk = dequeue(coll_q);
+
+  collect_token = false;
+  sched_unlock();
+
+  /* Allocate an encoder with given block size and default parameters. */
+  if (wblk == NULL) {
+    wblk = XMALLOC(struct work_blk);
+    wblk->pos = iblk->pos;
+    wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
+    wblk->weight = 0;
+  }
+
+  /* Collect as much data as we can. */
+  if (iblk != NULL) {
+    wblk->size = iblk->left;
+    done = collect(wblk->enc, iblk->next, &iblk->left);
+    wblk->size -= iblk->left;
+    wblk->weight += wblk->size;
+    iblk->next += wblk->size;
+
+    if (0u < iblk->left) {
+      ++iblk->pos.minor;
+      sched_lock();
+      enqueue(coll_q, iblk);
+      sched_unlock();
+    }
+    else {
+      source_release_buffer(iblk->buffer);
+      free(iblk);
+    }
+  }
+
+  if (!done) {
+    sched_lock();
+    collect_token = true;
+    unfinished_work = wblk;
+    return;
+  }
+
+  /* Do the hard work. */
+  wblk->size = encode(wblk->enc, &wblk->crc);
+
+  sched_lock();
+  collect_token = true;
   enqueue(trans_q, wblk);
   push(order_q, wblk);
 }
@@ -261,10 +334,11 @@ uninit(void)
 
 
 static const struct task task_list[] = {
-  { "reorder",  can_reorder,  do_reorder  },
-  { "transmit", can_transmit, do_transmit },
-  { "collect",  can_collect,  do_collect  },
-  { NULL,       NULL,         NULL        },
+  { "collect_seq", can_collect_seq, do_collect_seq },
+  { "reorder",     can_reorder,     do_reorder     },
+  { "transmit",    can_transmit,    do_transmit    },
+  { "collect",     can_collect,     do_collect     },
+  { NULL,          NULL,            NULL           },
 };
 
 const struct process compression = {

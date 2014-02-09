@@ -46,6 +46,7 @@ bool keep;                      /* -k */
 bool verbose;                   /* -v */
 bool print_cctrs;               /* -S */
 bool small;                     /* -s */
+bool ultra;                     /* -u */
 struct filespec ispec;
 struct filespec ospec;
 
@@ -494,6 +495,10 @@ opts_setup(struct arg **operands, size_t argc, char **argv)
 
             case 's':
               small = 1;
+              break;
+
+            case 'u':
+              ultra = 1;
               break;
 
             case 'v':

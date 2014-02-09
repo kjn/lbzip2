@@ -126,7 +126,7 @@ encoder_init(unsigned long max_block_size, unsigned cluster_factor)
 }
 
 
-void
+int
 collect(struct encoder_state *s, const uint8_t *inbuf, size_t *buf_sz)
 {
   /* Cache some often used member variables for faster access. */
@@ -327,6 +327,7 @@ done:
   s->nblock = q - s->block;
   s->block_crc = crc;
   *buf_sz -= p - inbuf;
+  return s->rle_state < 0;
 }
 
 
