@@ -219,24 +219,25 @@ G.\n  -z, --compress     : Force compression over the selection by PROG.\n  -1\
 he default.\n  -f, --force        : Open non-regular input files. Open input f\
 iles with more\n                       than one", " link. Try to remove each o\
 utput file before\n                       opening it. With `-cd' copy files no\
-t in bzip2 format.\n  -u, --sequential   : Perform splitting input blocks sequ\
-entially. This may\n                       improve compression ratio and decre\
-ase CPU usage, but\n                       will degrade scalability.\n  -v, --\
-verbose      : Log each (de)compression start to stderr. Display\n            \
-           compression ratio and space savings. Display progress\n            \
-           informatio", "n if stderr is connected to a terminal.\n  -S        \
-         : Print condition variable statistics to stderr.\n  -s, --small, -q,\
-\n  --quiet,\n  --repetitive-fast,\n  --repetitive-best,\n  --exponential     \
- : Accepted for compatibility, otherwise ignored.\n  -h, --help         : Prin\
-t this help to stdout and exit.\n  -L, --license, -V,\n  --version          : \
-Print version information to stdout and exit.\n\nOperands:\n\n  FILE          \
-     : Specify files to compress or decompress. If no FILE is\n               \
-   ", "     given, work as a filter. FILEs with `.bz2', `.tbz',\n             \
-          `.tbz2' and `.tz2' name suffixes will be skipped when\n             \
-          compressing. When decompressing, `.bz2' suffixes will be\n          \
-             removed in output filenames; `.tbz', `.tbz2' and `.tz2'\n        \
-               suffixes will be replaced by `.tar'; other filenames\n         \
-              will be suffixed with `.out'.\n"
+t in bzip2 format.\n  -s, --small        : Reduce memory usage at cost of perf\
+ormance.\n  -u, --sequential   : Perform splitting input blocks sequentially. \
+This may\n                       improve compression ratio and decrease CPU us\
+age, but\n                       will degrade scalability.\n  -v, --verbose   \
+   : Log each (de)compression start to stderr. Display\n                      \
+ compression ratio an", "d space savings. Display progress\n                  \
+     information if stderr is connected to a terminal.\n  -S                 :\
+ Print condition variable statistics to stderr.\n  -q, --quiet,\n  --repetitiv\
+e-fast,\n  --repetitive-best,\n  --exponential      : Accepted for compatibili\
+ty, otherwise ignored.\n  -h, --help         : Print this help to stdout and e\
+xit.\n  -L, --license, -V,\n  --version          : Print version information t\
+o stdout and exit.\n\nOperands:\n\n  FILE               : Specify files to com\
+p", "ress or decompress. If no FILE is\n                       given, work as \
+a filter. FILEs with `.bz2', `.tbz',\n                       `.tbz2' and `.tz2\
+' name suffixes will be skipped when\n                       compressing. When\
+ decompressing, `.bz2' suffixes will be\n                       removed in out\
+put filenames; `.tbz', `.tbz2' and `.tz2'\n                       suffixes wil\
+l be replaced by `.tar'; other filenames\n                       will be suffi\
+xed with `.out'.\n"
 
 #define HELP_STRING "%s version %s\n%s\n\n%s%s",                        \
     PACKAGE_NAME, PACKAGE_VERSION, "http://lbzip2.org/",                \

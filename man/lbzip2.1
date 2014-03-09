@@ -23,19 +23,19 @@ lbzip2 \- parallel bzip2 utility
 .SH SYNOPSIS
 .BR lbzip2 "|" bzip2 " [" \-n
 .IR WTHRS ]
-.RB [ \-k "|" \-c "|" \-t "] [" \-d "] [" \-1 " .. " \-9 "] [" \-f "] [" \-u ]
-.RB [ \-v "] [" \-S "] ["
+.RB [ \-k "|" \-c "|" \-t "] [" \-d "] [" \-1 " .. " \-9 "] [" \-f "] [" \-s ]
+.RB [ \-u "] [" \-v "] [" \-S "] ["
 .IR "FILE ... " ]
 
 .BR lbunzip2 "|" bunzip2 " [" \-n
 .IR WTHRS ]
-.RB [ \-k "|" \-c "|" \-t "] [" \-z "] [" \-f "] [" \-u "] [" \-v ]
+.RB [ \-k "|" \-c "|" \-t "] [" \-z "] [" \-f "] [" \-s "] [" \-u "] [" \-v ]
 .RB [ \-S "] ["
 .IR "FILE ... " ]
 
 .BR lbzcat "|" bzcat " [" \-n
 .IR WTHRS ]
-.RB [ \-z "] [" \-f "] [" \-u "] [" \-v ]
+.RB [ \-z "] [" \-f "] [" \-s "] [" \-u "] [" \-v ]
 .RB [ \-S "] ["
 .IR "FILE ... " ]
 
@@ -158,6 +158,10 @@ change; without
 would stop after reaching a file that is not in bzip2 format.
 
 .TP
+.BR \-s ", " \-\-small
+Reduce memory usage at cost of performance.
+
+.TP
 .BR \-u ", " \-\-sequential
 Perform splitting input blocks sequentially. This may improve compression ratio
 and decrease CPU usage, but will degrade scalability.
@@ -178,7 +182,7 @@ Print condition variable statistics to standard error for each completed
 (de)compression operation. Useful in profiling.
 
 .TP
-.BR \-s ", " \-\-small ", " \-q ", " \-\-quiet ", " \-\-repetitive\-fast ", " \
+.BR \-q ", " \-\-quiet ", " \-\-repetitive\-fast ", " \
     \-\-repetitive\-best ", " \-\-exponential
 Accepted for compatibility with
 .BR bzip2 ,
