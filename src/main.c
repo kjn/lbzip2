@@ -241,7 +241,7 @@ xed with `.out'.\n"
 
 #define HELP_STRING "%s version %s\n%s\n\n%s%s",                        \
     PACKAGE_NAME, PACKAGE_VERSION, "http://lbzip2.org/",                \
-    "Copyright (C) 2011, 2012 Mikolaj Izdebski\n"                       \
+    "Copyright (C) 2011, 2012, 2013, 2014 Mikolaj Izdebski\n"           \
     "Copyright (C) 2008, 2009, 2010 Laszlo Ersek\n"                     \
     "\n"                                                                \
     "This program is free software: you can redistribute it and/or modify\n" \
