@@ -433,6 +433,9 @@ opts_setup(struct arg **operands, size_t argc, char **argv)
           else if (0 == strcmp("small", argscan)) {
             small = 1;
           }
+          else if (0 == strcmp("sequential", argscan)) {
+            ultra = 1;
+          }
           else if (0 == strcmp("verbose", argscan)) {
             verbose = 1;
           }
