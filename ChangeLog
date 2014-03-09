@@ -1,3 +1,124 @@
+2014-03-09  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Release version 2.4
+
+	Update copyright notice in usage help
+
+	Add release notes for version 2.4
+
+	Document --small
+
+	Document --sequential
+
+	Add ---sequential CLI switch
+
+	Don't remove build-aux/.gitignore during cleanup
+
+2014-02-16  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Avoid scanning in sequential mode
+
+2014-02-09  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Implement sequential collector
+
+	Introduce order queue to compressor
+
+	Implement restartable collector
+	Now collector can potentially be stopped and restarted, allowing input
+	blocks to be much smaller than compression block.  This feature used
+	to be implemented in older versions of yambi.
+
+	Reorder code in package_merge()
+
+2014-02-08  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Cache current leaf weight at current depth in curr_weight[]
+
+	Reduce branching in Package-Merge
+	Add sentinel at the beginning of leaf_weight[] allows skipping bounds
+	check, which reduces branches in a tight loop.
+
+	Use memcpy() instead of bcopy()
+	memcpy() can be faster for non-overlapping memory regions.  Also using
+	constant length should be faster as optimizing compilers are expected
+	to fully inline and unroll the whole memcpy() call.
+
+2014-02-02  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Wrap lines which exceed 80 characters
+
+	Rewrite cost computation code
+
+	Code length counts don't need to be global
+
+	Optimize assign_codes() and add tracing code
+
+	Rename confusing variable lookup to code
+
+	Make variables names in prefix encoder more human-readable
+
+	Integrate Package-Merge with encoder
+
+	Port new Package-Merge implementation from Java
+
+	Compute cost when assigning prefix code
+
+	Remove old implementation of Package-Merge
+
+	Add .gitignore files
+
+2014-01-27  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Update copyright notices
+
+	Fix parser bug (overrun2)
+	* src/parse.c (parse): Backport parser bugfix from lbzip2-java
+	commit 4424921.
+
+	Rewrite Package-Merge
+	* src/encode.c (package_merge): Rewrite from scratch basing on
+	Java implementation in lbzip2-java.
+
+2014-01-18  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Add reproducer for parser bug
+
+2013-12-10  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Document code in process.h
+
+	Document block header parsing functions
+
+	Remove dead code
+	* src/parse.c (parse): Remove code that is executed
+	  under condition that is asserted to be false.
+
+	Explain existence of two different block parsing algorithms
+
+	Avoid integer overflow with some 32-bit versions of Perl
+	build-aux/make-crctab.pl: Avoid using arthmetic operators
+	in favor of bit shift and immediate constants.
+
+2013-10-27  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Fix another typo in tests/codelen20.c
+
+	Fix a typo in tests/codelen20.c
+
+	Add test case for bug #12 (rhbz#1017957)
+
+	Properly initialize base code sentinel in make_tree()
+	* src/decode.c (make_tree): make sure that base code sentinel
+	(base[21]) is always set to plus infinity.  Fixes #12.
+
+2013-10-13  Mikolaj Izdebski  <zurgunt@gmail.com>
+
+	Update automake to 1.14
+	* configure.ac: Bump automake version to 1.14.
+	* tests/Makefile.am: Update to use new test driver API.
+	* build-aux/autogen.sh: Remove build-aux/compile during cleanup.
+
 2013-09-22  Mikolaj Izdebski  <zurgunt@gmail.com>
 
 	Release version 2.3
