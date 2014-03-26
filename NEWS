@@ -11,7 +11,7 @@ NEWS for lbzip2                                                 -*- outline -*-
 
    This version also fixes a performance bug which prevented
    sequential compressor from fully utilizing all available threads,
-   which resultes in very poor performance.
+   which resulted in very poor performance.
 
 * What's new in lbzip2 2.4
 
