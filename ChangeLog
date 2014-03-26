@@ -1,5 +1,9 @@
 2014-03-26  Mikolaj Izdebski  <zurgunt@gmail.com>
 
+	Fix performance bug in sequential compressor code
+	* src/compress.c (do_collect_seq): Release collect semaphore before
+	compressing block.  This improves performance a lot.
+
 	Fix block ordering during compression
 	* src/compress.c: Replace order deque with next position pointer
 	stored in work block.  This way block order doesn't have to be defined

@@ -181,11 +181,14 @@ do_collect_seq(void)
     return;
   }
 
+  sched_lock();
+  collect_token = true;
+  sched_unlock();
+
   /* Do the hard work. */
   wblk->size = encode(wblk->enc, &wblk->crc);
 
   sched_lock();
-  collect_token = true;
   enqueue(trans_q, wblk);
 }
 
