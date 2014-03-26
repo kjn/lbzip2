@@ -1,5 +1,7 @@
 2014-03-26  Mikolaj Izdebski  <zurgunt@gmail.com>
 
+	Release version 2.5
+
 	Fix performance bug in sequential compressor code
 	* src/compress.c (do_collect_seq): Release collect semaphore before
 	compressing block.  This improves performance a lot.

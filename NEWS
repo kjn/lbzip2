@@ -1,6 +1,18 @@
 NEWS for lbzip2                                                 -*- outline -*-
 
 
+* What's new in lbzip2 2.5
+
+** Bug fixes
+
+   Version 2.5 fixes a compressor bug introduced in lbzip2 2.4.  This
+   bug manifests in assertion failure or deadlock when compressing
+   data.
+
+   This version also fixes a performance bug which prevented
+   sequential compressor from fully utilizing all available threads,
+   which resultes in very poor performance.
+
 * What's new in lbzip2 2.4
 
 ** Bug fixes
