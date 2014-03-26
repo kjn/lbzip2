@@ -5,6 +5,7 @@ lbzip2 (2.5-1) unstable; urgency=low
     - fixed several major and minor bugs.
   * debian/patches/automake-1.14: Remove patch, upstream has switched
     to Automake 1.14.
+  * debian/control: Bump Standards-Version to 3.9.5.
 
  -- Mikolaj Izdebski <zurgunt@gmail.com>  Wed, 26 Mar 2014 22:53:18 +0100
 
