@@ -1,7 +1,7 @@
 /*-
   encode.c -- low-level compressor
 
-  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013, 2014 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -53,8 +53,17 @@
 */
 
 
+/* Maximal code length that can possibly be generated using simple Huffman
+   algorighm is limited by maximal block size.  Generated codes should never be
+   longer than 30 bits because Fib(30+1) > MAX_BLOCK_SIZE+1.  (Huffman codes
+   are closely connected with the Fibonacci numbers.)  */
+#define MAX_HUFF_CODE_LENGTH 30
+
+
 struct encoder_state {
   bool cmap[256];
+  int rle_state;
+  unsigned rle_character;
 
   uint32_t block_crc;
 
@@ -74,12 +83,11 @@ struct encoder_state {
   uint8_t *selectorMTF;
   uint32_t num_selectors;
   uint32_t num_trees;
-  uint32_t count[MAX_TREES][32];
   /* There is a sentinel symbol added at the end of each alphabet,
      hence the +1s below. */
   uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
-  uint32_t lookup[MAX_TREES][MAX_ALPHA_SIZE + 1];
-  uint32_t rfreq[MAX_TREES][MAX_ALPHA_SIZE + 1];
+  uint32_t code[MAX_TREES][MAX_ALPHA_SIZE + 1];
+  uint32_t frequency[MAX_TREES][MAX_ALPHA_SIZE + 1];
 
   unsigned tmap_old2new[MAX_TREES];
   unsigned tmap_new2old[MAX_TREES];
@@ -110,41 +118,67 @@ encoder_init(unsigned long max_block_size, unsigned cluster_factor)
   s->block = XNMALLOC(max_block_size + 1, uint8_t);
 
   bzero(s->cmap, 256u * sizeof(bool));
+  s->rle_state = 0;
+  s->block_crc = -1;
+  s->nblock = 0;
 
   return s;
 }
 
 
-void
+int
 collect(struct encoder_state *s, const uint8_t *inbuf, size_t *buf_sz)
 {
   /* Cache some often used member variables for faster access. */
   size_t avail = *buf_sz;
   const uint8_t *p = inbuf;
   const uint8_t *pLim = p + avail;
-  uint8_t *q = s->block;
+  uint8_t *q = s->block + s->nblock;
   uint8_t *qMax = s->block + s->max_block_size - 1;
   unsigned ch, last;
   uint32_t run;
   uint32_t save_crc;
-  uint32_t crc = -1;
+  uint32_t crc = s->block_crc;
+
+  /* State can't be equal to MAX_RUN_LENGTH because the run would have
+     already been dumped by the previous function call. */
+  assert(s->rle_state >= 0 && s->rle_state < MAX_RUN_LENGTH);
+
+  /* Finish any existing runs before starting a new one. */
+  if (unlikely(s->rle_state != 0)) {
+    ch = s->rle_character;
+    goto finish_run;
+  }
 
 state0:
   /*=== STATE 0 ===*/
-  if (unlikely(q > qMax || p == pLim))
+  if (unlikely(q > qMax)) {
+    s->rle_state = -1;
     goto done;
+  }
+  if (unlikely(p == pLim)) {
+    s->rle_state = 0;
+    goto done;
+  }
   ch = *p++;
   CRC(ch);
 
 #define S1                                      \
   s->cmap[ch] = true;                           \
   *q++ = ch;                                    \
-  if (unlikely (q > qMax || p == pLim))         \
+  if (unlikely(q > qMax)) {                     \
+    s->rle_state = -1;                          \
     goto done;                                  \
+  }                                             \
+  if (unlikely(p == pLim)) {                    \
+    s->rle_state = 1;                           \
+    s->rle_character = ch;                      \
+    goto done;                                  \
+  }                                             \
   last = ch;                                    \
   ch = *p++;                                    \
-  CRC (ch);                                     \
-  if (unlikely (ch == last))                    \
+  CRC(ch);                                      \
+  if (unlikely(ch == last))                     \
     goto state2
 
 state1:
@@ -158,8 +192,15 @@ state1:
 state2:
   /*=== STATE 2 ===*/
   *q++ = ch;
-  if (unlikely(q > qMax || p == pLim))
+  if (unlikely(q > qMax)) {
+    s->rle_state = -1;
     goto done;
+  }
+  if (unlikely(p == pLim)) {
+    s->rle_state = 2;
+    s->rle_character = ch;
+    goto done;
+  }
   ch = *p++;
   CRC(ch);
   if (ch != last)
@@ -167,10 +208,15 @@ state2:
 
   /*=== STATE 3 ===*/
   *q++ = ch;
-
-  if (unlikely((q >= qMax && (q > qMax || (p < pLim && *p == last))) ||
-               p == pLim))
+  if (unlikely(q >= qMax && (q > qMax || (p < pLim && *p == last)))) {
+    s->rle_state = -1;
     goto done;
+  }
+  if (unlikely(p == pLim)) {
+    s->rle_state = 3;
+    s->rle_character = ch;
+    goto done;
+  }
   ch = *p++;
   CRC(ch);
   if (ch != last)
@@ -185,8 +231,8 @@ state2:
   for (run = 4; run < MAX_RUN_LENGTH; run++) {
     /* Check for end of input buffer. */
     if (unlikely(p == pLim)) {
-      *q++ = run - 4;
-      s->cmap[run - 4] = true;
+      s->rle_state = run;
+      s->rle_character = ch;
       goto done;
     }
 
@@ -207,6 +253,7 @@ state2:
          Unget the last character and finish. */
       p--;
       crc = save_crc;
+      s->rle_state = -1;
       goto done;
     }
   }
@@ -217,10 +264,70 @@ state2:
   s->cmap[MAX_RUN_LENGTH - 4] = true;
   goto state0;
 
+finish_run:
+  /* There is an unfinished run from the previous call, try to finish it. */
+  if (q >= qMax && (q > qMax || (s->rle_state == 3 && p < pLim && *p == ch))) {
+    s->rle_state = -1;
+    goto done;
+  }
+
+  /* We have run out of input bytes before finishing the run. */
+  if (p == pLim)
+    goto done;
+
+  /* If the run is at least 4 characters long, treat it specifically. */
+  if (s->rle_state >= 4) {
+    /* Make sure we really have a long run. */
+    assert(s->rle_state >= 4);
+    assert(q <= qMax);
+
+    while (p < pLim) {
+      /* Lookahead the next character. Terminate current run
+         if lookahead character doesn't match. */
+      if (*p != ch) {
+        *q++ = s->rle_state - 4;
+        s->cmap[s->rle_state - 4] = true;
+        goto state0;
+      }
+
+      /* Lookahead character turned out to be continuation of the run.
+         Consume it and increase run length. */
+      p++;
+      CRC(ch);
+      s->rle_state++;
+
+      /* If the run has reached length of MAX_RUN_LENGTH,
+         we have to terminate it prematurely (i.e. now). */
+      if (s->rle_state == MAX_RUN_LENGTH) {
+        *q++ = MAX_RUN_LENGTH - 4;
+        s->cmap[MAX_RUN_LENGTH - 4] = true;
+        goto state0;
+      }
+    }
+
+    /* We have ran out of input bytes before finishing the run. */
+    goto done;
+  }
+
+  /* Lookahead the next character. Terminate current run
+     if lookahead character does not match. */
+  if (*p != ch)
+    goto state0;
+
+  /* Append the character to the run. */
+  p++;
+  CRC(ch);
+  s->rle_state++;
+  *q++ = ch;
+
+  /* We haven't finished the run yet, so keep going. */
+  goto finish_run;
+
 done:
   s->nblock = q - s->block;
   s->block_crc = crc;
   *buf_sz -= p - inbuf;
+  return s->rle_state < 0;
 }
 
 
@@ -326,6 +433,13 @@ encode(struct encoder_state *s, uint32_t *crc)
   uint32_t EOB;
   uint8_t cmap[256];
 
+  /* Finalize initial RLE. */
+  if (s->rle_state >= 4) {
+    assert(s->nblock < s->max_block_size);
+    s->block[s->nblock++] = s->rle_state - 4;
+    s->cmap[s->rle_state - 4] = true;
+  }
+  assert(s->nblock > 0);
 
   EOB = make_map_e(cmap, s->cmap) + 1;
   assert(EOB >= 2);
@@ -337,7 +451,7 @@ encode(struct encoder_state *s, uint32_t *crc)
 
   s->bwt_idx = divbwt(s->block, s->mtfv, s->nblock);
   free(s->block);
-  s->nmtf = do_mtf(s->mtfv, s->lookup[0], cmap, s->nblock, EOB);
+  s->nmtf = do_mtf(s->mtfv, s->code[0], cmap, s->nblock, EOB);
 
   cost = 48    /* header */
        + 32    /* crc */
@@ -445,48 +559,47 @@ sort_alphabet(uint64_t *first, uint64_t *last)
   }
 }
 
-#ifndef PACKAGE_MERGE
 
 /* Build a prefix-free tree.  Because the source alphabet is already sorted,
    we need not to maintain a priority queue -- two normal FIFO queues
    (one for leaves and one for internal nodes) will suffice.
  */
 static void
-build_tree(uint32_t *restrict T, uint64_t *restrict P, int32_t n)
+build_tree(uint32_t *restrict tree, uint64_t *restrict weight, int32_t as)
 {
   unsigned r;  /* index of the next tree in the queue */
   unsigned s;  /* index of the next singleton leaf */
   unsigned t;  /**/
   uint64_t w1, w2;
 
-  r = n;
-  s = n;       /* Start with the last singleton tree. */
+  r = as;
+  s = as;      /* Start with the last singleton tree. */
 
-  for (t = n-1; t > 0; t--) {
-    if (s < 1 || (r > t+2 && P[r-2] < P[s-1])) {
+  for (t = as-1; t > 0; t--) {
+    if (s < 1 || (r > t+2 && weight[r-2] < weight[s-1])) {
       /* Select two internal nodes. */
-      T[r-1] = t;
-      T[r-2] = t;
-      w1 = P[r-1];
-      w2 = P[r-2];
+      tree[r-1] = t;
+      tree[r-2] = t;
+      w1 = weight[r-1];
+      w2 = weight[r-2];
       r -= 2;
     }
-    else if (r < t+2 || (s > 1 && P[s-2] <= P[r-1])) {
+    else if (r < t+2 || (s > 1 && weight[s-2] <= weight[r-1])) {
       /* Select two singleton leaf nodes. */
-      w1 = P[s-1];
-      w2 = P[s-2];
+      w1 = weight[s-1];
+      w2 = weight[s-2];
       s -= 2;
     }
     else {
       /* Select one internal node and one singleton leaf node. */
-      T[r-1] = t;
-      w1 = P[r-1];
-      w2 = P[s-1];
+      tree[r-1] = t;
+      w1 = weight[r-1];
+      w2 = weight[s-1];
       s--;
       r--;
     }
 
-    P[t] = (P[t] & 0xFFFF) + ((w1 + w2) & ~(uint64_t)0xFF00FFFF) +
+    weight[t] = (weight[t] & 0xFFFF) + ((w1 + w2) & ~(uint64_t)0xFF00FFFF) +
       max(w1 & 0xFF000000, w2 & 0xFF000000) + 0x01000000;
   }
   assert(r == 2);
@@ -497,215 +610,152 @@ build_tree(uint32_t *restrict T, uint64_t *restrict P, int32_t n)
 
 /* Compute counts from given Huffman tree.  The tree itself is clobbered. */
 static void
-compute_depths(uint32_t *restrict C, uint32_t *restrict T, uint32_t n)
+compute_depths(uint32_t *restrict count, uint32_t *restrict tree, uint32_t as)
 {
-  uint32_t a;    /* total number of nodes at current level */
-  uint32_t u;    /* number of internal nodes */
-  uint32_t t;    /* current tree node */
-  uint32_t d;    /* current node depth */
+  uint32_t avail;  /* total number of nodes at current level */
+  uint32_t used;   /* number of internal nodes */
+  uint32_t node;   /* current tree node */
+  uint32_t depth;  /* current node depth */
 
-  T[1] = 0;      /* The root always has depth of 0. */
-  C[0] = 0;      /* There are no zero-length codes in bzip2. */
-  t = 2;         /* The root is done, advance to the next node (of index 2). */
-  d = 1;         /* The root was the last node at depth 0, go deeper. */
-  a = 2;         /* At depth of 1 there are always exactly 2 nodes. */
+  tree[1] = 0;     /* The root always has depth of 0. */
+  count[0] = 0;    /* There are no zero-length codes in bzip2. */
+  node = 2;        /* The root is done, advance to the next node (index 2). */
+  depth = 1;       /* The root was the last node at depth 0, go deeper. */
+  avail = 2;       /* At depth of 1 there are always exactly 2 nodes. */
 
   /* Repeat while we have more nodes. */
-  while (d < 32) {
-    u = 0;       /* So far we haven't seen any internal nodes at this level. */
+  while (depth <= MAX_HUFF_CODE_LENGTH) {
+    used = 0;    /* So far we haven't seen any internal nodes at this level. */
 
-    while (t < n && T[T[t]] + 1 == d) {
-      assert(a > u);
-      u++;
-      T[t++] = d;  /* Overwrite parent pointer with node depth. */
+    while (node < as && tree[tree[node]] + 1 == depth) {
+      assert(avail > used);
+      used++;
+      tree[node++] = depth;  /* Overwrite parent pointer with node depth. */
     }
 
-    C[d] = a - u;
-    d++;
-    a = u << 1;
+    count[depth] = avail - used;
+    depth++;
+    avail = used << 1;
   }
 
-  assert(a == 0);
+  assert(avail == 0);
 }
 
-#endif /*!PACKAGE_MERGE */
 
+#define weight_add(w1,w2) ((((w1) + (w2)) & ~(uint64_t)0xFFFFFFFF) + \
+                           max((w1) & 0xFF000000,                    \
+                               (w2) & 0xFF000000) + 0x01000000)
 
 /* The following is an implementation of the Package-Merge algorithm for
    finding an optimal length-limited prefix-free codeset.
 */
 
 static void
-package_merge(uint32_t *restrict C, const uint64_t *restrict Pr, uint32_t n)
+package_merge(uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1],
+              uint32_t *restrict count, const uint64_t *restrict leaf_weight,
+              uint_fast32_t as)
 {
-#define BITS_PER_SYMBOL 9       /* ceil(log2(MAX_ALPHA_SIZE)) */
-#define SYMBOLS_PER_WORD 7      /* floor(64 / BITS_PER_SYMBOL) */
-#define VECTOR_SIZE 3           /* ceil(MAX_CODE_LENGTH / SYMBOLS_PER_WORD) */
-#define QUEUE_SIZE (MAX_ALPHA_SIZE - 1)
-/* It can be easily proved by induction that number of elemnts stored
-   in the queue is always stricly less elements than alphabet size. */
+  uint64_t pkg_weight[MAX_CODE_LENGTH + 1];
+  uint64_t prev_weight[MAX_CODE_LENGTH + 1];
+  uint64_t curr_weight[MAX_CODE_LENGTH + 1];
+  uint_fast32_t width;
+  uint_fast32_t next_depth;
+  uint_fast32_t depth;
 
-  uint64_t W[2*QUEUE_SIZE];     /* internal node weights */
-  uint64_t P[2*QUEUE_SIZE][VECTOR_SIZE];
+  pkg_weight[0] = -1;
 
-  unsigned x;                   /* number of unprocessed singleton nodes */
-  unsigned i;                   /* general purpose index */
-  unsigned k;                   /* vector index */
-  unsigned d;                   /* current node depth */
-  unsigned jP;                  /* current index in queue P */
-  unsigned jL;                  /* current index in queue L */
-  unsigned szP;                 /* current size of queue P */
-  unsigned iP;                  /* current offset of head of queue P */
-  uint64_t dw;                  /* symbol weight at current depth */
+  for (depth = 1; depth <= MAX_CODE_LENGTH; depth++) {
+    tree[depth][0] = 2;
+    pkg_weight[depth] = weight_add(leaf_weight[as], leaf_weight[as - 1]);
+    prev_weight[depth] = leaf_weight[as - 1];
+    curr_weight[depth] = leaf_weight[as - 2];
+  }
 
-  iP = MAX_CODE_LENGTH % 2 * (MAX_ALPHA_SIZE - 1);
-  szP = 0;
-
-  d = VECTOR_SIZE - 1;
-  dw = (uint64_t)1 << (MAX_CODE_LENGTH % SYMBOLS_PER_WORD * BITS_PER_SYMBOL);
-  for (;;) {
-    dw >>= BITS_PER_SYMBOL;
-    d += -!dw;
-    if (d+1 == 0)
-      break;
-    dw += -!dw & ((uint64_t)1 << ((SYMBOLS_PER_WORD - 1) * BITS_PER_SYMBOL));
-
-    x = n;
-    jP = iP;
-    iP ^= MAX_ALPHA_SIZE - 1;
-    jL = iP;
-
-    for (jL = iP; x + szP > 1; jL++) {
-      if (szP == 0 || (x > 1 && Pr[x-2] < W[jP])) {
-        W[jL] = Pr[x-1] + Pr[x-2];
-        for (k = 0; k < VECTOR_SIZE; k++)
-          P[jL][k] = 0;
-        P[jL][d] += 2 * dw;
-        x -= 2;
-      }
-      else if (x == 0 || (szP > 1 && W[jP+1] <= Pr[x-1])) {
-        W[jL] = W[jP] + W[jP+1];
-        for (k = 0; k < VECTOR_SIZE; k++)
-          P[jL][k] = P[jP][k] + P[jP+1][k];
-        jP += 2;
-        szP -= 2;
+  for (width = 2; width < as; width++) {
+    count[0] = MAX_CODE_LENGTH;
+    depth = MAX_CODE_LENGTH;
+    next_depth = 1;
+    for (;;) {
+      if (pkg_weight[depth - 1] <= curr_weight[depth]) {
+        if (likely(depth != 1)) {
+          memcpy(&tree[depth][1], &tree[depth - 1][0],
+                 MAX_CODE_LENGTH * sizeof(uint16_t));
+          pkg_weight[depth] = weight_add(prev_weight[depth],
+                                         pkg_weight[depth - 1]);
+          prev_weight[depth] = pkg_weight[depth - 1];
+          depth--;
+          count[next_depth++] = depth;
+          continue;
+        }
       }
       else {
-        W[jL] = W[jP] + Pr[x-1];
-        for (k = 0; k < VECTOR_SIZE; k++)
-          P[jL][k] = P[jP][k];
-        P[jL][d] += dw;
-        jP++;
-        x--;
-        szP--;
+        tree[depth][0]++;
+        pkg_weight[depth] = weight_add(prev_weight[depth], curr_weight[depth]);
+        prev_weight[depth] = curr_weight[depth];
+        curr_weight[depth] = leaf_weight[as - tree[depth][0]];
       }
+      if (unlikely(next_depth == 0))
+        break;
+      next_depth--;
+      depth = count[next_depth];
     }
-
-    szP = jL - iP;
-    assert(szP >= n/2);
-    assert(szP < n);
   }
-  assert(iP == 0);
-  assert(szP == n-1);
-
-  k = VECTOR_SIZE * SYMBOLS_PER_WORD;
-  for (i = VECTOR_SIZE; i--;) {
-    dw = P[szP-1][i];
-    for (d = SYMBOLS_PER_WORD * BITS_PER_SYMBOL; d;)
-      C[k--] = (dw >> (d -= BITS_PER_SYMBOL)) & 0x1ff;
-  }
-  C[0] = 0;
 }
 
 
 static void
-make_code_lengths(uint32_t C[], uint8_t L[], uint32_t P0[], uint32_t n)
+make_code_lengths(uint8_t length[], uint32_t frequency[], uint32_t as)
 {
   uint32_t i;
-  int32_t k;
-  int32_t d;
-  int32_t c;
-  uint64_t P[MAX_ALPHA_SIZE];
+  uint32_t k;
+  uint32_t d;
+  uint32_t c;
+  uint64_t weight[MAX_ALPHA_SIZE];
+  uint32_t V[MAX_ALPHA_SIZE];
+  uint32_t count[MAX_HUFF_CODE_LENGTH + 2];
 
-  assert(n >= MIN_ALPHA_SIZE);
-  assert(n <= MAX_ALPHA_SIZE);
+  assert(as >= MIN_ALPHA_SIZE);
+  assert(as <= MAX_ALPHA_SIZE);
 
   /* Label weights with sequence numbers.
      Labelling has two main purposes: firstly it allows to sort pairs of weight
      and sequence number more easily; secondly: the package-merge algorithm
      requires weights to be strictly monotonous and putting unique values in
      lower bits assures that. */
-  for (i = 0; i < n; i++) {
+  for (i = 0; i < as; i++) {
     /*
        FFFFFFFF00000000 - symbol frequency
        00000000FF000000 - node depth
        0000000000FF0000 - initially one
        000000000000FFFF - symbol
      */
-    if (P0[i] == 0)
-      P[i] = ((uint64_t)1 << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
-    else
-      P[i] = ((uint64_t)P0[i] << 32) | 0x10000 | (MAX_ALPHA_SIZE - i);
+    weight[i] = (((uint64_t)max(frequency[i], 1u) << 32) |
+                 0x10000 | (MAX_ALPHA_SIZE - i));
   }
 
   /* Sort weights and sequence numbers together. */
-  sort_alphabet(P, P + n);
+  sort_alphabet(weight, weight + as);
 
-  {
-#ifndef PACKAGE_MERGE
-    uint32_t V[MAX_ALPHA_SIZE];
+  build_tree(V, weight, as);
+  compute_depths(count, V, as);
 
-    build_tree(V, P, n);
-    compute_depths(C, V, n);
-  }
-
-  k = 0;
-  for (d = MAX_CODE_LENGTH + 1; d < 32; d++)
-    k += C[d];
-
-  /* If any code exceeds length limit, fallback to package-merge algorithm. */
-  if (k != 0) {
-    for (i = 0; i < n; i++) {
-      if (P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] == 0)
-        P[i] = ((uint64_t)1 << 32) | 0x10000 | (P[i] & 0xFFFF);
-      else
-        P[i] = ((uint64_t)P0[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] << 32)
-            | 0x10000 | (P[i] & 0xFFFF);
-    }
-#endif
-
-    package_merge(C, P, n);
-  }
-
-  /* Generate code lengths and transform counts into base codes. */
+  /* Generate code lengths. */
   i = 0;
   c = 0;
-  for (d = 0; d <= MAX_CODE_LENGTH; d++) {
-    k = C[d];
+  for (d = 0; d <= MAX_HUFF_CODE_LENGTH; d++) {
+    k = count[d];
 
-    C[d] = c;
     c = (c + k) << 1;
 
     while (k != 0) {
-      assert(i < n);
-      L[MAX_ALPHA_SIZE - (P[i] & 0xFFFF)] = d;
+      assert(i < as);
+      length[MAX_ALPHA_SIZE - (weight[i] & 0xFFFF)] = d;
       i++;
       k--;
     }
   }
-  assert(c == (1UL << (MAX_CODE_LENGTH + 1)));
-  assert(i == n);
-}
-
-
-static void
-assign_codes(uint32_t C[], uint32_t L[], uint8_t B[], uint32_t n)
-{
-  /* Assign prefix-free codes. */
-  uint32_t i;
-
-  for (i = 0; i < n; i++)
-    L[i] = C[B[i]]++;
+  assert(c == (1UL << (MAX_HUFF_CODE_LENGTH + 1)));
+  assert(i == as);
 }
 
 
@@ -735,7 +785,7 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
   /* Determine effective alphabet size. */
   as = 0;
   for (a = 0, cum = 0; cum < nm; a++) {
-    freq = s->lookup[0][a];
+    freq = s->code[0][a];
     cum += freq;
     as += min(freq, 1);
   }
@@ -753,12 +803,12 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
 
     /* Find a range of symbols which total count is roughly proportional to one
        nt-th of all values. */
-    freq = s->lookup[0][a];
+    freq = s->code[0][a];
     cum = freq;
     as -= min(freq, 1);
     b = a+1;
     while (as > nt-1 && cum * nt < nm) {
-      freq = s->lookup[0][b];
+      freq = s->code[0][b];
       cum += freq;
       as -= min(freq, 1);
       b++;
@@ -787,7 +837,7 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
    Return number from 0 to nt-1 identifying the selected tree.
 */
 static int
-find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len)
+find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len_pack)
 {
   unsigned c, bc;   /* code length, best code length */
   unsigned t, bt;   /* tree, best tree */
@@ -800,7 +850,7 @@ find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len)
    */
   cp = 0;
   for (i = 0; i < GROUP_SIZE; i++)
-    cp += len[gs[i]];
+    cp += len_pack[gs[i]];
 
   /* At the beginning assume the first tree is the best. */
   bc = cp & 0x3ff;
@@ -820,33 +870,113 @@ find_best_tree(const uint16_t *gs, unsigned nt, const uint64_t *len)
 }
 
 
-/* Compute bit cost of transmitting a single tree and all symbols it codes. */
+/* Assign prefix-free codes.  Return cost of transmitting the tree and
+   all symbols it codes. */
 static uint32_t
-transmission_cost(const uint8_t *length, const uint32_t *rfreq, uint32_t as)
+assign_codes(uint32_t *code, uint8_t *length,
+             const uint32_t *frequency, uint32_t as)
 {
-  unsigned v;
-  unsigned p;
+  uint32_t leaf;
+  uint32_t avail;
+  uint32_t height;
+  uint32_t next_code;
+  uint32_t symbol;
+  uint64_t leaf_weight[MAX_ALPHA_SIZE + 1];
+  uint32_t count[MAX_HUFF_CODE_LENGTH + 2];
+  uint32_t base_code[MAX_CODE_LENGTH + 1];
+  uint16_t tree[MAX_CODE_LENGTH + 1][MAX_CODE_LENGTH + 1];
+  uint32_t best_cost;
+  uint32_t best_height;
+  uint32_t depth;
   uint32_t cost;
 
-  /* Compute cost of transmiting RUNA symbols. */
-  cost = 6;  /* fixed code length (5bits) and delta code (1bit) */
-  p = length[0];
-  cost += rfreq[0] * p;  /* cost of transmitting prefix codes */
+  for (leaf = 0; leaf < as; leaf++)
+    leaf_weight[leaf + 1] = (((uint64_t)frequency[leaf] << 32) |
+                             0x10000 | (MAX_ALPHA_SIZE - leaf));
 
-  /* Compute cost of transmiting all other symbols, from RUNB to EOB. */
-  for (v = 1; v < as; v++) {
-    int c, d;
-    c = length[v];
-    assert(c >= 1 && c <= 20);
-    d = p - c;
-    if (d < 0)
-      d = -d;
-    cost += 1 + 2 * d;  /* cost of transmitting delta code ... */
-    p = c;
-    cost += rfreq[v] * length[v];  /* ... and prefix codes */
+  sort_alphabet(leaf_weight + 1, leaf_weight + as + 1);
+  leaf_weight[0] = -1;
+
+  bzero(tree, sizeof(tree));
+  package_merge(tree, count, leaf_weight, as);
+
+  best_cost = -1;
+  best_height = MAX_CODE_LENGTH;
+
+  for (height = 2; height <= MAX_CODE_LENGTH; height++) {
+    if ((1UL << height) < as)
+      continue;
+    if (tree[height][height - 1] == 0) {
+      Trace(("      (for heights >%u costs is the same as for height=%u)",
+             height - 1, height - 1));
+      break;
+    }
+
+    cost = 0;
+    leaf = 0;
+    for (depth = 1; depth <= height; depth++) {
+      for (avail = tree[height][depth - 1] - tree[height][depth];
+           avail > 0; avail--) {
+        assert(leaf < as);
+        symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf + 1] & 0xFFFF);
+        length[symbol] = depth;
+        cost += (unsigned)(leaf_weight[leaf + 1] >> 32) * depth;
+        leaf++;
+      }
+    }
+
+    for (symbol = 1; symbol < as; symbol++)
+      cost += 2 * max((int)length[symbol - 1] - (int)length[symbol],
+                      (int)length[symbol] - (int)length[symbol - 1]);
+    cost += 5 + as;
+
+    Trace(("    for height=%2u transmission cost is %7u", height, cost));
+    if (cost < best_cost) {
+      best_cost = cost;
+      best_height = height;
+    }
   }
+  Trace(("  best tree height is %u", best_height));
 
-  return cost;
+  /* Generate code lengths and base codes. */
+  leaf = 0;
+  next_code = 0;
+  for (depth = 1; depth <= best_height; depth++) {
+    avail = tree[best_height][depth - 1] - tree[best_height][depth];
+    base_code[depth] = next_code;
+    next_code = (next_code + avail) << 1;
+
+    while (avail > 0) {
+      assert(leaf < as);
+      symbol = MAX_ALPHA_SIZE - (leaf_weight[leaf + 1] & 0xFFFF);
+      length[symbol] = depth;
+      leaf++;
+      avail--;
+    }
+  }
+  assert(next_code == (1UL << (best_height + 1)));
+  assert(leaf == as);
+
+  /* Assign prefix-free codes. */
+  for (symbol = 0; symbol < as; symbol++)
+    code[symbol] = base_code[length[symbol]]++;
+
+#ifdef ENABLE_TRACING
+  Trace(("  Prefix code dump:"));
+  for (symbol = 0; symbol < as; symbol++) {
+    static char buffer[MAX_HUFF_CODE_LENGTH+2];
+    char *p = buffer;
+    unsigned len = length[symbol];
+
+    while (len-- > 0)
+      *p++ = (code[symbol] & (1UL << len)) ? '1' : '0';
+    *p = 0;
+
+    Trace(("    symbol %3u has code %s", symbol, buffer));
+  }
+#endif
+
+  return best_cost;
 }
 
 
@@ -926,7 +1056,7 @@ generate_prefix_code(struct encoder_state *s)
     sp = s->selector;
 
     /* (E): Expectation step -- estimate likehood. */
-    bzero(s->rfreq, nt * sizeof(*s->rfreq));
+    bzero(s->frequency, nt * sizeof(*s->frequency));
     for (gs = mtfv; gs < mtfv + nm; gs += GROUP_SIZE) {
       /* Check out which prefix-free tree is the best to encode current
          group.  Then increment symbol frequencies for the chosen tree
@@ -935,7 +1065,7 @@ generate_prefix_code(struct encoder_state *s)
       assert(t < nt);
       *sp++ = t;
       for (i = 0; i < GROUP_SIZE; i++)
-        s->rfreq[t][gs[i]]++;
+        s->frequency[t][gs[i]]++;
     }
 
     assert((size_t)(sp - s->selector) == s->num_selectors);
@@ -943,7 +1073,7 @@ generate_prefix_code(struct encoder_state *s)
 
     /* (M): Maximization step -- maximize expectations. */
     for (t = 0; t < nt; t++)
-      make_code_lengths(s->count[t], s->length[t], s->rfreq[t], as);
+      make_code_lengths(s->length[t], s->frequency[t], as);
   }
 
   cost = 0;
@@ -966,12 +1096,9 @@ generate_prefix_code(struct encoder_state *s)
 
         /* Create lookup tables for this tree. These tables are used by the
            transmiter to quickly send codes for MTF values. */
-        assign_codes(s->count[t], s->lookup[t], s->length[t], as);
-        s->lookup[t][as] = 0;
+        cost += assign_codes(s->code[t], s->length[t], s->frequency[t], as);
+        s->code[t][as] = 0;
         s->length[t][as] = 0;
-
-        /* Compute cost of transmiting the tree and all symbols it codes. */
-        cost += transmission_cost(s->length[t], s->rfreq[t], as);
       }
     }
 
@@ -1096,7 +1223,7 @@ transmit(struct encoder_state *s, void *buf)
     unsigned mv;         /* symbol (MTF value) */
 
     t = s->selector[gr];
-    L = s->lookup[t];
+    L = s->code[t];
     B = s->length[t];
 
     for (i = 0; i < GROUP_SIZE; i++) {

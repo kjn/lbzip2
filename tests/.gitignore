@@ -1,0 +1,11 @@
+*.bz2.log
+*.bz2.trs
+*.o
+*~
+.deps
+Makefile
+Makefile.in
+core
+minbzcat
+test-suite.log
+timeout

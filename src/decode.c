@@ -250,12 +250,12 @@ make_tree(struct retriever_internal_state *rs)
      greater than the greatest possible left-justified base).
    */
   assert(k == MAX_CODE_LENGTH + 1);
-  k = MAX_CODE_LENGTH;
-  while (C[k] == 0) {
+  do {
     assert(k > MIN_CODE_LENGTH);
-    assert(B[k] == 0);
+    assert(k > MAX_CODE_LENGTH || B[k] == 0);
     B[k--] = -1;
   }
+  while (C[k] == 0);
 
   /* Transform counts into indices (cumulative counts). */
   cum = 0;

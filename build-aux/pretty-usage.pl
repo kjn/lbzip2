@@ -130,6 +130,13 @@ Open non-regular input files. Open input files with more than one link. Try to
 remove each output file before opening it. With `-cd' copy files not in bzip2
 format.
 
+@-s, --small
+Reduce memory usage at cost of performance.
+
+@-u, --sequential
+Perform splitting input blocks sequentially. This may improve compression ratio
+and decrease CPU usage, but will degrade scalability.
+
 @-v, --verbose
 Log each (de)compression start to stderr. Display compression ratio and space
 savings. Display progress information if stderr is connected to a terminal.
@@ -137,7 +144,7 @@ savings. Display progress information if stderr is connected to a terminal.
 @-S
 Print condition variable statistics to stderr.
 
-@-s, --small, -q, --quiet, --repetitive-fast, --repetitive-best, --exponential
+@-q, --quiet, --repetitive-fast, --repetitive-best, --exponential
 Accepted for compatibility, otherwise ignored.
 
 @-h, --help

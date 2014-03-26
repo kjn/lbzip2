@@ -27,6 +27,10 @@ Test cases for lbzip2.                                          -*- outline -*-
 
    Test how decompressor copes with a `zip bomb'.
 
+** codelen20
+
+   Check if decompressor correctly handles 20-bit prefix codes.
+
 ** concat
 
    Check whether decompressor supports concatenated bzip2 streams. Some

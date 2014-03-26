@@ -1,6 +1,36 @@
 NEWS for lbzip2                                                 -*- outline -*-
 
 
+* What's new in lbzip2 2.5
+
+** Bug fixes
+
+   Version 2.5 fixes a compressor bug introduced in lbzip2 2.4.  This
+   bug manifests in assertion failure or deadlock when compressing
+   data.
+
+   This version also fixes a performance bug which prevented
+   sequential compressor from fully utilizing all available threads,
+   which resultes in very poor performance.
+
+* What's new in lbzip2 2.4
+
+** Bug fixes
+
+   Version 2.4 fixes a bug in compression code which could lead to undefined
+   behavior (usually segmentation fault) when compressing certain kinds
+   highly-redundant data.
+
+   A decompression bug in bz2 header parsing code was fixed.  This bug could
+   cause some valid compressed files to be rejected with "CRC mismatch" error.
+
+** New features
+
+   Version 2.4 of lbzip2 introduces sequential mode of operation, which is not
+   used by default but can be activated with a command-line switch.  This new
+   mode usually improves compression ratio and decreases CPU usage ("user
+   time") at cost of degraded scalability.
+
 * What's new in lbzip2 2.3
 
 ** Bug fixes

@@ -744,7 +744,7 @@ static bool
 can_scan(void)
 {
   return ((work_units > SCAN_THRESH || (work_units > 0u && !parse_token))
-          && !empty(scan_q) && can_attach(*peek(scan_q)));
+          && !ultra && !empty(scan_q) && can_attach(*peek(scan_q)));
 }
 
 static void

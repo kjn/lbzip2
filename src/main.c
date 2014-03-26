@@ -46,6 +46,7 @@ bool keep;                      /* -k */
 bool verbose;                   /* -v */
 bool print_cctrs;               /* -S */
 bool small;                     /* -s */
+bool ultra;                     /* -u */
 struct filespec ispec;
 struct filespec ospec;
 
@@ -218,25 +219,29 @@ G.\n  -z, --compress     : Force compression over the selection by PROG.\n  -1\
 he default.\n  -f, --force        : Open non-regular input files. Open input f\
 iles with more\n                       than one", " link. Try to remove each o\
 utput file before\n                       opening it. With `-cd' copy files no\
-t in bzip2 format.\n  -v, --verbose      : Log each (de)compression start to s\
-tderr. Display\n                       compression ratio and space savings. Di\
-splay progress\n                       information if stderr is connected to a\
- terminal.\n  -S                 : Print condition variable statistics to stde\
-rr.\n  -s, --small, -q,\n  --quiet,\n  --repetitive-fast,\n  --repetitive-best\
-,\n  --exponential      ", ": Accepted for compatibility, otherwise ignored.\n\
-  -h, --help         : Print this help to stdout and exit.\n  -L, --license, -\
-V,\n  --version          : Print version information to stdout and exit.\n\nOp\
-erands:\n\n  FILE               : Specify files to compress or decompress. If \
-no FILE is\n                       given, work as a filter. FILEs with `.bz2',\
- `.tbz',\n                       `.tbz2' and `.tz2' name suffixes will be skip\
-ped when\n                       compressing. When decompressing, `.bz2' suffi\
-x", "es will be\n                       removed in output filenames; `.tbz', `\
-.tbz2' and `.tz2'\n                       suffixes will be replaced by `.tar';\
- other filenames\n                       will be suffixed with `.out'.\n"
+t in bzip2 format.\n  -s, --small        : Reduce memory usage at cost of perf\
+ormance.\n  -u, --sequential   : Perform splitting input blocks sequentially. \
+This may\n                       improve compression ratio and decrease CPU us\
+age, but\n                       will degrade scalability.\n  -v, --verbose   \
+   : Log each (de)compression start to stderr. Display\n                      \
+ compression ratio an", "d space savings. Display progress\n                  \
+     information if stderr is connected to a terminal.\n  -S                 :\
+ Print condition variable statistics to stderr.\n  -q, --quiet,\n  --repetitiv\
+e-fast,\n  --repetitive-best,\n  --exponential      : Accepted for compatibili\
+ty, otherwise ignored.\n  -h, --help         : Print this help to stdout and e\
+xit.\n  -L, --license, -V,\n  --version          : Print version information t\
+o stdout and exit.\n\nOperands:\n\n  FILE               : Specify files to com\
+p", "ress or decompress. If no FILE is\n                       given, work as \
+a filter. FILEs with `.bz2', `.tbz',\n                       `.tbz2' and `.tz2\
+' name suffixes will be skipped when\n                       compressing. When\
+ decompressing, `.bz2' suffixes will be\n                       removed in out\
+put filenames; `.tbz', `.tbz2' and `.tz2'\n                       suffixes wil\
+l be replaced by `.tar'; other filenames\n                       will be suffi\
+xed with `.out'.\n"
 
 #define HELP_STRING "%s version %s\n%s\n\n%s%s",                        \
     PACKAGE_NAME, PACKAGE_VERSION, "http://lbzip2.org/",                \
-    "Copyright (C) 2011, 2012 Mikolaj Izdebski\n"                       \
+    "Copyright (C) 2011, 2012, 2013, 2014 Mikolaj Izdebski\n"           \
     "Copyright (C) 2008, 2009, 2010 Laszlo Ersek\n"                     \
     "\n"                                                                \
     "This program is free software: you can redistribute it and/or modify\n" \
@@ -432,6 +437,9 @@ opts_setup(struct arg **operands, size_t argc, char **argv)
           else if (0 == strcmp("small", argscan)) {
             small = 1;
           }
+          else if (0 == strcmp("sequential", argscan)) {
+            ultra = 1;
+          }
           else if (0 == strcmp("verbose", argscan)) {
             verbose = 1;
           }
@@ -494,6 +502,10 @@ opts_setup(struct arg **operands, size_t argc, char **argv)
 
             case 's':
               small = 1;
+              break;
+
+            case 'u':
+              ultra = 1;
               break;
 
             case 'v':

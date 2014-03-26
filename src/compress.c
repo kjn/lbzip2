@@ -1,7 +1,7 @@
 /*-
   compress.c -- high-level compression routines
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2014 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -43,38 +43,30 @@ struct in_blk {
 
 struct work_blk {
   struct position pos;
+  struct position next;
 
   struct encoder_state *enc;
-  size_t size;
-  uint32_t crc;
-  int last;
-  size_t weight;
-};
-
-
-struct out_blk {
-  struct position pos;
-
   void *buffer;
   size_t size;
   uint32_t crc;
-  int last;
   size_t weight;
 };
 
 
 static struct pqueue(struct in_blk *) coll_q;
 static struct pqueue(struct work_blk *) trans_q;
-static struct pqueue(struct out_blk *) reord_q;
-static struct position reord_pos;
+static struct pqueue(struct work_blk *) reord_q;
+static struct position order;
 static uintmax_t next_id;       /* next free input block sequence number */
 static uint32_t combined_crc;
+static bool collect_token = true;
+static struct work_blk *unfinished_work;
 
 
 static bool
 can_collect(void)
 {
-  return !empty(coll_q) && work_units > 0;
+  return !ultra && !empty(coll_q) && work_units > 0;
 }
 
 
@@ -91,6 +83,7 @@ do_collect(void)
   wblk = XMALLOC(struct work_blk);
 
   wblk->pos = iblk->pos;
+  wblk->next = iblk->pos;
 
   /* Allocate an encoder with given block size and default parameters. */
   wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
@@ -102,14 +95,15 @@ do_collect(void)
   iblk->next += wblk->weight;
 
   if (0u < iblk->left) {
-    wblk->last = 0;
+    ++wblk->next.minor;
     ++iblk->pos.minor;
     sched_lock();
     enqueue(coll_q, iblk);
     sched_unlock();
   }
   else {
-    wblk->last = 1;
+    ++wblk->next.major;
+    wblk->next.minor = 0;
     source_release_buffer(iblk->buffer);
     free(iblk);
   }
@@ -123,11 +117,87 @@ do_collect(void)
 
 
 static bool
+can_collect_seq(void)
+{
+  return ultra && collect_token && (!empty(coll_q) || (eof && unfinished_work != NULL)) && (work_units > 0 || unfinished_work != NULL);
+}
+
+
+static void
+do_collect_seq(void)
+{
+  struct in_blk *iblk;
+  struct work_blk *wblk;
+  bool done = true;
+
+  wblk = unfinished_work;
+  unfinished_work = NULL;
+  if (wblk == NULL)
+    --work_units;
+
+  iblk = NULL;
+  if (!empty(coll_q))
+    iblk = dequeue(coll_q);
+
+  collect_token = false;
+  sched_unlock();
+
+  /* Allocate an encoder with given block size and default parameters. */
+  if (wblk == NULL) {
+    wblk = XMALLOC(struct work_blk);
+    wblk->pos = iblk->pos;
+    wblk->next = iblk->pos;
+    wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
+    wblk->weight = 0;
+  }
+
+  /* Collect as much data as we can. */
+  if (iblk != NULL) {
+    wblk->size = iblk->left;
+    done = collect(wblk->enc, iblk->next, &iblk->left);
+    wblk->size -= iblk->left;
+    wblk->weight += wblk->size;
+    iblk->next += wblk->size;
+
+    if (0u < iblk->left) {
+      ++wblk->next.minor;
+      ++iblk->pos.minor;
+      sched_lock();
+      enqueue(coll_q, iblk);
+      sched_unlock();
+    }
+    else {
+      ++wblk->next.major;
+      wblk->next.minor = 0;
+      source_release_buffer(iblk->buffer);
+      free(iblk);
+    }
+  }
+
+  if (!done) {
+    sched_lock();
+    collect_token = true;
+    unfinished_work = wblk;
+    return;
+  }
+
+  sched_lock();
+  collect_token = true;
+  sched_unlock();
+
+  /* Do the hard work. */
+  wblk->size = encode(wblk->enc, &wblk->crc);
+
+  sched_lock();
+  enqueue(trans_q, wblk);
+}
+
+
+static bool
 can_transmit(void)
 {
   return !empty(trans_q) && (out_slots > TRANSM_THRESH ||
-                             (out_slots > 0 && pos_eq(peek(trans_q)->pos,
-                                                      reord_pos)));
+                             (out_slots > 0 && pos_eq(peek(trans_q)->pos, order)));
 }
 
 
@@ -135,59 +205,41 @@ static void
 do_transmit(void)
 {
   struct work_blk *wblk;
-  struct out_blk *oblk;
 
   wblk = dequeue(trans_q);
   --out_slots;
   sched_unlock();
 
-  oblk = XMALLOC(struct out_blk);
-
-  oblk->pos = wblk->pos;
-  oblk->crc = wblk->crc;
-  oblk->last = wblk->last;
-  oblk->size = wblk->size;
-  oblk->weight = wblk->weight;
-
   /* Allocate the output buffer and transmit the block into it. */
-  oblk->buffer = XNMALLOC((oblk->size + 3) / 4, uint32_t);
+  wblk->buffer = XNMALLOC((wblk->size + 3) / 4, uint32_t);
 
-  transmit(wblk->enc, oblk->buffer);
-  free(wblk);
+  transmit(wblk->enc, wblk->buffer);
 
   sched_lock();
   ++work_units;
-  enqueue(reord_q, oblk);
+  enqueue(reord_q, wblk);
 }
 
 
 static bool
 can_reorder(void)
 {
-  return !empty(reord_q) && pos_eq(peek(reord_q)->pos, reord_pos);
+  return !empty(reord_q) && pos_eq(peek(reord_q)->pos, order);
 }
 
 
 static void
 do_reorder(void)
 {
-  struct out_blk *oblk;
-  int last;
+  struct work_blk *wblk;
 
-  oblk = dequeue(reord_q);
+  wblk = dequeue(reord_q);
+  order = wblk->next;
 
-  sink_write_buffer(oblk->buffer, oblk->size, oblk->weight);
-  combined_crc = combine_crc(combined_crc, oblk->crc);
-  last = oblk->last;
-  free(oblk);
+  sink_write_buffer(wblk->buffer, wblk->size, wblk->weight);
+  combined_crc = combine_crc(combined_crc, wblk->crc);
 
-  if (last) {
-    ++reord_pos.major;
-    reord_pos.minor = 0u;
-  }
-  else {
-    ++reord_pos.minor;
-  }
+  free(wblk);
 }
 
 
@@ -269,9 +321,9 @@ init(void)
   pqueue_init(trans_q, work_units);
   pqueue_init(reord_q, out_slots);
 
-  reord_pos.major = 0;
-  reord_pos.minor = 0;
   next_id = 0;
+  order.major = 0;
+  order.minor = 0;
 
   assert(1 <= bs100k && bs100k <= 9);
   combined_crc = 0;
@@ -292,10 +344,11 @@ uninit(void)
 
 
 static const struct task task_list[] = {
-  { "reorder",  can_reorder,  do_reorder  },
-  { "transmit", can_transmit, do_transmit },
-  { "collect",  can_collect,  do_collect  },
-  { NULL,       NULL,         NULL        },
+  { "collect_seq", can_collect_seq, do_collect_seq },
+  { "reorder",     can_reorder,     do_reorder     },
+  { "transmit",    can_transmit,    do_transmit    },
+  { "collect",     can_collect,     do_collect     },
+  { NULL,          NULL,            NULL           },
 };
 
 const struct process compression = {

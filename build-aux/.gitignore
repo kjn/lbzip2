@@ -1,0 +1,10 @@
+*~
+compile
+config.guess
+config.sub
+depcomp
+gitlog-to-changelog
+install-sh
+missing
+snippet
+test-driver

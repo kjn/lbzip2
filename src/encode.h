@@ -27,7 +27,7 @@
 struct encoder_state;
 
 struct encoder_state *encoder_init(unsigned long mbs, unsigned cf);
-void collect(struct encoder_state *e, const uint8_t *buf, size_t *buf_sz);
+int collect(struct encoder_state *e, const uint8_t *buf, size_t *buf_sz);
 size_t encode(struct encoder_state *e, uint32_t *crc);
 void transmit(struct encoder_state *e, void *buf);
 unsigned generate_prefix_code(struct encoder_state *s);
