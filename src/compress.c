@@ -43,6 +43,7 @@ struct in_blk {
 
 struct work_blk {
   struct position pos;
+  struct position next;
 
   struct encoder_state *enc;
   void *buffer;
@@ -55,7 +56,7 @@ struct work_blk {
 static struct pqueue(struct in_blk *) coll_q;
 static struct pqueue(struct work_blk *) trans_q;
 static struct pqueue(struct work_blk *) reord_q;
-static struct deque(struct work_blk *) order_q;
+static struct position order;
 static uintmax_t next_id;       /* next free input block sequence number */
 static uint32_t combined_crc;
 static bool collect_token = true;
@@ -82,6 +83,7 @@ do_collect(void)
   wblk = XMALLOC(struct work_blk);
 
   wblk->pos = iblk->pos;
+  wblk->next = iblk->pos;
 
   /* Allocate an encoder with given block size and default parameters. */
   wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
@@ -93,12 +95,15 @@ do_collect(void)
   iblk->next += wblk->weight;
 
   if (0u < iblk->left) {
+    ++wblk->next.minor;
     ++iblk->pos.minor;
     sched_lock();
     enqueue(coll_q, iblk);
     sched_unlock();
   }
   else {
+    ++wblk->next.major;
+    wblk->next.minor = 0;
     source_release_buffer(iblk->buffer);
     free(iblk);
   }
@@ -108,7 +113,6 @@ do_collect(void)
 
   sched_lock();
   enqueue(trans_q, wblk);
-  push(order_q, wblk);
 }
 
 
@@ -142,6 +146,7 @@ do_collect_seq(void)
   if (wblk == NULL) {
     wblk = XMALLOC(struct work_blk);
     wblk->pos = iblk->pos;
+    wblk->next = iblk->pos;
     wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
     wblk->weight = 0;
   }
@@ -155,12 +160,15 @@ do_collect_seq(void)
     iblk->next += wblk->size;
 
     if (0u < iblk->left) {
+      ++wblk->next.minor;
       ++iblk->pos.minor;
       sched_lock();
       enqueue(coll_q, iblk);
       sched_unlock();
     }
     else {
+      ++wblk->next.major;
+      wblk->next.minor = 0;
       source_release_buffer(iblk->buffer);
       free(iblk);
     }
@@ -179,7 +187,6 @@ do_collect_seq(void)
   sched_lock();
   collect_token = true;
   enqueue(trans_q, wblk);
-  push(order_q, wblk);
 }
 
 
@@ -187,7 +194,7 @@ static bool
 can_transmit(void)
 {
   return !empty(trans_q) && (out_slots > TRANSM_THRESH ||
-                             (out_slots > 0 && peek(trans_q) == dq_get(order_q, 0)));
+                             (out_slots > 0 && pos_eq(peek(trans_q)->pos, order)));
 }
 
 
@@ -214,7 +221,7 @@ do_transmit(void)
 static bool
 can_reorder(void)
 {
-  return !empty(reord_q) && peek(reord_q) == dq_get(order_q, 0);
+  return !empty(reord_q) && pos_eq(peek(reord_q)->pos, order);
 }
 
 
@@ -224,7 +231,7 @@ do_reorder(void)
   struct work_blk *wblk;
 
   wblk = dequeue(reord_q);
-  (void)shift(order_q);
+  order = wblk->next;
 
   sink_write_buffer(wblk->buffer, wblk->size, wblk->weight);
   combined_crc = combine_crc(combined_crc, wblk->crc);
@@ -310,9 +317,10 @@ init(void)
   pqueue_init(coll_q, in_slots);
   pqueue_init(trans_q, work_units);
   pqueue_init(reord_q, out_slots);
-  deque_init(order_q, max(work_units, out_slots));
 
   next_id = 0;
+  order.major = 0;
+  order.minor = 0;
 
   assert(1 <= bs100k && bs100k <= 9);
   combined_crc = 0;
@@ -329,7 +337,6 @@ uninit(void)
   pqueue_uninit(coll_q);
   pqueue_uninit(trans_q);
   pqueue_uninit(reord_q);
-  deque_uninit(order_q);
 }
 
 
