@@ -4,17 +4,17 @@ Upstream-Contact: Mikolaj Izdebski <zurgunt@gmail.com>
 Source: https://github.com/kjn/lbzip2
 
 Files: *
-Copyright: 2011, 2012, 2013 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012, 2013, 2014 Mikolaj Izdebski <zurgunt@gmail.com>
 License: GPL-3+
 
 Files: build-aux/pretty-usage.pl debian/changelog debian/copyright
  src/signals.c src/compress.c src/main.c src/main.h
-Copyright: 2011, 2012, 2013 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012, 2013, 2014 Mikolaj Izdebski <zurgunt@gmail.com>
  2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
 License: GPL-3+
 
 Files: man/lbzip2.1
-Copyright: 2011, 2012, 2013 Mikolaj Izdebski <zurgunt@gmail.com>
+Copyright: 2011, 2012, 2013, 2014 Mikolaj Izdebski <zurgunt@gmail.com>
  2008, 2009, 2010 Laszlo Ersek <lacos@caesar.elte.hu>
  1996 Julian Seward <sewardj@cs.man.ac.uk>
 License: GPL-3+
