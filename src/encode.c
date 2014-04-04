@@ -277,8 +277,6 @@ finish_run:
 
   /* If the run is at least 4 characters long, treat it specifically. */
   if (s->rle_state >= 4) {
-    /* Make sure we really have a long run. */
-    assert(s->rle_state >= 4);
     assert(q <= qMax);
 
     while (p < pLim) {
