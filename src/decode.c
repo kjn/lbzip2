@@ -751,8 +751,6 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
             if (ds->bwt_idx >= ds->block_size)
               return ERR_BWTIDX;
 
-            free(ds->internal_state);
-            ds->internal_state = NULL;
             return OK;
           }
 
@@ -1138,20 +1136,19 @@ emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
 }
 
 
-void
-decoder_init(struct decoder_state *ds)
+size_t
+decoder_alloc_size(void)
 {
-  ds->internal_state = XMALLOC(struct retriever_internal_state);
-  ds->internal_state->state = S_INIT;
-
-  ds->tt = XNMALLOC(MAX_BLOCK_SIZE, uint32_t);
-  ds->block_size = 0;
+  return (sizeof(struct decoder_state) +
+          MAX_BLOCK_SIZE * sizeof(uint32_t) +
+          sizeof(struct retriever_internal_state));
 }
 
 
 void
-decoder_free(struct decoder_state *ds)
+decoder_init(struct decoder_state *ds)
 {
-  free(ds->tt);
-  free(ds->internal_state);
+  ds->internal_state = (void *)(ds->tt + MAX_BLOCK_SIZE);
+  ds->internal_state->state = S_INIT;
+  ds->block_size = 0;
 }
