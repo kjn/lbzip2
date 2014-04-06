@@ -21,6 +21,8 @@
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
+#else
+#define restrict
 #endif
 
 #include <assert.h>             /* assert() */
