@@ -1,7 +1,7 @@
 /*-
   decode.c -- low-level decompressor
 
-  Copyright (C) 2011, 2012, 2013 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2013, 2014 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -850,7 +850,7 @@ static const uint16_t rand_table[512] = {
 void
 decode(struct decoder_state *ds)
 {
-  uint32_t i, j = 0;
+  uint32_t i, j, k;
   uint32_t cum;
   uint8_t uc;
 
@@ -890,32 +890,34 @@ decode(struct decoder_state *ds)
      it usually leads to decreased compression ratio.
    */
   if (unlikely(ds->rand)) {
-    uint8_t *block;
-
-    /* Allocate a temporary array to hold the block. */
-    block = XNMALLOC(ds->block_size, uint8_t);
-
-    /* Copy the IBWT linked list into the temporary array. */
-    j = tt[ds->bwt_idx];
+    /* Compute IBWT in-situ.  A slower algorithm based on binary search is used
+       to avoid extra memory allocation. */
+    j = ds->bwt_idx;
     for (i = 0; i < ds->block_size; i++) {
-      j = tt[j >> 8];
-      block[i] = j;
+      k = 0;
+      if (j >= ds->ftab[k + 127]) k += 128;
+      if (j >= ds->ftab[k +  63]) k +=  64;
+      if (j >= ds->ftab[k +  31]) k +=  32;
+      if (j >= ds->ftab[k +  15]) k +=  16;
+      if (j >= ds->ftab[k +   7]) k +=   8;
+      if (j >= ds->ftab[k +   3]) k +=   4;
+      if (j >= ds->ftab[k +   1]) k +=   2;
+      if (j >= ds->ftab[k +   0]) k +=   1;
+      tt[i] = (tt[i] & ~0xFF) + k;
+      j = tt[j] >> 8;
     }
 
     /* Derandomize the block. */
     i = 0, j = RAND_THRESH;
     while (j < ds->block_size) {
-      block[j] ^= 1;
+      tt[j] ^= 1;
       i = (i + 1) & 0x1FF;
       j += rand_table[i];
     }
 
-    /* Reform a linked list from the array. */
+    /* Reform a linked list. */
     for (i = 0; i < ds->block_size; i++)
-      tt[i] = ((i + 1) << 8) + block[i];
-
-    /* Release the temporary array. */
-    free(block);
+      tt[i] = ((i + 1) << 8) + (tt[i] & 0xFF);
   }
 
   ds->rle_state = 0;
