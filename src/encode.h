@@ -26,7 +26,8 @@
 
 struct encoder_state;
 
-struct encoder_state *encoder_init(unsigned long mbs, unsigned cf);
+size_t encoder_alloc_size(unsigned long mbs);
+void encoder_init(struct encoder_state *e, unsigned long mbs, unsigned cf);
 int collect(struct encoder_state *e, const uint8_t *buf, size_t *buf_sz);
 size_t encode(struct encoder_state *e, uint32_t *crc);
 void transmit(struct encoder_state *e, void *buf);

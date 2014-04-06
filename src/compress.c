@@ -86,7 +86,8 @@ do_collect(void)
   wblk->next = iblk->pos;
 
   /* Allocate an encoder with given block size and default parameters. */
-  wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
+  wblk->enc = xmalloc(encoder_alloc_size(bs100k * 100000u));
+  encoder_init(wblk->enc, bs100k * 100000u, CLUSTER_FACTOR);
 
   /* Collect as much data as we can. */
   wblk->weight = iblk->left;
@@ -147,7 +148,8 @@ do_collect_seq(void)
     wblk = XMALLOC(struct work_blk);
     wblk->pos = iblk->pos;
     wblk->next = iblk->pos;
-    wblk->enc = encoder_init(bs100k * 100000u, CLUSTER_FACTOR);
+    wblk->enc = xmalloc(encoder_alloc_size(bs100k * 100000u));
+    encoder_init(wblk->enc, bs100k * 100000u, CLUSTER_FACTOR);
     wblk->weight = 0;
   }
 
@@ -214,6 +216,7 @@ do_transmit(void)
   wblk->buffer = XNMALLOC((wblk->size + 3) / 4, uint32_t);
 
   transmit(wblk->enc, wblk->buffer);
+  free(wblk->enc);
 
   sched_lock();
   ++work_units;

@@ -76,11 +76,8 @@ struct encoder_state {
   uint32_t max_block_size;
   uint32_t cluster_factor;
 
-  uint8_t *block;
-  void *mtfv;
-
-  uint8_t *selector;
-  uint8_t *selectorMTF;
+  uint8_t selector[18000 + 1 + 1];
+  uint8_t selectorMTF[18000 + 1 + 7];
   uint32_t num_selectors;
   uint32_t num_trees;
   /* There is a sentinel symbol added at the end of each alphabet,
@@ -91,6 +88,8 @@ struct encoder_state {
 
   unsigned tmap_old2new[MAX_TREES];
   unsigned tmap_new2old[MAX_TREES];
+
+  int32_t SA[0];
 };
 
 extern uint32_t crc_table[256];
@@ -101,11 +100,19 @@ extern uint32_t crc_table[256];
 #define MAX_RUN_LENGTH (4+255)
 
 
-struct encoder_state *
-encoder_init(unsigned long max_block_size, unsigned cluster_factor)
+size_t
+encoder_alloc_size(unsigned long max_block_size)
 {
-  struct encoder_state *s = XMALLOC(struct encoder_state);
+  return (sizeof(struct encoder_state) +
+          (max_block_size + GROUP_SIZE) * sizeof(uint32_t) +
+          max_block_size + 1);
+}
 
+
+void
+encoder_init(struct encoder_state *s, unsigned long max_block_size,
+             unsigned cluster_factor)
+{
   assert(s != 0);
   assert(max_block_size > 0 && max_block_size <= MAX_BLOCK_SIZE);
   assert(cluster_factor > 0 && cluster_factor <= 65535);
@@ -113,16 +120,10 @@ encoder_init(unsigned long max_block_size, unsigned cluster_factor)
   s->max_block_size = max_block_size;
   s->cluster_factor = cluster_factor;
 
-  s->selector = XNMALLOC(18000 + 1 + 1, uint8_t);
-  s->selectorMTF = XNMALLOC(18000 + 1 + 7, uint8_t);
-  s->block = XNMALLOC(max_block_size + 1, uint8_t);
-
   bzero(s->cmap, 256u * sizeof(bool));
   s->rle_state = 0;
   s->block_crc = -1;
   s->nblock = 0;
-
-  return s;
 }
 
 
@@ -133,8 +134,9 @@ collect(struct encoder_state *s, const uint8_t *inbuf, size_t *buf_sz)
   size_t avail = *buf_sz;
   const uint8_t *p = inbuf;
   const uint8_t *pLim = p + avail;
-  uint8_t *q = s->block + s->nblock;
-  uint8_t *qMax = s->block + s->max_block_size - 1;
+  uint8_t *block = (void *)(s->SA + s->max_block_size + GROUP_SIZE);
+  uint8_t *q = block + s->nblock;
+  uint8_t *qMax = block + s->max_block_size - 1;
   unsigned ch, last;
   uint32_t run;
   uint32_t save_crc;
@@ -322,7 +324,7 @@ finish_run:
   goto finish_run;
 
 done:
-  s->nblock = q - s->block;
+  s->nblock = q - block;
   s->block_crc = crc;
   *buf_sz -= p - inbuf;
   return s->rle_state < 0;
@@ -351,7 +353,7 @@ make_map_e(uint8_t *cmap, const bool *inuse)
 /*---------------------------------------------------*/
 /* returns nmtf */
 static uint32_t
-do_mtf(uint16_t *mtfv, uint32_t *mtffreq, uint8_t *cmap, int32_t nblock,
+do_mtf(int32_t *bwt, uint32_t *mtffreq, uint8_t *cmap, int32_t nblock,
        int32_t EOB)
 {
   uint8_t order[255];
@@ -360,7 +362,7 @@ do_mtf(uint16_t *mtfv, uint32_t *mtffreq, uint8_t *cmap, int32_t nblock,
   int32_t t;
   uint8_t c;
   uint8_t u;
-  uint32_t *bwt = (void *)mtfv;
+  uint16_t *mtfv = (void *)bwt;
   const uint16_t *mtfv0 = mtfv;
 
   for (i = 0; i <= EOB; i++)
@@ -430,11 +432,12 @@ encode(struct encoder_state *s, uint32_t *crc)
   uint32_t p;                   /* MTF state */
   uint32_t EOB;
   uint8_t cmap[256];
+  uint8_t *block = (void *)(s->SA + s->max_block_size + GROUP_SIZE);
 
   /* Finalize initial RLE. */
   if (s->rle_state >= 4) {
     assert(s->nblock < s->max_block_size);
-    s->block[s->nblock++] = s->rle_state - 4;
+    block[s->nblock++] = s->rle_state - 4;
     s->cmap[s->rle_state - 4] = true;
   }
   assert(s->nblock > 0);
@@ -445,11 +448,9 @@ encode(struct encoder_state *s, uint32_t *crc)
 
   /* Sort block. */
   assert(s->nblock > 0);
-  s->mtfv = XNMALLOC(s->nblock + GROUP_SIZE, uint32_t);
 
-  s->bwt_idx = divbwt(s->block, s->mtfv, s->nblock);
-  free(s->block);
-  s->nmtf = do_mtf(s->mtfv, s->code[0], cmap, s->nblock, EOB);
+  s->bwt_idx = divbwt(block, s->SA, s->nblock);
+  s->nmtf = do_mtf(s->SA, s->code[0], cmap, s->nblock, EOB);
 
   cost = 48    /* header */
        + 32    /* crc */
@@ -1001,7 +1002,7 @@ generate_prefix_code(struct encoder_state *s)
   uint32_t iter, i;
   uint32_t cost;
 
-  uint16_t *mtfv = s->mtfv;
+  uint16_t *mtfv = (void *)s->SA;
   uint32_t nm = s->nmtf;
 
   as = mtfv[nm - 1] + 1;       /* the last mtfv is EOB */
@@ -1188,7 +1189,7 @@ transmit(struct encoder_state *s, void *buf)
     SEND(v, (1 << v) - 2);
   }
 
-  mtfv = s->mtfv;
+  mtfv = (void *)s->SA;
   as = mtfv[s->nmtf - 1] + 1;
   ns = (s->nmtf + GROUP_SIZE - 1) / GROUP_SIZE;
 
@@ -1235,9 +1236,4 @@ transmit(struct encoder_state *s, void *buf)
   assert(k / 8 == s->out_expect_len % 4);
   assert(p == (uint32_t *)buf + s->out_expect_len / 4);
   SEND(31, 0);
-
-  free(s->selector);
-  free(s->selectorMTF);
-  free(s->mtfv);
-  free(s);
 }
