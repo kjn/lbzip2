@@ -1133,7 +1133,7 @@ generate_prefix_code(struct encoder_state *s)
     *p++ = htonl(w);                            \
   }
 
-void
+void *
 transmit(struct encoder_state *s, void *buf)
 {
   uint64_t b;
@@ -1152,6 +1152,18 @@ transmit(struct encoder_state *s, void *buf)
   b = 0;
   k = 0;
   p = buf;
+
+  mtfv = (void *)s->SA;
+  as = mtfv[s->nmtf - 1] + 1;
+  ns = (s->nmtf + GROUP_SIZE - 1) / GROUP_SIZE;
+
+  /* If no external buffer was provided then use an internal buffer. */
+  if (!buf) {
+    buf = &mtfv[ns * GROUP_SIZE];
+    assert((char *)buf + (s->out_expect_len + 3) / 4 * 4 <=
+           (char *)s + encoder_alloc_size(s->max_block_size));
+    p = buf;
+  }
 
   /* Transmit block metadata. */
   SEND(24, 0x314159);
@@ -1186,17 +1198,13 @@ transmit(struct encoder_state *s, void *buf)
   /* Transmit selectors. */
   assert(s->u.s.num_trees >= MIN_TREES && s->u.s.num_trees <= MAX_TREES);
   SEND(3, s->u.s.num_trees);
-  ns = s->u.s.num_selectors;
-  SEND(15, ns);
+  t = s->u.s.num_selectors;
+  SEND(15, t);
   sp = s->u.s.selectorMTF;
-  while (ns--) {
+  while (t--) {
     v = 1 + *sp++;
     SEND(v, (1 << v) - 2);
   }
-
-  mtfv = (void *)s->SA;
-  as = mtfv[s->nmtf - 1] + 1;
-  ns = (s->nmtf + GROUP_SIZE - 1) / GROUP_SIZE;
 
   /* Transmit prefix trees. */
   for (t = 0; t < s->u.s.num_trees; t++) {
@@ -1241,4 +1249,6 @@ transmit(struct encoder_state *s, void *buf)
   assert(k / 8 == s->out_expect_len % 4);
   assert(p == (uint32_t *)buf + s->out_expect_len / 4);
   SEND(31, 0);
+
+  return buf;
 }

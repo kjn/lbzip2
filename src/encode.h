@@ -30,7 +30,7 @@ size_t encoder_alloc_size(unsigned long mbs);
 void encoder_init(struct encoder_state *e, unsigned long mbs, unsigned cf);
 int collect(struct encoder_state *e, const uint8_t *buf, size_t *buf_sz);
 size_t encode(struct encoder_state *e, uint32_t *crc);
-void transmit(struct encoder_state *e, void *buf);
+void *transmit(struct encoder_state *e, void *buf);
 unsigned generate_prefix_code(struct encoder_state *s);
 
 int32_t divbwt(uint8_t *T, int32_t *SA, int32_t *bucket, int32_t n);
