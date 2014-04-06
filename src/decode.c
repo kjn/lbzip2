@@ -23,7 +23,6 @@
 #include <arpa/inet.h>          /* ntohl() */
 #include <string.h>             /* memcpy() */
 
-#include "main.h"
 #include "decode.h"
 
 
