@@ -120,7 +120,9 @@ do_collect(void)
 static bool
 can_collect_seq(void)
 {
-  return ultra && collect_token && (!empty(coll_q) || (eof && unfinished_work != NULL)) && (work_units > 0 || unfinished_work != NULL);
+  return ultra && collect_token &&
+    (!empty(coll_q) || (eof && unfinished_work != NULL)) &&
+    (work_units > 0 || unfinished_work != NULL);
 }
 
 
@@ -198,8 +200,9 @@ do_collect_seq(void)
 static bool
 can_transmit(void)
 {
-  return !empty(trans_q) && (out_slots > TRANSM_THRESH ||
-                             (out_slots > 0 && pos_eq(peek(trans_q)->pos, order)));
+  return !empty(trans_q) &&
+    (out_slots > TRANSM_THRESH ||
+     (out_slots > 0 && pos_eq(peek(trans_q)->pos, order)));
 }
 
 

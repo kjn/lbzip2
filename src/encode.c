@@ -770,8 +770,8 @@ make_code_lengths(uint8_t length[], uint32_t frequency[], uint32_t as)
    minimal. We use a kind of a heuristic to achieve that. There might exist a
    better way to achieve that, but this one seems to be good (and fast) enough.
 
-   If the symbol v belongs to the equivalence class t then set s->u.s.length[t][v]
-   to zero. Otherwise set it to 1.
+   If the symbol v belongs to the equivalence class t then set
+   s->u.s.length[t][v] to zero. Otherwise set it to 1.
 */
 static void
 generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
@@ -1100,7 +1100,8 @@ generate_prefix_code(struct encoder_state *s)
 
         /* Create lookup tables for this tree. These tables are used by the
            transmiter to quickly send codes for MTF values. */
-        cost += assign_codes(s->u.s.code[t], s->u.s.length[t], s->u.s.frequency[t], as);
+        cost += assign_codes(s->u.s.code[t], s->u.s.length[t],
+                             s->u.s.frequency[t], as);
         s->u.s.code[t][as] = 0;
         s->u.s.length[t][as] = 0;
       }
