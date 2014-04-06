@@ -19,6 +19,10 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+
+#include "xalloc.h"             /* xmalloc() */
+
+
 /* Task - smallest schedulable unit.
 */
 struct task {

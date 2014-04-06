@@ -1,7 +1,7 @@
 /*-
   main.c -- main module
 
-  Copyright (C) 2011, 2012 Mikolaj Izdebski
+  Copyright (C) 2011, 2012, 2014 Mikolaj Izdebski
   Copyright (C) 2008, 2009, 2010 Laszlo Ersek
 
   This file is part of lbzip2.
@@ -32,6 +32,7 @@
 
 #include "stat-time.h"          /* get_stat_atime() */
 #include "utimens.h"            /* fdutimens() */
+#include "xalloc.h"             /* XMALLOC() */
 
 #include "signals.h"            /* setup_signals() */
 #include "main.h"               /* pname */

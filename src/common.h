@@ -1,7 +1,7 @@
 /*-
   common.h -- common declarations
 
-  Copyright (C) 2012 Mikolaj Izdebski
+  Copyright (C) 2012, 2014 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -29,8 +29,6 @@
 #include <stdbool.h>            /* bool */
 #include <stddef.h>             /* size_t */
 #include <stdlib.h>             /* abort() */
-
-#include "xalloc.h"             /* XMALLOC() */
 
 
 /* Tracing, useful in debugging, but not officially supported. */
