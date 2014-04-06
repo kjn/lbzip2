@@ -1,7 +1,7 @@
 /*-
   divbwt.c -- Burrows-Wheeler transformation
 
-  Copyright (C) 2012 Mikolaj Izdebski
+  Copyright (C) 2012, 2014 Mikolaj Izdebski
   Copyright (c) 2012 Yuta Mori
 
   This file is part of lbzip2.
@@ -24,6 +24,8 @@
 
 #include "encode.h"
 
+#include <strings.h>            /* bzero() */
+
 
 /*- Settings -*/
 #define SS_INSERTIONSORT_THRESHOLD 8
@@ -39,9 +41,6 @@ typedef int_fast32_t saint_t;
 
 /*- Constants -*/
 #define INLINE
-/* for divsufsort.c */
-#define BUCKET_A_SIZE (ALPHABET_SIZE)
-#define BUCKET_B_SIZE (ALPHABET_SIZE * ALPHABET_SIZE)
 /* for sssort.c */
 #if defined(SS_INSERTIONSORT_THRESHOLD)
 # if SS_INSERTIONSORT_THRESHOLD < 1
@@ -121,13 +120,13 @@ typedef int_fast32_t saint_t;
     (_c) = stack[ssize].c, (_d) = stack[ssize].d, (_e) = stack[ssize].e;\
   } while(0)
 /* for divsufsort.c */
-#define BUCKET_A(_c0) bucket_A[(_c0)]
+#define BUCKET_A(_c0) bucket[(_c0) + ALPHABET_SIZE * ALPHABET_SIZE]
 #if ALPHABET_SIZE == 256
-#define BUCKET_B(_c0, _c1) (bucket_B[((_c1) << 8) | (_c0)])
-#define BUCKET_BSTAR(_c0, _c1) (bucket_B[((_c0) << 8) | (_c1)])
+#define BUCKET_B(_c0, _c1) (bucket[((_c1) << 8) | (_c0)])
+#define BUCKET_BSTAR(_c0, _c1) (bucket[((_c0) << 8) | (_c1)])
 #else
-#define BUCKET_B(_c0, _c1) (bucket_B[(_c1) * ALPHABET_SIZE + (_c0)])
-#define BUCKET_BSTAR(_c0, _c1) (bucket_B[(_c0) * ALPHABET_SIZE + (_c1)])
+#define BUCKET_B(_c0, _c1) (bucket[(_c1) * ALPHABET_SIZE + (_c0)])
+#define BUCKET_BSTAR(_c0, _c1) (bucket[(_c0) * ALPHABET_SIZE + (_c1)])
 #endif
 /* for trsort.c */
 #define TR_GETC(_p) (((_p) < (ISAn - ISAd)) ? ISAd[(_p)] : ISA[(ISAd - ISA + (_p)) % (ISAn - ISA)])
@@ -1538,16 +1537,14 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
 static
 saidx_t
 sort_typeBstar(const sauchar_t *T, saidx_t *SA,
-               saidx_t *bucket_A, saidx_t *bucket_B,
-               saidx_t n) {
+               saidx_t *bucket, saidx_t n) {
   saidx_t *PAb, *ISAb, *buf;
   saidx_t i, j, k, t, m, bufsize;
   saint_t c0, c1;
   int flag;
 
   /* Initialize bucket arrays. */
-  for(i = 0; i < BUCKET_A_SIZE; ++i) { bucket_A[i] = 0; }
-  for(i = 0; i < BUCKET_B_SIZE; ++i) { bucket_B[i] = 0; }
+  bzero(bucket, (ALPHABET_SIZE + 1) * ALPHABET_SIZE * sizeof(saidx_t));
 
   /* Count the number of occurrences of the first one or two characters of each
      type A, B and B* suffix. Moreover, store the beginning position of all
@@ -1686,8 +1683,7 @@ note:
 static
 saidx_t
 construct_BWT(const sauchar_t *T, saidx_t *SA,
-              saidx_t *bucket_A, saidx_t *bucket_B,
-              saidx_t n) {
+              saidx_t *bucket, saidx_t n) {
   saidx_t *i, *j, *k;
   saidx_t s, t, orig = -10;
   saint_t c0, c1, c2;
@@ -1757,8 +1753,7 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
 /*- Function -*/
 
 saidx_t
-divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
-  saidx_t *bucket_A, *bucket_B;
+divbwt(sauchar_t *T, saidx_t *SA, saidx_t *bucket, saidx_t n) {
   saidx_t m, pidx, i;
 
   /* Check arguments. */
@@ -1767,20 +1762,14 @@ divbwt(sauchar_t *T, saidx_t *SA, saidx_t n) {
 
   T[n] = T[0];
 
-  bucket_A = XCALLOC(BUCKET_A_SIZE, saidx_t);
-  bucket_B = XCALLOC(BUCKET_B_SIZE, saidx_t);
-
   /* Burrows-Wheeler Transform. */
-  m = sort_typeBstar(T, SA, bucket_A, bucket_B, n);
+  m = sort_typeBstar(T, SA, bucket, n);
   if(0 < m) {
-    pidx = construct_BWT(T, SA, bucket_A, bucket_B, n);
+    pidx = construct_BWT(T, SA, bucket, n);
   } else {
     pidx = 0;
     for(i = 0; i < n; ++i) { SA[i] = T[0]; }
   }
-
-  free(bucket_B);
-  free(bucket_A);
 
   return pidx;
 }

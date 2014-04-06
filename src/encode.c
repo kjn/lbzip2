@@ -76,18 +76,23 @@ struct encoder_state {
   uint32_t max_block_size;
   uint32_t cluster_factor;
 
-  uint8_t selector[18000 + 1 + 1];
-  uint8_t selectorMTF[18000 + 1 + 7];
-  uint32_t num_selectors;
-  uint32_t num_trees;
-  /* There is a sentinel symbol added at the end of each alphabet,
-     hence the +1s below. */
-  uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
-  uint32_t code[MAX_TREES][MAX_ALPHA_SIZE + 1];
-  uint32_t frequency[MAX_TREES][MAX_ALPHA_SIZE + 1];
+  union {
+    struct {
+      uint8_t selector[18000 + 1 + 1];
+      uint8_t selectorMTF[18000 + 1 + 7];
+      uint32_t num_selectors;
+      uint32_t num_trees;
+      /* There is a sentinel symbol added at the end of each alphabet,
+         hence the +1s below. */
+      uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
+      uint32_t code[MAX_TREES][MAX_ALPHA_SIZE + 1];
+      uint32_t frequency[MAX_TREES][MAX_ALPHA_SIZE + 1];
+      unsigned tmap_old2new[MAX_TREES];
+      unsigned tmap_new2old[MAX_TREES];
+    } s;
 
-  unsigned tmap_old2new[MAX_TREES];
-  unsigned tmap_new2old[MAX_TREES];
+    int32_t bucket[65536 + 256];
+  } u;
 
   int32_t SA[0];
 };
@@ -449,8 +454,8 @@ encode(struct encoder_state *s, uint32_t *crc)
   /* Sort block. */
   assert(s->nblock > 0);
 
-  s->bwt_idx = divbwt(block, s->SA, s->nblock);
-  s->nmtf = do_mtf(s->SA, s->code[0], cmap, s->nblock, EOB);
+  s->bwt_idx = divbwt(block, s->SA, s->u.bucket, s->nblock);
+  s->nmtf = do_mtf(s->SA, s->u.s.code[0], cmap, s->nblock, EOB);
 
   cost = 48    /* header */
        + 32    /* crc */
@@ -465,8 +470,8 @@ encode(struct encoder_state *s, uint32_t *crc)
 
   cost += generate_prefix_code(s);
 
-  sp = s->selector;
-  smp = s->selectorMTF;
+  sp = s->u.s.selector;
+  smp = s->u.s.selectorMTF;
 
   /* A trick that allows to do MTF without branching, using arithmetical
      and logical operations only.  The whole MTF state packed into one
@@ -477,14 +482,14 @@ encode(struct encoder_state *s, uint32_t *crc)
   p = 0x543210;
 
   assert(*sp < MAX_TREES);
-  assert(s->tmap_old2new[*sp] == 0);
+  assert(s->u.s.tmap_old2new[*sp] == 0);
 
   while ((c = *sp) != MAX_TREES) {
     uint32_t v, z, l, h;
 
-    c = s->tmap_old2new[c];
-    assert(c < s->num_trees);
-    assert((size_t)(sp - s->selector) < s->num_selectors);
+    c = s->u.s.tmap_old2new[c];
+    assert(c < s->u.s.num_trees);
+    assert((size_t)(sp - s->u.s.selector) < s->u.s.num_selectors);
 
     v = p ^ (0x111111 * c);
     z = (v + 0xEEEEEF) & 0x888888;
@@ -510,7 +515,7 @@ encode(struct encoder_state *s, uint32_t *crc)
      multiply of 8 bits. */
   j = cost & 0x7;
   j = (8 - j) & 0x7;
-  s->num_selectors += j;
+  s->u.s.num_selectors += j;
   cost += j;
   while (j--)
     *smp++ = 0;
@@ -765,7 +770,7 @@ make_code_lengths(uint8_t length[], uint32_t frequency[], uint32_t as)
    minimal. We use a kind of a heuristic to achieve that. There might exist a
    better way to achieve that, but this one seems to be good (and fast) enough.
 
-   If the symbol v belongs to the equivalence class t then set s->length[t][v]
+   If the symbol v belongs to the equivalence class t then set s->u.s.length[t][v]
    to zero. Otherwise set it to 1.
 */
 static void
@@ -779,12 +784,12 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
   unsigned t;      /* current tree */
 
   /* Equivalence classes are initially empty. */
-  memset(s->length, 1, sizeof(s->length));
+  memset(s->u.s.length, 1, sizeof(s->u.s.length));
 
   /* Determine effective alphabet size. */
   as = 0;
   for (a = 0, cum = 0; cum < nm; a++) {
-    freq = s->code[0][a];
+    freq = s->u.s.code[0][a];
     cum += freq;
     as += min(freq, 1);
   }
@@ -802,12 +807,12 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
 
     /* Find a range of symbols which total count is roughly proportional to one
        nt-th of all values. */
-    freq = s->code[0][a];
+    freq = s->u.s.code[0][a];
     cum = freq;
     as -= min(freq, 1);
     b = a+1;
     while (as > nt-1 && cum * nt < nm) {
-      freq = s->code[0][b];
+      freq = s->u.s.code[0][b];
       cum += freq;
       as -= min(freq, 1);
       b++;
@@ -824,7 +829,7 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
     Trace(("Tree %u: EC=[%3u,%3u), |EC|=%3u, cum=%6u", t, a, b, b-a, cum));
 
     /* Now [a,b) is our range -- assign it to equivalence class t. */
-    bzero(&s->length[t][a], b - a);
+    bzero(&s->u.s.length[t][a], b - a);
     a = b;
     nm -= cum;
   }
@@ -1006,7 +1011,7 @@ generate_prefix_code(struct encoder_state *s)
   uint32_t nm = s->nmtf;
 
   as = mtfv[nm - 1] + 1;       /* the last mtfv is EOB */
-  s->num_selectors = (nm + GROUP_SIZE - 1) / GROUP_SIZE;
+  s->u.s.num_selectors = (nm + GROUP_SIZE - 1) / GROUP_SIZE;
 
   /* Decide how many prefix-free trees to use for current block.  The best
      for compression ratio would be to always use the maximal number of trees.
@@ -1023,7 +1028,7 @@ generate_prefix_code(struct encoder_state *s)
         nm >  150 ? 2 : 1);
 
   /* Complete the last group with dummy symbols. */
-  for (i = nm; i < s->num_selectors * GROUP_SIZE; i++)
+  for (i = nm; i < s->u.s.num_selectors * GROUP_SIZE; i++)
     mtfv[i] = as;
 
   /* Grow up an initial forest. */
@@ -1044,18 +1049,18 @@ generate_prefix_code(struct encoder_state *s)
        50 codes, each code is at most 20 bit long, so each group is coded
        by at most 1000 bits.  We can store that in 10 bits. */
     for (v = 0; v < as; v++)
-      len_pack[v] = (((uint64_t)s->length[0][v]      ) +
-                     ((uint64_t)s->length[1][v] << 10) +
-                     ((uint64_t)s->length[2][v] << 20) +
-                     ((uint64_t)s->length[3][v] << 30) +
-                     ((uint64_t)s->length[4][v] << 40) +
-                     ((uint64_t)s->length[5][v] << 50));
+      len_pack[v] = (((uint64_t)s->u.s.length[0][v]      ) +
+                     ((uint64_t)s->u.s.length[1][v] << 10) +
+                     ((uint64_t)s->u.s.length[2][v] << 20) +
+                     ((uint64_t)s->u.s.length[3][v] << 30) +
+                     ((uint64_t)s->u.s.length[4][v] << 40) +
+                     ((uint64_t)s->u.s.length[5][v] << 50));
     len_pack[as] = 0;
 
-    sp = s->selector;
+    sp = s->u.s.selector;
 
     /* (E): Expectation step -- estimate likehood. */
-    bzero(s->frequency, nt * sizeof(*s->frequency));
+    bzero(s->u.s.frequency, nt * sizeof(*s->u.s.frequency));
     for (gs = mtfv; gs < mtfv + nm; gs += GROUP_SIZE) {
       /* Check out which prefix-free tree is the best to encode current
          group.  Then increment symbol frequencies for the chosen tree
@@ -1064,15 +1069,15 @@ generate_prefix_code(struct encoder_state *s)
       assert(t < nt);
       *sp++ = t;
       for (i = 0; i < GROUP_SIZE; i++)
-        s->frequency[t][gs[i]]++;
+        s->u.s.frequency[t][gs[i]]++;
     }
 
-    assert((size_t)(sp - s->selector) == s->num_selectors);
+    assert((size_t)(sp - s->u.s.selector) == s->u.s.num_selectors);
     *sp = MAX_TREES;  /* sentinel */
 
     /* (M): Maximization step -- maximize expectations. */
     for (t = 0; t < nt; t++)
-      make_code_lengths(s->length[t], s->frequency[t], as);
+      make_code_lengths(s->u.s.length[t], s->u.s.frequency[t], as);
   }
 
   cost = 0;
@@ -1083,21 +1088,21 @@ generate_prefix_code(struct encoder_state *s)
        i-th tree exists but hasn't been seen yet. */
     unsigned not_seen = (1 << nt) - 1;
     unsigned t, v;
-    uint8_t *sp = s->selector;
+    uint8_t *sp = s->u.s.selector;
 
     nt = 0;
     while (not_seen > 0 && (t = *sp++) < MAX_TREES) {
       if (not_seen & (1 << t)) {
         not_seen -= 1 << t;
-        s->tmap_old2new[t] = nt;
-        s->tmap_new2old[nt] = t;
+        s->u.s.tmap_old2new[t] = nt;
+        s->u.s.tmap_new2old[nt] = t;
         nt++;
 
         /* Create lookup tables for this tree. These tables are used by the
            transmiter to quickly send codes for MTF values. */
-        cost += assign_codes(s->code[t], s->length[t], s->frequency[t], as);
-        s->code[t][as] = 0;
-        s->length[t][as] = 0;
+        cost += assign_codes(s->u.s.code[t], s->u.s.length[t], s->u.s.frequency[t], as);
+        s->u.s.code[t][as] = 0;
+        s->u.s.length[t][as] = 0;
       }
     }
 
@@ -1107,16 +1112,16 @@ generate_prefix_code(struct encoder_state *s)
     assert(nt >= 1);
     if (nt == 1) {
       nt = 2;
-      t = s->tmap_new2old[0] ^ 1;
-      s->tmap_old2new[t] = 1;
-      s->tmap_new2old[1] = t;
+      t = s->u.s.tmap_new2old[0] ^ 1;
+      s->u.s.tmap_old2new[t] = 1;
+      s->u.s.tmap_new2old[1] = t;
       for (v = 0; v < MAX_ALPHA_SIZE; v++)
-        s->length[t][v] = MAX_CODE_LENGTH;
+        s->u.s.length[t][v] = MAX_CODE_LENGTH;
       cost += as + 5;
     }
   }
 
-  s->num_trees = nt;
+  s->u.s.num_trees = nt;
   return cost;
 }
 
@@ -1179,11 +1184,11 @@ transmit(struct encoder_state *s, void *buf)
   }
 
   /* Transmit selectors. */
-  assert(s->num_trees >= MIN_TREES && s->num_trees <= MAX_TREES);
-  SEND(3, s->num_trees);
-  ns = s->num_selectors;
+  assert(s->u.s.num_trees >= MIN_TREES && s->u.s.num_trees <= MAX_TREES);
+  SEND(3, s->u.s.num_trees);
+  ns = s->u.s.num_selectors;
   SEND(15, ns);
-  sp = s->selectorMTF;
+  sp = s->u.s.selectorMTF;
   while (ns--) {
     v = 1 + *sp++;
     SEND(v, (1 << v) - 2);
@@ -1194,9 +1199,9 @@ transmit(struct encoder_state *s, void *buf)
   ns = (s->nmtf + GROUP_SIZE - 1) / GROUP_SIZE;
 
   /* Transmit prefix trees. */
-  for (t = 0; t < s->num_trees; t++) {
+  for (t = 0; t < s->u.s.num_trees; t++) {
     int32_t a, c;
-    uint8_t *len = s->length[s->tmap_new2old[t]];
+    uint8_t *len = s->u.s.length[s->u.s.tmap_new2old[t]];
 
     a = len[0];
     SEND(6, a << 1);
@@ -1221,9 +1226,9 @@ transmit(struct encoder_state *s, void *buf)
     const uint8_t *B;    /* code lengths */
     unsigned mv;         /* symbol (MTF value) */
 
-    t = s->selector[gr];
-    L = s->code[t];
-    B = s->length[t];
+    t = s->u.s.selector[gr];
+    L = s->u.s.code[t];
+    B = s->u.s.length[t];
 
     for (i = 0; i < GROUP_SIZE; i++) {
       mv = *mtfv++;
