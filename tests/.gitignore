@@ -9,3 +9,4 @@ core
 minbzcat
 test-suite.log
 timeout
+tmp.*
