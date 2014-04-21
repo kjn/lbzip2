@@ -38,6 +38,7 @@ TESTS = \
     empty.bz2 \
     fib.bz2 \
     gap.bz2 \
+    idx899999.bz2 \
     incomp-1.bz2 \
     incomp-2.bz2 \
     load0.bz2 \

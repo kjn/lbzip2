@@ -62,6 +62,12 @@ Test cases for lbzip2.                                          -*- outline -*-
    Check if decompressor allows a gap consisting of garbage bytes between
    bzip2 streams. Pre-2.0 lbzip2 allows that.
 
+** idx899999
+
+   An interesting case with maximal possible value of BWT primary
+   index (899999).  There are 899999 type A suffixes and only one type
+   B* suffix.
+
 ** incomp-[12]
 
    Check if cyclic, non-randomized files are supported. See comments in
