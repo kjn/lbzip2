@@ -39,8 +39,8 @@ struct process {
   void (*init)(void);        /* called once before process is started */
   void (*uninit)(void);      /* called once after process finishes */
   bool (*finished)(void);    /* returns true iff stop condition was reached */
-  void (*on_block)(void *buffer, size_t size);   /* inout block is available */
-  void (*on_written)(void *buffer);              /* outout block was written */
+  void (*on_block)(void *buffer, size_t size);   /* input block is available */
+  void (*on_written)(void *buffer);              /* output block was written */
 };
 
 /* Unique position in compressed stream.  This limits maximal supported stream
