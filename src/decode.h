@@ -1,7 +1,7 @@
 /*-
   decode.h -- low-level decompressor header
 
-  Copyright (C) 2012 Mikolaj Izdebski
+  Copyright (C) 2012, 2014 Mikolaj Izdebski
 
   This file is part of lbzip2.
 
@@ -30,6 +30,7 @@ struct parser_state {
   int bs100k;
   uint32_t stored_crc;
   uint32_t computed_crc;
+  int stream_mode;
 };
 
 
@@ -69,7 +70,7 @@ struct source;
 
 extern uint32_t crc_table[256];
 
-void parser_init(struct parser_state *ps, int bs100k);
+void parser_init(struct parser_state *ps, int bs100k, int stream_mode);
 int parse(struct parser_state *ps, struct header *hd, struct bitstream *bs,
           unsigned *garbage);
 int scan(struct bitstream *bs, unsigned skip);

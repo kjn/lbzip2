@@ -121,11 +121,12 @@ enum {
 
 
 void
-parser_init(struct parser_state *ps, int my_bs100k)
+parser_init(struct parser_state *ps, int bs100k, int stream_mode)
 {
   ps->state = BLOCK_MAGIC_1;
-  ps->bs100k = my_bs100k;
+  ps->bs100k = bs100k;
   ps->computed_crc = 0u;
+  ps->stream_mode = stream_mode;
 }
 
 
@@ -155,6 +156,7 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
 
     switch (ps->state) {
     case STREAM_MAGIC_1:
+      assert(!ps->stream_mode);
       if (0x425Au != word) {
         hd->bs100k = -1;
         hd->crc = 0;
@@ -166,6 +168,7 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
       continue;
 
     case STREAM_MAGIC_2:
+      assert(!ps->stream_mode);
       if (0x6839u < word || 0x6831 > word) {
         hd->bs100k = -1;
         hd->crc = 0;
@@ -233,6 +236,11 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
       ps->stored_crc = (ps->stored_crc << 16) | word;
       if (ps->stored_crc != ps->computed_crc)
         return ERR_STRMCRC;
+      if (ps->stream_mode) {
+        ps->state = ACCEPT;
+        *garbage = 0;
+        return FINISH;
+      }
       ps->computed_crc = 0u;
       bits_align(bs);
       ps->state = STREAM_MAGIC_1;

@@ -898,7 +898,7 @@ init(void)
   reord_offs = 0;
 
   parser_bs = bits_init(0);
-  parser_init(&par, bs100k);
+  parser_init(&par, bs100k, 0);
 }
 
 
