@@ -73,7 +73,6 @@
 
 #include <arpa/inet.h>          /* htonl() */
 
-#include "main.h"               /* Trace() */
 #include "decode.h"             /* bits_need() */
 
 #include "scantab.h"
