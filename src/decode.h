@@ -79,5 +79,4 @@ size_t decoder_alloc_size(void);
 void decoder_init(struct decoder_state *ds);
 int retrieve(struct decoder_state *ds, struct bitstream *bs);
 void decode(struct decoder_state *ds);
-int verify(struct decoder_state *ds);
 int emit(struct decoder_state *ds, void *buf, size_t *buf_sz);
