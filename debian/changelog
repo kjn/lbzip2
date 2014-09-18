@@ -1,3 +1,9 @@
+lbzip2 (2.5-2) unstable; urgency=low
+
+  * debian/control: Bump Standards-Version to 3.9.6.
+
+ -- Mikolaj Izdebski <zurgunt@gmail.com>  Thu, 18 Sep 2014 20:33:14 +0200
+
 lbzip2 (2.5-1) unstable; urgency=low
 
   * New upstream release:
