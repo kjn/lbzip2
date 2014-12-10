@@ -78,7 +78,8 @@ cleanup(void)
 /* Called when one of xalloc functions fails. */
 void xalloc_die(void)
 {
-  failx(errno, "xalloc");
+  fail("Insufficient memory to complete operation."
+       " See manual page for ways of reducing memory usage.");
 }
 
 
