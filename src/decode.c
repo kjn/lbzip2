@@ -691,7 +691,7 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
             continue;
           }
 
-          if (unlikely(run > tt_limit - tt)) {
+          if (unlikely(run > (size_t)(tt_limit - tt))) {
             return ERR_OVERFLOW;
           }
 
@@ -735,7 +735,7 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
 
           if (unlikely(IS_EOB(s))) {
           eob:
-            if (unlikely(rs->run > tt_limit - tt))
+            if (unlikely(rs->run > (size_t)(tt_limit - tt)))
               return ERR_OVERFLOW;
 
             ds->ftab[rs->runChar] += rs->run;
@@ -770,7 +770,7 @@ retrieve(struct decoder_state *restrict ds, struct bitstream *bs)
              bytes.  Zero-length run is possible only at the beginning,
              once per block, so any optimization involving zero-length
              runs are pointless. */
-          if (unlikely(rs->run > tt_limit - tt)) {
+          if (unlikely(rs->run > (size_t)(tt_limit - tt))) {
             return ERR_OVERFLOW;
           }
 

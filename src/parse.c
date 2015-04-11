@@ -288,7 +288,7 @@ scan(struct bitstream *bs, unsigned skip)
     skip -= bs->live;
     bits_dump(bs, bs->live);
     skip = (skip + 31u) / 32u;
-    if (bs->limit - bs->data < skip)
+    if ((size_t)(bs->limit - bs->data) < skip)
       bs->data = bs->limit;
     else
       bs->data += skip;
