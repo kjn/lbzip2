@@ -188,7 +188,7 @@ sti(void)
 
 
 /* Terminate the process with a signal. */
-static void _Noreturn
+_Noreturn static void
 terminate(int sig)
 {
   sigset_t set;

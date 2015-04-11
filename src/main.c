@@ -260,7 +260,7 @@ xed with `.out'.\n"
     "ong with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
 
 
-static void _Noreturn
+_Noreturn static void
 usage(void)
 {
   if (0 > printf(USAGE_STRING))
@@ -271,7 +271,7 @@ usage(void)
 }
 
 
-static void _Noreturn
+_Noreturn static void
 version(void)
 {
   if (0 > printf(HELP_STRING))

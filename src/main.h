@@ -74,13 +74,13 @@ void warnx(int x, const char *fmt, ...)
   __attribute__((format(printf, 2, 3)));
 void warnfx(const struct filespec *f, int x, const char *fmt, ...)
   __attribute__((format(printf, 3, 4)));
-void _Noreturn fail(const char *fmt, ...)
+_Noreturn void fail(const char *fmt, ...)
   __attribute__((format(printf, 1, 2)));
-void _Noreturn failf(const struct filespec *f, const char *fmt, ...)
+_Noreturn void failf(const struct filespec *f, const char *fmt, ...)
   __attribute__((format(printf, 2, 3)));
-void _Noreturn failx(int x, const char *fmt, ...)
+_Noreturn void failx(int x, const char *fmt, ...)
   __attribute__((format(printf, 2, 3)));
-void _Noreturn failfx(const struct filespec *f, int x, const char *fmt, ...)
+_Noreturn void failfx(const struct filespec *f, int x, const char *fmt, ...)
   __attribute__((format(printf, 3, 4)));
 void display(const char *fmt, ...)
   __attribute__((format(printf, 1, 2)));

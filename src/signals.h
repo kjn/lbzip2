@@ -24,6 +24,6 @@ void cli(void);
 void sti(void);
 void halt(void);
 void xraise(int sig);
-void _Noreturn bailout(void);
+_Noreturn void bailout(void);
 
 void cleanup(void);
