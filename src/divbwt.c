@@ -142,6 +142,12 @@ static const saint_t lg_table[256]= {
   7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7
 };
 
+static
+saidx_t
+getidx(saidx_t *pa) {
+  saidx_t a = *pa;
+  return (0 <= a) ? a : ~a;
+}
 
 /*---- sssort ----*/
 
@@ -613,7 +619,7 @@ ss_inplacemerge(const sauchar_t *T, const saidx_t *PA,
         0 < len;
         len = half, half >>= 1) {
       b = a + half;
-      q = ss_compare(T, PA + ((0 <= *b) ? *b : ~*b), p, depth);
+      q = ss_compare(T, PA + getidx(b), p, depth);
       if(q < 0) {
         a = b + 1;
         half -= (len & 1) ^ 1;
@@ -746,6 +752,20 @@ ss_mergebackward(const sauchar_t *T, const saidx_t *PA,
   }
 }
 
+static
+void
+merge_check(const sauchar_t *T, const saidx_t *PA,
+            saidx_t *first, saidx_t *last,
+            saint_t check, saidx_t depth) {
+  if((check & 1) ||
+     ((check & 2) && (ss_compare(T, PA + getidx(first - 1), PA + *first, depth) == 0))) {
+    *first = ~*first;
+  }
+  if((check & 4) && ((ss_compare(T, PA + getidx(last - 1), PA + *last, depth) == 0))) {
+    *last = ~*last;
+  }
+}
+
 /* D&C based merge. */
 static
 void
@@ -753,17 +773,6 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
              saidx_t *first, saidx_t *middle, saidx_t *last,
              saidx_t *buf, saidx_t bufsize, saidx_t depth) {
 #define STACK_SIZE SS_SMERGE_STACKSIZE
-#define GETIDX(a) ((0 <= (a)) ? (a) : (~(a)))
-#define MERGE_CHECK(a, b, c)\
-  do {\
-    if(((c) & 1) ||\
-       (((c) & 2) && (ss_compare(T, PA + GETIDX(*((a) - 1)), PA + *(a), depth) == 0))) {\
-      *(a) = ~*(a);\
-    }\
-    if(((c) & 4) && ((ss_compare(T, PA + GETIDX(*((b) - 1)), PA + *(b), depth) == 0))) {\
-      *(b) = ~*(b);\
-    }\
-  } while(0)
   struct { saidx_t *a, *b, *c; saint_t d; } stack[STACK_SIZE];
   saidx_t *l, *r, *lm, *rm;
   saidx_t m, len, half;
@@ -775,7 +784,7 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
       if((first < middle) && (middle < last)) {
         ss_mergebackward(T, PA, first, middle, last, buf, depth);
       }
-      MERGE_CHECK(first, last, check);
+      merge_check(T, PA, first, last, check, depth);
       STACK_POP(first, middle, last, check);
       continue;
     }
@@ -784,7 +793,7 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
       if(first < middle) {
         ss_mergeforward(T, PA, first, middle, last, buf, depth);
       }
-      MERGE_CHECK(first, last, check);
+      merge_check(T, PA, first, last, check, depth);
       STACK_POP(first, middle, last, check);
       continue;
     }
@@ -792,8 +801,8 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
     for(m = 0, len = MIN(middle - first, last - middle), half = len >> 1;
         0 < len;
         len = half, half >>= 1) {
-      if(ss_compare(T, PA + GETIDX(*(middle + m + half)),
-                       PA + GETIDX(*(middle - m - half - 1)), depth) < 0) {
+      if(ss_compare(T, PA + getidx(middle + m + half),
+                       PA + getidx(middle - m - half - 1), depth) < 0) {
         m += half + 1;
         half -= (len & 1) ^ 1;
       }
@@ -823,10 +832,10 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
         first = r, middle = rm, check = (next & 3) | (check & 4);
       }
     } else {
-      if(ss_compare(T, PA + GETIDX(*(middle - 1)), PA + *middle, depth) == 0) {
+      if(ss_compare(T, PA + getidx(middle - 1), PA + *middle, depth) == 0) {
         *middle = ~*middle;
       }
-      MERGE_CHECK(first, last, check);
+      merge_check(T, PA, first, last, check, depth);
       STACK_POP(first, middle, last, check);
     }
   }
