@@ -152,39 +152,9 @@ static const saint_t lg_table[256]= {
 static INLINE
 saint_t
 ss_ilg(saidx_t n) {
-#if SS_BLOCKSIZE == 0
-# if defined(BUILD_DIVSUFSORT64)
-  return (n >> 32) ?
-          ((n >> 48) ?
-            ((n >> 56) ?
-              56 + lg_table[(n >> 56) & 0xff] :
-              48 + lg_table[(n >> 48) & 0xff]) :
-            ((n >> 40) ?
-              40 + lg_table[(n >> 40) & 0xff] :
-              32 + lg_table[(n >> 32) & 0xff])) :
-          ((n & 0xffff0000) ?
-            ((n & 0xff000000) ?
-              24 + lg_table[(n >> 24) & 0xff] :
-              16 + lg_table[(n >> 16) & 0xff]) :
-            ((n & 0x0000ff00) ?
-               8 + lg_table[(n >>  8) & 0xff] :
-               0 + lg_table[(n >>  0) & 0xff]));
-# else
-  return (n & 0xffff0000) ?
-          ((n & 0xff000000) ?
-            24 + lg_table[(n >> 24) & 0xff] :
-            16 + lg_table[(n >> 16) & 0xff]) :
-          ((n & 0x0000ff00) ?
-             8 + lg_table[(n >>  8) & 0xff] :
-             0 + lg_table[(n >>  0) & 0xff]);
-# endif
-#elif SS_BLOCKSIZE < 256
-  return lg_table[n];
-#else
   return (n & 0xff00) ?
           8 + lg_table[(n >> 8) & 0xff] :
           0 + lg_table[(n >> 0) & 0xff];
-#endif
 }
 
 #endif /* (SS_BLOCKSIZE == 0) || (SS_INSERTIONSORT_THRESHOLD < SS_BLOCKSIZE) */
@@ -215,25 +185,17 @@ saidx_t
 ss_isqrt(saidx_t x) {
   saidx_t y, e;
 
-  if(x >= (SS_BLOCKSIZE * SS_BLOCKSIZE)) { return SS_BLOCKSIZE; }
-  e = (x & 0xffff0000) ?
-        ((x & 0xff000000) ?
-          24 + lg_table[(x >> 24) & 0xff] :
-          16 + lg_table[(x >> 16) & 0xff]) :
-        ((x & 0x0000ff00) ?
-           8 + lg_table[(x >>  8) & 0xff] :
-           0 + lg_table[(x >>  0) & 0xff]);
+  assert(x <= 0x00ffffff);
+  if(x < 0x100) { return sqq_table[x] >> 4; }
 
-  if(e >= 16) {
-    y = sqq_table[x >> ((e - 6) - (e & 1))] << ((e >> 1) - 7);
-    if(e >= 24) { y = (y + 1 + x / y) >> 1; }
-    y = (y + 1 + x / y) >> 1;
-  } else if(e >= 8) {
+  if(x < 0x10000) {
+    e = 8 + lg_table[(x >> 8) & 0xff];
     y = (sqq_table[x >> ((e - 6) - (e & 1))] >> (7 - (e >> 1))) + 1;
   } else {
-    return sqq_table[x] >> 4;
+    e = 16 + lg_table[(x >> 16) & 0xff];
+    y = sqq_table[x >> ((e - 6) - (e & 1))] << ((e >> 1) - 7);
+    y = (y + 1 + x / y) >> 1;
   }
-
   return (x < (y * y)) ? y - 1 : y;
 }
 
@@ -960,31 +922,11 @@ sssort(const sauchar_t *T, const saidx_t *PA,
 static INLINE
 saint_t
 tr_ilg(saidx_t n) {
-#if defined(BUILD_DIVSUFSORT64)
-  return (n >> 32) ?
-          ((n >> 48) ?
-            ((n >> 56) ?
-              56 + lg_table[(n >> 56) & 0xff] :
-              48 + lg_table[(n >> 48) & 0xff]) :
-            ((n >> 40) ?
-              40 + lg_table[(n >> 40) & 0xff] :
-              32 + lg_table[(n >> 32) & 0xff])) :
-          ((n & 0xffff0000) ?
-            ((n & 0xff000000) ?
-              24 + lg_table[(n >> 24) & 0xff] :
-              16 + lg_table[(n >> 16) & 0xff]) :
-            ((n & 0x0000ff00) ?
-               8 + lg_table[(n >>  8) & 0xff] :
-               0 + lg_table[(n >>  0) & 0xff]));
-#else
-  return (n & 0xffff0000) ?
-          ((n & 0xff000000) ?
-            24 + lg_table[(n >> 24) & 0xff] :
-            16 + lg_table[(n >> 16) & 0xff]) :
-          ((n & 0x0000ff00) ?
-             8 + lg_table[(n >>  8) & 0xff] :
-             0 + lg_table[(n >>  0) & 0xff]);
-#endif
+  return (n & 0x00ffff00) ?
+          ((n & 0x00ff0000) ?
+            16 + lg_table[(n >> 16) & 0xff] :
+             8 + lg_table[(n >>  8) & 0xff]) :
+             0 + lg_table[(n >>  0) & 0xff];
 }
 
 
