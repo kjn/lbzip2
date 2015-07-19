@@ -979,5 +979,5 @@ main(int argc, char **argv)
     failx(errno, "close(stdout)");
   }
 
-  _exit(warned ? EX_WARN : EX_OK);
+  exit(warned ? EX_WARN : EX_OK);
 }
