@@ -1127,11 +1127,16 @@ generate_prefix_code(struct encoder_state *s)
 }
 
 
-#define SEND(n,v)                               \
+#define PUTBIT(n,v)                             \
   b = (b << (n)) | (v);                         \
-  if ((k += (n)) >= 32) {                       \
-    uint32_t w = (uint32_t)(b >> (k -= 32));    \
-    *p++ = htonl(w);                            \
+  k += (n);
+#define DUMP()                                  \
+  k -= 32;                                      \
+  *p++ = htonl((uint32_t)(b >> k));
+#define SEND(n,v)                               \
+  PUTBIT((n), (v));                             \
+  if (k >= 32) {                                \
+    DUMP();                                     \
   }
 
 void *
@@ -1167,11 +1172,15 @@ transmit(struct encoder_state *s, void *buf)
   }
 
   /* Transmit block metadata. */
-  SEND(24, 0x314159);
-  SEND(24, 0x265359);
-  SEND(32, s->block_crc ^ 0xFFFFFFFF);
-  SEND(1, 0);                   /* non-rand */
-  SEND(24, s->bwt_idx);         /* bwt primary index */
+  PUTBIT(24, 0x314159);
+  PUTBIT(24, 0x265359);
+  DUMP();
+  PUTBIT(32, s->block_crc ^ 0xFFFFFFFF);
+  DUMP();
+  PUTBIT(1, 0);                   /* non-rand */
+  PUTBIT(24, s->bwt_idx);         /* bwt primary index */
+  DUMP();
+  assert(k == 9);
 
   /* Transmit character map. */
   {
@@ -1189,7 +1198,7 @@ transmit(struct encoder_state *s, void *buf)
       big = (big << 1) + !!pk;
     }
 
-    SEND(16, big);
+    PUTBIT(16, big);
     for (i = 0; i < 16; i++)
       if (pack[i]) {
         SEND(16, pack[i]);
@@ -1198,7 +1207,8 @@ transmit(struct encoder_state *s, void *buf)
 
   /* Transmit selectors. */
   assert(s->u.s.num_trees >= MIN_TREES && s->u.s.num_trees <= MAX_TREES);
-  SEND(3, s->u.s.num_trees);
+  PUTBIT(3, s->u.s.num_trees);
+  assert(k == 12 || k == 28);
   t = s->u.s.num_selectors;
   SEND(15, t);
   sp = s->u.s.selectorMTF;
