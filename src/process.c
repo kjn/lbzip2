@@ -165,15 +165,22 @@ up_heap(void *vroot, unsigned size)
   struct position *el;
   unsigned j;
 
+  /* Handle common case: inserting element to empty heap */
+  if (size == 0)
+    return;
+
   j = size;
   el = root[j];
 
-  while (j > 0 && pos_lt(*el, *root[parent(j)])) {
-    root[j] = root[parent(j)];
-    j = parent(j);
-  }
+  if (pos_lt(*el, *root[parent(j)])) {
+    do {
+      root[j] = root[parent(j)];
+      j = parent(j);
+    }
+    while (j > 0 && pos_lt(*el, *root[parent(j)]));
 
-  root[j] = el;
+    root[j] = el;
+  }
 }
 
 void
@@ -182,6 +189,10 @@ down_heap(void *vroot, unsigned size)
   struct position **root = vroot;
   struct position *el;
   unsigned j;
+
+  /* Handle common case: removing the only remaining heap element */
+  if (size == 0)
+    return;
 
   el = root[size];
   root[size] = root[0];
