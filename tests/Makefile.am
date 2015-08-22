@@ -29,3 +29,12 @@ TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 TESTS = manual.test fuzz-collect.test fuzz-divbwt.test
 
 EXTRA_DIST = $(TESTS) 32767.diff bzip2-0.1pl2.c ch255.c crc2.diff cve.c fib.c
+
+if ENABLE_COVERAGE
+clean-local:
+	$(LCOV) --rc lcov_branch_coverage=1 --directory $(top_srcdir) --zerocounters
+check-local:
+	$(LCOV) --rc lcov_branch_coverage=1 --directory $(top_srcdir) --capture --output-file coverage.info
+	rm -rf $(builddir)/coverage
+	$(GENHTML) --rc lcov_branch_coverage=1 --output-directory $(builddir)/coverage coverage.info
+endif

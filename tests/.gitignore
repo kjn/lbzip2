@@ -9,6 +9,8 @@ core
 driver
 minbzcat
 test-suite.log
+coverage.info
+coverage/
 suite/*/*.err
 suite/*/*.out
 suite/*/*.raw

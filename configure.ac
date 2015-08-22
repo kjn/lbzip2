@@ -1,5 +1,5 @@
 #-
-# Copyright (C) 2011, 2012, 2013, 2014 Mikolaj Izdebski
+# Copyright (C) 2011, 2012, 2013, 2014, 2015 Mikolaj Izdebski
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -44,6 +44,31 @@ AC_ARG_ENABLE([tracing],
     AC_DEFINE([ENABLE_TRACING], [1], [Define to enable tracing])
   ])
 ])
+
+AC_ARG_ENABLE([coverage],
+  [AS_HELP_STRING([--enable-coverage],
+      [enable code coverage report generation])],
+      [enable_coverage=yes
+
+  AC_SUBST([COVERAGE_CFLAGS], ["-fno-inline -fprofile-arcs -ftest-coverage"])
+  AC_MSG_CHECKING([whether C compiler supports code coverage flags])
+  kjn_CFLAGS="$CFLAGS"
+  CFLAGS="$CFLAGS $COVERAGE_CFLAGS"
+  AC_TRY_COMPILE([], [], [AC_MSG_RESULT([yes])], [
+    AC_MSG_RESULT([no])
+    AC_MSG_ERROR([compiler does not support code coverage flags: $COVERAGE_CFLAGS])
+  ])
+  CFLAGS="$kjn_CFLAGS"
+  AC_CHECK_PROG([LCOV], [lcov], [lcov], [])
+  if test "x$LCOV" = "x"; then
+    AC_MSG_ERROR([unable to find lcov in PATH, but it is required to generate test coverage report.])
+  fi
+  AC_CHECK_PROG([GENHTML], [genhtml], [genhtml], [])
+  if test "x$GENHTML" = "x"; then
+    AC_MSG_ERROR([unable to find genhtml in PATH, but it is required to generate test coverage report.])
+  fi
+])
+AM_CONDITIONAL([ENABLE_COVERAGE], [test "$enable_coverage" = yes])
 
 AC_ARG_ENABLE([warnings],
   [AS_HELP_STRING([--enable-warnings],
