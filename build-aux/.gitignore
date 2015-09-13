@@ -7,4 +7,4 @@ gitlog-to-changelog
 install-sh
 missing
 snippet
-test-driver
+tap-driver.sh

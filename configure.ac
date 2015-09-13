@@ -21,6 +21,7 @@ AC_INIT([lbzip2], [2.5])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_AUX_DIR([build-aux])
+AC_REQUIRE_AUX_FILE([tap-driver.sh])
 AC_CONFIG_HEADERS([lib/config.h])
 
 AM_INIT_AUTOMAKE([1.14 color-tests])
