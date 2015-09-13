@@ -110,3 +110,11 @@ enum error {
 #ifndef __GNUC__
 #define __attribute__(x)
 #endif
+
+
+#if ENABLE_COVERAGE + 0
+void __gcov_flush(void);
+#define gcov_flush() __gcov_flush()
+#else
+#define gcov_flush()
+#endif

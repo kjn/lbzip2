@@ -50,11 +50,11 @@ AC_ARG_ENABLE([coverage],
       [enable code coverage report generation])],
       [enable_coverage=yes
 
-  AC_SUBST([COVERAGE_CFLAGS], ["-fno-inline -fprofile-arcs -ftest-coverage"])
+  AC_SUBST([COVERAGE_CFLAGS], ["-fno-inline -fprofile-arcs -ftest-coverage -DENABLE_COVERAGE=1"])
   AC_MSG_CHECKING([whether C compiler supports code coverage flags])
   kjn_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS $COVERAGE_CFLAGS"
-  AC_TRY_COMPILE([], [], [AC_MSG_RESULT([yes])], [
+  AC_TRY_COMPILE([], [void __gcov_flush(void); __gcov_flush()], [AC_MSG_RESULT([yes])], [
     AC_MSG_RESULT([no])
     AC_MSG_ERROR([compiler does not support code coverage flags: $COVERAGE_CFLAGS])
   ])
