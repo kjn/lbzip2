@@ -26,7 +26,7 @@ driver_LDADD = $(top_builddir)/lib/libgnu.a
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
                   $(top_srcdir)/build-aux/tap-driver.sh
 
-TESTS = manual.test fuzz-collect.test fuzz-divbwt.test
+TESTS = manual-compress.test fuzz-collect.test fuzz-divbwt.test
 
 EXTRA_DIST = $(TESTS) 32767.diff bzip2-0.1pl2.c ch255.c crc2.diff cve.c fib.c
 
