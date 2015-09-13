@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ./driver suite/manual-expand
+exec ./driver expand suite/manual-expand

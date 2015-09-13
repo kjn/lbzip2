@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ./driver suite/fuzz-divbwt
+exec ./driver compress suite/fuzz-divbwt

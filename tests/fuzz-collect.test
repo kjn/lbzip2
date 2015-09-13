@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ./driver suite/fuzz-collect
+exec ./driver compress suite/fuzz-collect

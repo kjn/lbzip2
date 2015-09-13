@@ -198,6 +198,15 @@ xrename(const char *old, const char *new)
   }
 }
 
+/* Remove file, bail out on failure. */
+static void
+xunlink(const char *path)
+{
+  if (unlink(path) != 0) {
+    t_error("Unable to remove file %s", path);
+  }
+}
+
 /* Return file's base name. */
 static char *
 xbasename(const char *path)
@@ -427,7 +436,7 @@ t_compare(struct test_case *tc, const char *exp, const char *act)
 
 /* Run compression test case. */
 static void
-t_compress(struct test_case *tc)
+test_compress(struct test_case *tc)
 {
   char *args[2] = {NULL, NULL};
 
@@ -510,6 +519,100 @@ t_compress(struct test_case *tc)
 }
 
 
+/* Run decompression test case. */
+static void
+test_expand(struct test_case *tc)
+{
+  char *args[3] = {NULL, "-d", NULL};
+
+  int fd;
+  int is_bad;
+  off_t err_size;
+
+  char *bad;
+  char *zin;
+  char *out;
+  char *exp;
+  char *err;
+
+  int status;
+
+  bad = t_concat(tc->suite_name, "/", tc->name, ".bad", NULL);
+  zin = t_concat(tc->suite_name, "/", tc->name, ".bz2", NULL);
+  out = t_concat(tc->suite_name, "/", tc->name, ".out", NULL);
+  exp = t_concat(tc->suite_name, "/", tc->name, ".exp", NULL);
+  err = t_concat(tc->suite_name, "/", tc->name, ".err", NULL);
+
+  do {
+    is_bad = file_exists(bad);
+    if (is_bad == file_exists(exp)) {
+      if (is_bad) {
+        xunlink(bad);
+        xunlink(exp);
+      }
+      status = t_exec("./minbzcat", args, zin, out, err);
+      if (WIFSIGNALED(status)) {
+        t_error("minbzcat was killed by signal %d (%s)",
+                WTERMSIG(status), signal_name(WTERMSIG(status)));
+      }
+      if (WEXITSTATUS(status) == 0) {
+        is_bad = 0;
+        xrename(out, exp);
+      }
+      else {
+        if (WEXITSTATUS(status) != 1) {
+          t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
+        }
+        is_bad = 1;
+        xclose(open_wr(bad));
+      }
+    }
+    status = t_exec("../src/lbzip2", args, zin, out, err);
+    if (WIFSIGNALED(status)) {
+      t_fail(tc, "lbzip2 was killed by signal %d (%s)",
+             WTERMSIG(status), signal_name(WTERMSIG(status)));
+      break;
+    }
+    fd = open_rd(err);
+    err_size = xfstat_size(fd);
+    xclose(fd);
+    if (!is_bad) {
+      if (WEXITSTATUS(status) != 0) {
+        t_fail(tc, "lbzip2 failed with exit code %d, but expected success", WEXITSTATUS(status));
+        break;
+      }
+      if (err_size != 0) {
+        t_fail(tc, "lbzip2 succeeded, but printed message on standard error");
+        break;
+      }
+    }
+    else {
+      if (WEXITSTATUS(status) == 0) {
+        t_fail(tc, "lbzip2 succeeded, but expected failure", WEXITSTATUS(status));
+        break;
+      }
+      if (WEXITSTATUS(status) != 1) {
+        t_fail(tc, "lbzip2 failed with exit code %d, but expected 1", WEXITSTATUS(status));
+        break;
+      }
+      if (err_size == 0) {
+        t_fail(tc, "lbzip2 failed, but did not print message on standard error");
+        break;
+      }
+    }
+
+    t_succeed(tc);
+  }
+  while (0);
+
+  free(bad);
+  free(zin);
+  free(out);
+  free(exp);
+  free(err);
+}
+
+
 /* Compare strings using strcmp.  Used in qsort. */
 static int
 string_cmp(const void *va, const void *vb)
@@ -565,17 +668,31 @@ int
 main(int argc, char **argv)
 {
   char **case_name;
-  const char *suite_name = argv[1];
+  const char *mode;
+  const char *suite_name;
   int last_case_id = 0;
+  void (*test_handler)(struct test_case *);
   static char *suite[MAX_CASES+1];
 
   (void)setlocale(LC_CTYPE, "C");  /* for isxdigit() */
   (void)setvbuf(stdout, NULL, _IONBF, 0);  /* for real-time test progress */
 
-  if (argc != 2) {
-    t_error("This program accepts exactly one argument: path to test suite");
+  if (argc != 3) {
+    t_error("Exactly two arguments are expected: mode and path to test suite");
   }
 
+  mode = argv[1];
+  if (strcmp(mode, "compress") == 0) {
+    test_handler = test_compress;
+  }
+  else if (strcmp(mode, "expand") == 0) {
+    test_handler = test_expand;
+  }
+  else {
+    t_error("unknown test mode: %s", mode);
+  }
+
+  suite_name = argv[2];
   read_suite(suite, suite_name);
 
   for (case_name = suite; *case_name != NULL; case_name++) {
@@ -585,7 +702,7 @@ main(int argc, char **argv)
     tc->id = ++last_case_id;
     tc->name = *case_name;
     tc->suite_name = suite_name;
-    t_compress(tc);
+    test_handler(tc);
     if (tc->status == OK) {
       xprintf("ok %d %s\n", tc->id, tc->name);
     }

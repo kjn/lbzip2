@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ./driver suite/manual-compress
+exec ./driver compress suite/manual-compress

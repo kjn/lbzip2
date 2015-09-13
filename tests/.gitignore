@@ -11,6 +11,8 @@ minbzcat
 test-suite.log
 coverage.info
 coverage/
+suite/*/*.bad
+suite/*/*.exp
 suite/*/*.err
 suite/*/*.out
 suite/*/*.raw
