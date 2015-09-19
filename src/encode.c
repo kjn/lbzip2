@@ -24,7 +24,6 @@
 
 #include <arpa/inet.h>          /* htonl() */
 #include <string.h>             /* memset() */
-#include <strings.h>            /* bzero() */
 
 
 /*
@@ -125,7 +124,7 @@ encoder_init(struct encoder_state *s, unsigned long max_block_size,
   s->max_block_size = max_block_size;
   s->cluster_factor = cluster_factor;
 
-  bzero(s->cmap, 256u * sizeof(bool));
+  memset(s->cmap, 0, 256u * sizeof(bool));
   s->rle_state = 0;
   s->block_crc = -1;
   s->nblock = 0;
@@ -829,7 +828,7 @@ generate_initial_trees(struct encoder_state *s, unsigned nm, unsigned nt)
     Trace(("Tree %u: EC=[%3u,%3u), |EC|=%3u, cum=%6u", t, a, b, b-a, cum));
 
     /* Now [a,b) is our range -- assign it to equivalence class t. */
-    bzero(&s->u.s.length[t][a], b - a);
+    memset(&s->u.s.length[t][a], 0, b - a);
     a = b;
     nm -= cum;
   }
@@ -901,7 +900,7 @@ assign_codes(uint32_t *code, uint8_t *length,
   sort_alphabet(leaf_weight + 1, leaf_weight + as + 1);
   leaf_weight[0] = -1;
 
-  bzero(tree, sizeof(tree));
+  memset(tree, 0, sizeof(tree));
   package_merge(tree, count, leaf_weight, as);
 
   best_cost = -1;
@@ -1060,7 +1059,7 @@ generate_prefix_code(struct encoder_state *s)
     sp = s->u.s.selector;
 
     /* (E): Expectation step -- estimate likehood. */
-    bzero(s->u.s.frequency, nt * sizeof(*s->u.s.frequency));
+    memset(s->u.s.frequency, 0, nt * sizeof(*s->u.s.frequency));
     for (gs = mtfv; gs < mtfv + nm; gs += GROUP_SIZE) {
       /* Check out which prefix-free tree is the best to encode current
          group.  Then increment symbol frequencies for the chosen tree

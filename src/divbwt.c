@@ -24,7 +24,7 @@
 
 #include "encode.h"
 
-#include <strings.h>            /* bzero() */
+#include <string.h>             /* memset() */
 
 
 /*- Settings -*/
@@ -1495,7 +1495,7 @@ sort_typeBstar(const sauchar_t *T, saidx_t *SA,
   int flag;
 
   /* Initialize bucket arrays. */
-  bzero(bucket, (ALPHABET_SIZE + 1) * ALPHABET_SIZE * sizeof(saidx_t));
+  memset(bucket, 0, (ALPHABET_SIZE + 1) * ALPHABET_SIZE * sizeof(saidx_t));
 
   /* Count the number of occurrences of the first one or two characters of each
      type A, B and B* suffix. Moreover, store the beginning position of all

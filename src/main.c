@@ -172,11 +172,11 @@ xstrtol(const char *str, int source, uintmax_t lower, uintmax_t upper)
     goto fail;
   val = tmp;
 
-  endptr = index(suffix, *endptr);
+  endptr = strchr(suffix, *endptr);
   if (endptr == NULL)
     goto fail;
 
-  shift = (index(suffix, '\0') - endptr + 1) / 2 * 10;
+  shift = (strchr(suffix, '\0') - endptr + 1) / 2 * 10;
 
   if (val > (UINTMAX_MAX >> shift))
     goto fail;

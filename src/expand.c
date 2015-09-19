@@ -25,7 +25,7 @@
 #include "main.h"               /* bs100k */
 #include "process.h"            /* struct process */
 
-#include <strings.h>            /* bzero() */
+#include <string.h>             /* memset() */
 
 
 /*
@@ -841,7 +841,7 @@ on_input_avail(void *buffer, size_t size)
      can possibly alter it, so here we can read tail_offs without locking. */
 
   missing = -size % 4;
-  bzero((char *)buffer + size, missing);
+  memset((char *)buffer + size, 0, missing);
 
   scan_task = XMALLOC(struct detached_bitstream);
   *scan_task = bits_init(tail_offs);
