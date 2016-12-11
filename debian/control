@@ -3,7 +3,7 @@ Section: utils
 Priority: extra
 Maintainer: Mikolaj Izdebski <zurgunt@gmail.com>
 Build-Depends: debhelper (>= 9), gnulib (>= 20130805), autoconf, automake (>= 1.14)
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 Homepage: http://lbzip2.org/
 Vcs-Git: git://github.com/kjn/lbzip2.git
 Vcs-Browser: https://github.com/kjn/lbzip2/tree/debian
