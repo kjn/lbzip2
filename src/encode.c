@@ -1111,12 +1111,18 @@ generate_prefix_code(struct encoder_state *s)
        but unfortunately bzip2 doesn't allow blocks with a single tree. */
     assert(nt >= 1);
     if (nt == 1) {
+      unsigned cl0;
       nt = 2;
       t = s->u.s.tmap_new2old[0] ^ 1;
       s->u.s.tmap_old2new[t] = 1;
       s->u.s.tmap_new2old[1] = t;
-      for (v = 0; v < MAX_ALPHA_SIZE; v++)
-        s->u.s.length[t][v] = MAX_CODE_LENGTH;
+      cl0 = (as < 0x20 ? 1 : 5) + ((0xffffaa50 >> ((as < 0x20 ? as : (as >> 4)) & 0x1e)) & 0x3);
+      for (v = 0; v < (2 << cl0) - as; v++)
+        s->u.s.length[t][v] = cl0;
+      if (v < as)
+	cost += 2;
+      for (; v < as; v++)
+        s->u.s.length[t][v] = cl0 + 1;
       cost += as + 5;
     }
   }
