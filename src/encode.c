@@ -81,6 +81,7 @@ struct encoder_state {
       uint8_t selectorMTF[18000 + 1 + 7];
       uint32_t num_selectors;
       uint32_t num_trees;
+      unsigned tree_pad;
       /* There is a sentinel symbol added at the end of each alphabet,
          hence the +1s below. */
       uint8_t length[MAX_TREES][MAX_ALPHA_SIZE + 1];
@@ -514,8 +515,11 @@ encode(struct encoder_state *s, uint32_t *crc)
      multiply of 8 bits. */
   j = cost & 0x7;
   j = (8 - j) & 0x7;
-  s->u.s.num_selectors += j;
+  Trace(("Block padding: %d bits", j));
   cost += j;
+  s->u.s.tree_pad = j >> 1;
+  j &= 1;
+  s->u.s.num_selectors += j;
   while (j--)
     *smp++ = 0;
   assert(cost % 8 == 0);
@@ -1228,8 +1232,14 @@ transmit(struct encoder_state *s, void *buf)
     uint8_t *len = s->u.s.length[s->u.s.tmap_new2old[t]];
 
     a = len[0];
-    SEND(6, a << 1);
-    for (v = 1; v < as; v++) {
+    if (t == 0) {
+      if (a < 4)
+	a += s->u.s.tree_pad;
+      else
+	a -= s->u.s.tree_pad;
+    }
+    SEND(5, a);
+    for (v = 0; v < as; v++) {
       c = len[v];
       while (a < c) {
         SEND(2, 2);
