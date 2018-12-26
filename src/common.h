@@ -112,6 +112,13 @@ enum error {
 #endif
 
 
+#if GNUC_VERSION >= 70000
+# define FALLTHROUGH __attribute__((fallthrough))
+#else
+# define FALLTHROUGH
+#endif
+
+
 #if ENABLE_COVERAGE + 0
 void __gcov_flush(void);
 #define gcov_flush() __gcov_flush()

@@ -455,7 +455,7 @@ mtf_one(uint8_t **imtf_row, uint8_t *imtf_slide, uint8_t c)
     switch (nn) {
     default:
       abort();
-#define R(n) case n: pp[n] = pp[n-1]
+#define R(n) case n: pp[n] = pp[n-1]; FALLTHROUGH
       R(15); R(14); R(13); R(12); R(11); R(10); R(9);
       R(8); R(7); R(6); R(5); R(4); R(3); R(2); R(1);
 #undef R
@@ -981,6 +981,7 @@ emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
     if (unlikely(!a--))
       break;
     c = p = t[p >> 8];
+    /* fall-through */
   case 2:
     if (unlikely(!m--)) {
       ds->rle_state = 2;
@@ -992,6 +993,7 @@ emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
     if (unlikely(!a--))
       break;
     c = p = t[p >> 8];
+    /* fall-through */
   case 3:
     if (unlikely(!m--)) {
       ds->rle_state = 3;
@@ -1003,6 +1005,7 @@ emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
     if (unlikely(!a--))
       return ERR_RUNLEN;
     c = p = t[p >> 8];
+    /* fall-through */
   case 4:
     if (unlikely(m < c)) {
       c -= m;
@@ -1014,10 +1017,12 @@ emit(struct decoder_state *ds, void *buf, size_t *buf_sz)
     m -= c;
     while (c--)
       s = (s << 8) ^ crc_table[(s >> 24) ^ (*b++ = d)];
+    /* fall-through */
   case 0:
     if (unlikely(!a--))
       break;
     c = p = t[p >> 8];
+    /* fall-through */
   case 5:
     if (unlikely(!m--)) {
       ds->rle_state = 5;
