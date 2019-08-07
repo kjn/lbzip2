@@ -62,7 +62,7 @@ struct decoder_state {
   uint8_t rle_char;             /* current character */
   uint8_t rle_prev;             /* prevoius character */
 
-  uint32_t tt[0];
+  uint32_t tt[0] __attribute__((aligned (8)));
 };
 
 
