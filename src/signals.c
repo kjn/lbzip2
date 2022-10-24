@@ -157,6 +157,11 @@ setup_signals(void)
   foreach (sig, handled_signals)
     xadd(&handled, *sig);
 
+  /* unblock all needed signals at the process level in case   */
+  /* they were inherited from the lbzip2 parent process        */
+  
+  if (sigprocmask(SIG_UNBLOCK, &handled, NULL)) { abort(); }
+  
   xmask(SIG_BLOCK, &blocked, 0);
 }
 
