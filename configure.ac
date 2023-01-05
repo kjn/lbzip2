@@ -31,6 +31,9 @@ AC_PROG_LN_S
 AC_PROG_RANLIB
 AC_PROG_CC_C89
 
+AC_DEFINE(GNULIB_XALLOC_DIE, 1,
+  [This package is providing its own definition of the xalloc_die function.])
+
 gl_ASSERT_NO_GNULIB_TESTS
 gl_ASSERT_NO_GNULIB_POSIXCHECK
 gl_EARLY
