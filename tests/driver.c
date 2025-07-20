@@ -19,10 +19,6 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif
-
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -40,47 +36,12 @@
 #include <unistd.h>
 
 
-#define MAX_CASES 1000000
-
-struct test_case {
-  struct test_case *next;
-  int id;
-  const char *name;
-  const char *suite_name;
-  enum { RUN, OK, FAIL } status;
-  char *message;
-};
+static const char *base_dir;
+static const char *suite_name;
+static const char *case_name;
 
 
-/* Like GNU's vasprintf(), but _exits on failure. */
-static char *
-xvasprintf(const char *fmt, va_list ap)
-{
-  char *str;
-  size_t n;
-  va_list aq;
-
-  for (n = 100;; n += n) {
-    va_copy(aq, ap);
-    str = malloc(n);
-    if (str == NULL) {
-      perror("malloc");
-      _exit(2);
-    }
-    str[n-1] = 'x';
-    if (vsnprintf(str, n, fmt, aq) == -1) {
-      perror("vsnprintf");
-      _exit(2);
-    }
-    if (str[n-1] != '\0') {
-      return str;
-    }
-    free(str);
-    va_end(aq);
-  }
-}
-
-/* Like printf(), but _exits on failure. */
+/* Like fprintf(stderr, ...), but _exits on failure. */
 static void
 xprintf(const char *fmt, ...)
 {
@@ -88,50 +49,41 @@ xprintf(const char *fmt, ...)
 
   va_start(ap, fmt);
 
-  if (vprintf(fmt, ap) == -1) {
-    perror("vprintf");
+  if (vfprintf(stderr, fmt, ap) == -1) {
+    perror("vfprintf");
     _exit(2);
   }
 
   va_end(ap);
 }
 
+
 /* Bail out current test suite with given message. */
 static void
 t_error(const char *fmt, ...)
 {
   va_list ap;
-  char *msg;
 
   va_start(ap, fmt);
-  msg = xvasprintf(fmt, ap);
+  vfprintf(stderr, fmt, ap);
   va_end(ap);
+  fprintf(stderr, "\n");
 
-  xprintf("Bail out! %s\n", msg);
-  free(msg);
-  _exit(1);
+  _exit(2);
 }
 
 /* Fail current test case with given message. */
 static void
-t_fail(struct test_case *tc, const char *fmt, ...)
+t_fail(const char *fmt, ...)
 {
   va_list ap;
-  char *msg;
 
   va_start(ap, fmt);
-  tc->message = xvasprintf(fmt, ap);
+  vfprintf(stderr, fmt, ap);
   va_end(ap);
+  fprintf(stderr, "\n");
 
-  tc->status = FAIL;
-}
-
-/* Succeed current test case. */
-static void
-t_succeed(struct test_case *tc)
-{
-  tc->status = OK;
-  tc->message = NULL;
+  _exit(1);
 }
 
 
@@ -219,6 +171,13 @@ xbasename(const char *path)
   }
 
   return bn + 1;
+}
+
+static void
+xmkdir(const char *path) {
+  if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+    t_error("Unable to create directory %s", path);
+  }
 }
 
 /* Open file for reading, bail out on failure. */
@@ -395,39 +354,31 @@ t_exec(const char *path, char *argv[],
 
 
 /* Compare two given files and fail test case if they differ. */
-static int
-t_compare(struct test_case *tc, const char *exp, const char *act)
+static void
+t_compare(const char *exp, const char *act)
 {
   int exp_fd;
   int act_fd;
   off_t size;
   void *exp_ptr;
   void *act_ptr;
-  int ret = 1;
 
   exp_fd = open_rd(exp);
   act_fd = open_rd(act);
 
   size = xfstat_size(exp_fd);
   if (xfstat_size(act_fd) != size) {
-    t_fail(tc, "files differ in size; expected: %s, actual: %s", exp, act);
-    ret = 1;
+    t_fail("files differ in size; expected: %s, actual: %s", exp, act);
   }
-  else {
-    exp_ptr = xmmap(0, size, PROT_READ, MAP_SHARED, exp_fd, 0);
-    act_ptr = xmmap(0, size, PROT_READ, MAP_SHARED, act_fd, 0);
+  exp_ptr = xmmap(0, size, PROT_READ, MAP_SHARED, exp_fd, 0);
+  act_ptr = xmmap(0, size, PROT_READ, MAP_SHARED, act_fd, 0);
 
-    if (memcmp(exp_ptr, act_ptr, size) != 0) {
-      t_fail(tc, "files differ; expected: %s, actual: %s", exp, act);
-      ret = 1;
-    }
-    else {
-      ret = 0;
-    }
-
-    xmunmap(exp_ptr, size);
-    xmunmap(act_ptr, size);
+  if (memcmp(exp_ptr, act_ptr, size) != 0) {
+    t_fail("files differ; expected: %s, actual: %s", exp, act);
   }
+
+  xmunmap(exp_ptr, size);
+  xmunmap(act_ptr, size);
 
   xclose(exp_fd);
   xclose(act_fd);
@@ -436,12 +387,13 @@ t_compare(struct test_case *tc, const char *exp, const char *act)
 
 /* Run compression test case. */
 static void
-test_compress(struct test_case *tc)
+test_compress(void)
 {
   char *args[2] = {NULL, NULL};
 
   int fd;
 
+  char *dir;
   char *in;
   char *zin;
   char *out;
@@ -451,65 +403,57 @@ test_compress(struct test_case *tc)
 
   int status;
 
-  in = t_concat(tc->suite_name, "/", tc->name, ".raw", NULL);
-  zin = t_concat(tc->suite_name, "/", tc->name, ".bz2", NULL);
-  out = t_concat(tc->suite_name, "/", tc->name, ".out", NULL);
-  zout = t_concat(tc->suite_name, "/", tc->name, ".zout", NULL);
-  zexp = t_concat(tc->suite_name, "/", tc->name, ".zexp", NULL);
-  err = t_concat(tc->suite_name, "/", tc->name, ".err", NULL);
+  dir = t_concat("work-", suite_name, NULL);
+  xmkdir(dir);
 
-  do {
-    if (!file_exists(in)) {
-      status = t_exec("./minbzcat", args, zin, out, err);
-      if (WIFSIGNALED(status)) {
-        t_error("minbzcat was killed by signal %d (%s)",
-                WTERMSIG(status), signal_name(WTERMSIG(status)));
-      }
-      if (WEXITSTATUS(status) != 0) {
-        t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
-      }
-      xrename(out, in);
-    }
-    status = t_exec("../src/lbzip2", args, in, zout, err);
+  in = t_concat(dir, "/", case_name, ".raw", NULL);
+  zin = t_concat(base_dir, "/tests/suite/", suite_name, "/", case_name, ".bz2", NULL);
+  out = t_concat(dir, "/", case_name, ".out", NULL);
+  zout = t_concat(dir, "/", case_name, ".zout", NULL);
+  zexp = t_concat(dir, "/", case_name, ".zexp", NULL);
+  err = t_concat(dir, "/", case_name, ".err", NULL);
+
+  if (!file_exists(in)) {
+    status = t_exec("./minbzcat", args, zin, out, err);
     if (WIFSIGNALED(status)) {
-      t_fail(tc, "lbzip2 was killed by signal %d (%s)",
-             WTERMSIG(status), signal_name(WTERMSIG(status)));
-      break;
+      t_error("minbzcat was killed by signal %d (%s)",
+              WTERMSIG(status), signal_name(WTERMSIG(status)));
     }
     if (WEXITSTATUS(status) != 0) {
-      t_fail(tc, "lbzip2 failed with exit code %d", WEXITSTATUS(status));
-      break;
+      t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
     }
-    fd = open_rd(err);
-    if (xfstat_size(fd) != 0) {
-      t_fail(tc, "lbzip2 printed message on standard error");
-      break;
-    }
-    xclose(fd);
-    if (file_exists(zexp)) {
-      if (t_compare(tc, zexp, zout)) {
-        break;
-      }
-    }
-    else {
-      status = t_exec("./minbzcat", args, zout, out, err);
-      if (WIFSIGNALED(status)) {
-        t_error("minbzcat was killed by signal %d (%s)",
-                WTERMSIG(status), signal_name(WTERMSIG(status)));
-      }
-      if (WEXITSTATUS(status) != 0) {
-        t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
-      }
-      if (t_compare(tc, in, out)) {
-        break;
-      }
-      xrename(zout, zexp);
-    }
-
-    t_succeed(tc);
+    xrename(out, in);
   }
-  while (0);
+  status = t_exec("./lbzip2", args, in, zout, err);
+  if (WIFSIGNALED(status)) {
+    t_fail("lbzip2 was killed by signal %d (%s)", WTERMSIG(status),
+           signal_name(WTERMSIG(status)));
+  }
+  if (WEXITSTATUS(status) != 0) {
+    t_fail("lbzip2 failed with exit code %d", WEXITSTATUS(status));
+  }
+  fd = open_rd(err);
+  if (xfstat_size(fd) != 0) {
+    t_fail("lbzip2 printed message on standard error");
+  }
+  xclose(fd);
+  if (file_exists(zexp)) {
+    t_compare(zexp, zout);
+  }
+  else {
+    status = t_exec("./minbzcat", args, zout, out, err);
+    if (WIFSIGNALED(status)) {
+      t_error("minbzcat was killed by signal %d (%s)",
+              WTERMSIG(status), signal_name(WTERMSIG(status)));
+    }
+    if (WEXITSTATUS(status) != 0) {
+      t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
+    }
+    t_compare(in, out);
+    xrename(zout, zexp);
+  }
 
+  free(dir);
   free(in);
   free(zin);
   free(out);
@@ -521,7 +465,7 @@ test_compress(struct test_case *tc)
 
 /* Run decompression test case. */
 static void
-test_expand(struct test_case *tc)
+test_expand(void)
 {
   char *args[3] = {NULL, "-d", NULL};
 
@@ -529,6 +473,7 @@ test_expand(struct test_case *tc)
   int is_bad;
   off_t err_size;
 
+  char *dir;
   char *bad;
   char *zin;
   char *out;
@@ -537,74 +482,67 @@ test_expand(struct test_case *tc)
 
   int status;
 
-  bad = t_concat(tc->suite_name, "/", tc->name, ".bad", NULL);
-  zin = t_concat(tc->suite_name, "/", tc->name, ".bz2", NULL);
-  out = t_concat(tc->suite_name, "/", tc->name, ".out", NULL);
-  exp = t_concat(tc->suite_name, "/", tc->name, ".exp", NULL);
-  err = t_concat(tc->suite_name, "/", tc->name, ".err", NULL);
+  dir = t_concat("work-", suite_name, NULL);
+  xmkdir(dir);
 
-  do {
-    is_bad = file_exists(bad);
-    if (is_bad == file_exists(exp)) {
-      if (is_bad) {
-        xunlink(bad);
-        xunlink(exp);
-      }
-      status = t_exec("./minbzcat", args, zin, out, err);
-      if (WIFSIGNALED(status)) {
-        t_error("minbzcat was killed by signal %d (%s)",
-                WTERMSIG(status), signal_name(WTERMSIG(status)));
-      }
-      if (WEXITSTATUS(status) == 0) {
-        is_bad = 0;
-        xrename(out, exp);
-      }
-      else {
-        if (WEXITSTATUS(status) != 1) {
-          t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
-        }
-        is_bad = 1;
-        xclose(open_wr(bad));
-      }
+  bad = t_concat(dir, "/", case_name, ".bad", NULL);
+  zin = t_concat(base_dir, "/tests/suite/", suite_name, "/", case_name, ".bz2", NULL);
+  out = t_concat(dir, "/", case_name, ".out", NULL);
+  exp = t_concat(dir, "/", case_name, ".exp", NULL);
+  err = t_concat(dir, "/", case_name, ".err", NULL);
+
+  is_bad = file_exists(bad);
+  if (is_bad == file_exists(exp)) {
+    if (is_bad) {
+      xunlink(bad);
+      xunlink(exp);
     }
-    status = t_exec("../src/lbzip2", args, zin, out, err);
+    status = t_exec("./minbzcat", args, zin, out, err);
     if (WIFSIGNALED(status)) {
-      t_fail(tc, "lbzip2 was killed by signal %d (%s)",
-             WTERMSIG(status), signal_name(WTERMSIG(status)));
-      break;
+      t_error("minbzcat was killed by signal %d (%s)",
+              WTERMSIG(status), signal_name(WTERMSIG(status)));
     }
-    fd = open_rd(err);
-    err_size = xfstat_size(fd);
-    xclose(fd);
-    if (!is_bad) {
-      if (WEXITSTATUS(status) != 0) {
-        t_fail(tc, "lbzip2 failed with exit code %d, but expected success", WEXITSTATUS(status));
-        break;
-      }
-      if (err_size != 0) {
-        t_fail(tc, "lbzip2 succeeded, but printed message on standard error");
-        break;
-      }
+    if (WEXITSTATUS(status) == 0) {
+      is_bad = 0;
+      xrename(out, exp);
     }
     else {
-      if (WEXITSTATUS(status) == 0) {
-        t_fail(tc, "lbzip2 succeeded, but expected failure", WEXITSTATUS(status));
-        break;
-      }
       if (WEXITSTATUS(status) != 1) {
-        t_fail(tc, "lbzip2 failed with exit code %d, but expected 1", WEXITSTATUS(status));
-        break;
+        t_error("minbzcat failed with exit code %d", WEXITSTATUS(status));
       }
-      if (err_size == 0) {
-        t_fail(tc, "lbzip2 failed, but did not print message on standard error");
-        break;
-      }
+      is_bad = 1;
+      xclose(open_wr(bad));
     }
-
-    t_succeed(tc);
   }
-  while (0);
+  status = t_exec("./lbzip2", args, zin, out, err);
+  if (WIFSIGNALED(status)) {
+    t_fail("lbzip2 was killed by signal %d (%s)", WTERMSIG(status),
+           signal_name(WTERMSIG(status)));
+  }
+  fd = open_rd(err);
+  err_size = xfstat_size(fd);
+  xclose(fd);
+  if (!is_bad) {
+    if (WEXITSTATUS(status) != 0) {
+      t_fail("lbzip2 failed with exit code %d, but expected success", WEXITSTATUS(status));
+    }
+    if (err_size != 0) {
+      t_fail("lbzip2 succeeded, but printed message on standard error");
+    }
+  }
+  else {
+    if (WEXITSTATUS(status) == 0) {
+      t_fail("lbzip2 succeeded, but expected failure", WEXITSTATUS(status));
+    }
+    if (WEXITSTATUS(status) != 1) {
+      t_fail("lbzip2 failed with exit code %d, but expected 1", WEXITSTATUS(status));
+    }
+    if (err_size == 0) {
+      t_fail("lbzip2 failed, but did not print message on standard error");
+    }
+  }
 
+  free(dir);
   free(bad);
   free(zin);
   free(out);
@@ -613,71 +551,17 @@ test_expand(struct test_case *tc)
 }
 
 
-/* Compare strings using strcmp.  Used in qsort. */
-static int
-string_cmp(const void *va, const void *vb)
-{
-  const char *const *pa = va;
-  const char *const *pb = vb;
-  return strcmp(*pa, *pb);
-}
-
-/* Read entire test suite into memory. */
-static void
-read_suite(char **t_suite, const char *suite_name)
-{
-  DIR *dp;
-  struct dirent *ep;
-  int i;
-  int j;
-
-  dp = opendir(suite_name);
-  if (dp == NULL) {
-    t_error("Failed to open directory: %s", suite_name);
-  }
-  j = 0;
-  while ((ep = readdir(dp)) != NULL) {
-    if (j >= MAX_CASES) {
-      t_error("Test suites lagrer than %u test cases are not supported", MAX_CASES);
-    }
-    for (i = 0; i < 40; i++) {
-      if (!isxdigit(ep->d_name[i]))
-        break;
-    }
-    if (i < 40 || strcmp(ep->d_name + 40, ".bz2")) {
-      continue;
-    }
-    t_suite[j] = t_concat(ep->d_name, NULL);
-    t_suite[j][40] = '\0';
-    j++;
-  }
-  if (j == 0) {
-    t_error("No test cases found in specified directory: %s", suite_name);
-  }
-  t_suite[j] = NULL;
-  if (closedir(dp) != 0) {
-    t_error("Failed to close directory: %s", suite_name);
-  }
-  xprintf("1..%d\n", j);
-  qsort(t_suite, j, sizeof(char *), string_cmp);
-}
-
-
 /* Run specified test suite. */
 int
 main(int argc, char **argv)
 {
-  char **case_name;
   const char *mode;
-  const char *suite_name;
-  int last_case_id = 0;
-  void (*test_handler)(struct test_case *);
-  static char *suite[MAX_CASES+1];
+  void (*test_handler)(void);
 
   (void)setlocale(LC_CTYPE, "C");  /* for isxdigit() */
   (void)setvbuf(stdout, NULL, _IONBF, 0);  /* for real-time test progress */
 
-  if (argc != 3) {
+  if (argc != 5) {
     t_error("Exactly two arguments are expected: mode and path to test suite");
   }
 
@@ -692,25 +576,11 @@ main(int argc, char **argv)
     t_error("unknown test mode: %s", mode);
   }
 
-  suite_name = argv[2];
-  read_suite(suite, suite_name);
+  base_dir = argv[2];
+  suite_name = argv[3];
+  case_name = argv[4];
 
-  for (case_name = suite; *case_name != NULL; case_name++) {
-    struct test_case test_case;
-    struct test_case *tc = &test_case;
-    tc->status = RUN;
-    tc->id = ++last_case_id;
-    tc->name = *case_name;
-    tc->suite_name = suite_name;
-    test_handler(tc);
-    if (tc->status == OK) {
-      xprintf("ok %d %s\n", tc->id, tc->name);
-    }
-    else if (tc->status == FAIL) {
-      xprintf("not ok %d %s %s\n", tc->id, tc->name, tc->message);
-    }
-    else {
-      abort();
-    }
-  }
+  test_handler();
+  xprintf("test passed\n");
+  return 0;
 }

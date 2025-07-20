@@ -55,9 +55,6 @@
    Bits --(retrieve)--> MTF values --(decode)--> Characters --(emit)--> Bytes
 */
 
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif
 
 /* This code can be easily embedded, just #define EMBEDDED, provide your own
    read(), write() and bad() functions. Call expand() to perform decompression.
