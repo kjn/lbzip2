@@ -94,7 +94,7 @@ struct encoder_state {
     int32_t bucket[65536 + 256];
   } u;
 
-  int32_t SA[0];
+  int32_t SA[];
 };
 
 extern uint32_t crc_table[256];

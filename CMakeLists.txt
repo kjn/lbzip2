@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(lbzip2 C)
 
-set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_compile_definitions(

@@ -19,12 +19,6 @@
   along with lbzip2.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#else
-#define restrict
-#endif
-
 #include <assert.h>             /* assert() */
 #include <errno.h>              /* errno */
 #include <inttypes.h>           /* uint32_t */
@@ -109,6 +103,15 @@ enum error {
 
 #ifndef __GNUC__
 #define __attribute__(x)
+#endif
+
+
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 201112L
+# if GNUC_VERSION >= 20500
+#  define _Noreturn __attribute__((noreturn))
+# else
+#  define _Noreturn
+# endif
 #endif
 
 
