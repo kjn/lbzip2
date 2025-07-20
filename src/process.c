@@ -76,16 +76,21 @@
 #define xsignal(c)    ((void)(pthread_cond_signal(c)     && (abort(), 0)))
 #define xbroadcast(c) ((void)(pthread_cond_broadcast(c)  && (abort(), 0)))
 
+struct thread_entry {
+  void (*entry_func)(void);
+};
+
 static void *
-thread_entry(void *real_entry)
+thread_entry(void *entry)
 {
-  ((void (*)(void))real_entry)();
+  struct thread_entry *te = entry;
+  te->entry_func();
   return NULL;
 }
 
 /* Create a POSIX thread with error checking. */
 static pthread_t
-xcreate(void (*entry)(void))
+xcreate(struct thread_entry *entry)
 {
   int err;
   pthread_t thread;
@@ -301,6 +306,8 @@ source_thread_proc(void)
   Trace(("    source: terminating"));
 }
 
+static struct thread_entry source_thread_entry = { source_thread_proc };
+
 
 void
 source_release_buffer(void *buffer)
@@ -409,6 +416,8 @@ sink_thread_proc(void)
   Trace(("      sink: terminating"));
 }
 
+struct thread_entry sink_thread_entry = { sink_thread_proc };
+
 
 static void
 select_task(void)
@@ -452,6 +461,8 @@ worker_thread_proc(void)
   Trace(("worker[%2u]: terminating", id));
 }
 
+static struct thread_entry worker_thread_entry = { worker_thread_proc };
+
 
 /* Enter scheduler monitor. */
 void
@@ -481,8 +492,8 @@ init_io(void)
   finish = false;
   deque_init(output_q, out_slots);
 
-  sink_thread = xcreate(sink_thread_proc);
-  source_thread = xcreate(source_thread_proc);
+  sink_thread = xcreate(&sink_thread_entry);
+  source_thread = xcreate(&source_thread_entry);
 }
 
 
@@ -518,7 +529,7 @@ primary_thread(void)
   init_io();
 
   for (i = 1u; i < num_worker; ++i)
-    worker_thread[i] = xcreate(worker_thread_proc);
+    worker_thread[i] = xcreate(&worker_thread_entry);
 
   worker_thread_proc();
 
@@ -535,6 +546,8 @@ primary_thread(void)
 
   xraise(SIGUSR2);
 }
+
+static struct thread_entry primary_thread_entry = { primary_thread };
 
 
 static void
@@ -601,7 +614,7 @@ schedule(const struct process *proc)
   process = proc;
 
   worker_thread = XNMALLOC(num_worker, pthread_t);
-  *worker_thread = xcreate(primary_thread);
+  *worker_thread = xcreate(&primary_thread_entry);
   halt();
   xjoin(*worker_thread);
   free(worker_thread);
