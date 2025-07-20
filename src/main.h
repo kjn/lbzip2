@@ -63,30 +63,30 @@ void *xmalloc(size_t);
 #define XNMALLOC(n, type) ((type *)xmalloc((n) * sizeof(type)))
 
 void info(const char *fmt, ...)
-  __attribute__((format(printf, 1, 2)));
+  format_printf(1, 2);
 void infof(const struct filespec *f, const char *fmt, ...)
-  __attribute__((format(printf, 2, 3)));
+  format_printf(2, 3);
 void infox(int x, const char *fmt, ...)
-  __attribute__((format(printf, 2, 3)));
+  format_printf(2, 3);
 void infofx(const struct filespec *f, int x, const char *fmt, ...)
-  __attribute__((format(printf, 3, 4)));
+  format_printf(3, 4);
 void warn(const char *fmt, ...)
-  __attribute__((format(printf, 1, 2)));
+  format_printf(1, 2);
 void warnf(const struct filespec *f, const char *fmt, ...)
-  __attribute__((format(printf, 2, 3)));
+  format_printf(2, 3);
 void warnx(int x, const char *fmt, ...)
-  __attribute__((format(printf, 2, 3)));
+  format_printf(2, 3);
 void warnfx(const struct filespec *f, int x, const char *fmt, ...)
-  __attribute__((format(printf, 3, 4)));
+  format_printf(3, 4);
 _Noreturn void fail(const char *fmt, ...)
-  __attribute__((format(printf, 1, 2)));
+  format_printf(1, 2);
 _Noreturn void failf(const struct filespec *f, const char *fmt, ...)
-  __attribute__((format(printf, 2, 3)));
+  format_printf(2, 3);
 _Noreturn void failx(int x, const char *fmt, ...)
-  __attribute__((format(printf, 2, 3)));
+  format_printf(2, 3);
 _Noreturn void failfx(const struct filespec *f, int x, const char *fmt, ...)
-  __attribute__((format(printf, 3, 4)));
+  format_printf(3, 4);
 void display(const char *fmt, ...)
-  __attribute__((format(printf, 1, 2)));
+  format_printf(1, 2);
 
 void work(void);

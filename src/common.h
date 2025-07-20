@@ -101,8 +101,10 @@ enum error {
 #endif
 
 
-#ifndef __GNUC__
-#define __attribute__(x)
+#if GNUC_VERSION >= 20300
+# define format_printf(fmt, args) __attribute__((format(printf, (fmt), (args))))
+#else
+# define format_printf(fmt, args)
 #endif
 
 

@@ -87,7 +87,7 @@ xmalloc(size_t n)
 /* Logging utilities. */
 
 static void log_generic(const struct filespec *fs, int code, const char *fmt,
-  va_list args, int nl) __attribute__((format(printf, 3, 0)));
+  va_list args, int nl) format_printf(3, 0);
 
 static void
 log_generic(const struct filespec *fs, int code, const char *fmt, va_list args,
