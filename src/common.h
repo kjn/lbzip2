@@ -118,7 +118,7 @@ enum error {
 
 
 #if GNUC_VERSION >= 70000
-# define FALLTHROUGH __attribute__((fallthrough))
+# define FALLTHROUGH __attribute__((fallthrough));
 #else
 # define FALLTHROUGH
 #endif

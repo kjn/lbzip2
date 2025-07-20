@@ -455,7 +455,7 @@ mtf_one(uint8_t **imtf_row, uint8_t *imtf_slide, uint8_t c)
     switch (nn) {
     default:
       abort();
-#define R(n) case n: pp[n] = pp[n-1]; FALLTHROUGH
+#define R(n) FALLTHROUGH case n: pp[n] = pp[n-1]
       R(15); R(14); R(13); R(12); R(11); R(10); R(9);
       R(8); R(7); R(6); R(5); R(4); R(3); R(2); R(1);
 #undef R
