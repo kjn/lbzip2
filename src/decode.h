@@ -54,6 +54,7 @@ struct decoder_state {
   unsigned block_size;          /* compressed block size */
   uint32_t crc;                 /* expected block CRC */
   uint32_t ftab[256];           /* frequency table used in counting sort */
+  uint32_t *tt;
 
   int rle_state;                /* FSA state */
   uint32_t rle_crc;             /* CRC checksum */
@@ -61,8 +62,6 @@ struct decoder_state {
   uint32_t rle_avail;           /* available input bytes */
   uint8_t rle_char;             /* current character */
   uint8_t rle_prev;             /* prevoius character */
-
-  uint32_t tt[0];
 };
 
 
@@ -75,8 +74,8 @@ int parse(struct parser_state *ps, struct header *hd, struct bitstream *bs,
           unsigned *garbage);
 int scan(struct bitstream *bs, unsigned skip);
 
-size_t decoder_alloc_size(void);
 void decoder_init(struct decoder_state *ds);
+void decoder_free(struct decoder_state *ds);
 int retrieve(struct decoder_state *ds, struct bitstream *bs);
 void decode(struct decoder_state *ds);
 int emit(struct decoder_state *ds, void *buf, size_t *buf_sz);

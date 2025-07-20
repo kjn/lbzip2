@@ -119,13 +119,13 @@ struct unord_blk {
 struct retr_blk {
   struct detached_bitstream curr_pos;
   struct position base;
-  struct decoder_state *ds;
+  struct decoder_state ds;
   struct unord_blk *unord_link;
 };
 
 struct emit_blk {
   struct position base;
-  struct decoder_state *ds;
+  struct decoder_state ds;
   int status;
   uintmax_t end_offset;
 };
@@ -371,7 +371,7 @@ advance(struct detached_bitstream bs)
     Trace(("Advanced over miss-recognized bit pattern at {%u}",
            nbsx2(rb->base)));
 
-    free(rb->ds);
+    decoder_free(&rb->ds);
     free(rb);
     work_units++;
   }
@@ -456,7 +456,7 @@ do_parse(void)
       Trace(("Parser discovered a bit pattern beyond EOF at {%u}",
              nbsx2(rb->base)));
 
-      free(rb->ds);
+      decoder_free(&rb->ds);
       free(rb);
       work_units++;
     }
@@ -532,8 +532,7 @@ do_parse(void)
     struct retr_blk *rb = XMALLOC(struct retr_blk);
 
     rb->unord_link = NULL;
-    rb->ds = xmalloc(decoder_alloc_size());
-    decoder_init(rb->ds);
+    decoder_init(&rb->ds);
     rb->curr_pos = parser_bs;
     rb->base = parser_bs.pos;
     enqueue(retr_q, rb);
@@ -562,11 +561,11 @@ do_retrieve(void)
   rb = dequeue(retr_q);
 
   true_bitstream = attach(rb->curr_pos);
-  rv = retrieve(rb->ds, &true_bitstream);
+  rv = retrieve(&rb->ds, &true_bitstream);
   rb->curr_pos = detach(true_bitstream);
 
   if (parsing_done) {
-    free(rb->ds);
+    decoder_free(&rb->ds);
     free(rb);
     work_units++;
     check_invariants();
@@ -580,7 +579,7 @@ do_retrieve(void)
        abort this retrieve job. */
     Trace(("Retriever found himself redundand"));
     work_units++;
-    free(rb->ds);
+    decoder_free(&rb->ds);
     free(rb);
     check_invariants();
     return;
@@ -624,7 +623,7 @@ do_retrieve(void)
   sched_unlock();
 
   if (rv == OK)
-    decode(rb->ds);
+    decode(&rb->ds);
 
   eb = XMALLOC(struct emit_blk);
 
@@ -664,10 +663,10 @@ do_emit(void)
 
   oblk = xmalloc(sizeof(struct out_blk) + out_granul);
   oblk->size = out_granul;
-  oblk->blk_sz = eb->ds->block_size;
+  oblk->blk_sz = eb->ds.block_size;
   rv = eb->status;
   if (rv == OK)
-    rv = emit(eb->ds, oblk + 1, &oblk->size);
+    rv = emit(&eb->ds, oblk + 1, &oblk->size);
   oblk->size = out_granul - oblk->size;
   oblk->status = rv;
   oblk->base = eb->base;
@@ -680,8 +679,8 @@ do_emit(void)
   }
   else {
     oblk->end_offset = eb->end_offset;
-    oblk->crc = eb->ds->crc;
-    free(eb->ds);
+    oblk->crc = eb->ds.crc;
+    decoder_free(&eb->ds);
     free(eb);
     sched_lock();
     work_units++;
@@ -798,8 +797,7 @@ do_scan(void)
 
     rb = XMALLOC(struct retr_blk);
     rb->unord_link = ub;
-    rb->ds = xmalloc(decoder_alloc_size());
-    decoder_init(rb->ds);
+    decoder_init(&rb->ds);
     rb->curr_pos = *bs;
     rb->base = bs->pos;
     enqueue(retr_q, rb);
