@@ -147,6 +147,7 @@ do_collect_seq(void)
 
   /* Allocate an encoder with given block size and default parameters. */
   if (wblk == NULL) {
+    assert(iblk != NULL);
     wblk = XMALLOC(struct work_blk);
     wblk->pos = iblk->pos;
     wblk->next = iblk->pos;

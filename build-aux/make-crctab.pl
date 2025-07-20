@@ -22,7 +22,6 @@ printf F q(/* This file was generated automatically by make-crctab.pl.
    For comments refer to the generator script -- make-crctab.pl. */
 
 #include "common.h"
-#include "encode.h"
 
 uint32_t crc_table[256] = {
 %s

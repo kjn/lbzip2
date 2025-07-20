@@ -429,10 +429,6 @@ select_task(void)
 static void
 worker_thread_proc(void)
 {
-  unsigned id;
-
-  (void)id;
-
   xlock(&sched_mutex);
   Trace(("worker[%2u]: spawned", (id = thread_id++)));
 

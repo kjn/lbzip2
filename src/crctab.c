@@ -2,7 +2,6 @@
    For comments refer to the generator script -- make-crctab.pl. */
 
 #include "common.h"
-#include "encode.h"
 
 uint32_t crc_table[256] = {
   0x00000000, 0x04C11DB7, 0x09823B6E, 0x0D4326D9, 0x130476DC, 0x17C56B6B,
