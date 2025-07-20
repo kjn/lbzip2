@@ -29,10 +29,7 @@
 #include <string.h>             /* strcpy() */
 #include <sys/stat.h>           /* lstat() */
 #include <fcntl.h>              /* open() */
-
-#include "stat-time.h"          /* get_stat_atime() */
-#include "utimens.h"            /* fdutimens() */
-#include "xalloc.h"             /* XMALLOC() */
+#include <time.h>               /* futimens() */
 
 #include "signals.h"            /* setup_signals() */
 #include "main.h"               /* pname */
@@ -75,11 +72,15 @@ cleanup(void)
   }
 }
 
-/* Called when one of xalloc functions fails. */
-void xalloc_die(void)
+
+void *
+xmalloc(size_t n)
 {
-  fail("Insufficient memory to complete operation."
-       " See manual page for ways of reducing memory usage.");
+  void *p = malloc(n);
+  if (!p)
+    fail("Insufficient memory to complete operation."
+         " See manual page for ways of reducing memory usage.");
+  return p;
 }
 
 
@@ -887,11 +888,11 @@ output_regf_uninit(int outfd, const struct stat *sbuf)
   {
     struct timespec ts[2];
 
-    ts[0] = get_stat_atime(sbuf);
-    ts[1] = get_stat_mtime(sbuf);
+    ts[0] = sbuf->st_atim;
+    ts[1] = sbuf->st_mtim;
 
-    if (-1 == fdutimens(outfd, opathn, ts)) {
-      warnx(errno, "fdutimens(\"%s\")", opathn);
+    if (-1 == futimens(outfd, ts)) {
+      warnx(errno, "futimens(\"%s\")", opathn);
     }
   }
 

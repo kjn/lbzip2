@@ -20,9 +20,6 @@
 */
 
 
-#include "xalloc.h"             /* xmalloc() */
-
-
 /* Task - smallest schedulable unit.
 */
 struct task {

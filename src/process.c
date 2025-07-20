@@ -348,9 +348,8 @@ sink_thread_proc(void)
   uintmax_t processed;
   struct timespec start_time;
   struct timespec next_time;
-  struct timespec update_interval;
   struct block block;
-  static const double UPDATE_INTERVAL = 0.1;
+  static const double UPDATE_INTERVAL_NANO = 1000000000L;
 
   Trace(("      sink: spawned"));
 
@@ -362,9 +361,8 @@ sink_thread_proc(void)
    */
   progress_enabled = (verbose && ispec.size > 0 && isatty(STDERR_FILENO));
   processed = 0u;
-  gettime(&start_time);
+  start_time = ts_now();
   next_time = start_time;
-  update_interval = dtotimespec(UPDATE_INTERVAL);
 
   for (;;) {
     xlock(&sink_mutex);
@@ -390,11 +388,11 @@ sink_thread_proc(void)
 
       processed = min(processed + block.weight, ispec.size);
 
-      gettime(&time_now);
+      time_now = ts_now();
 
-      if (timespec_cmp(time_now, next_time) > 0) {
-        next_time = timespec_add(time_now, update_interval);
-        elapsed = timespectod(timespec_sub(time_now, start_time));
+      if (ts_before(next_time, time_now)) {
+        next_time = ts_add_nano(time_now, UPDATE_INTERVAL_NANO);
+        elapsed = ts_diff(time_now, start_time);
         completed = (double)processed / ispec.size;
 
         if (elapsed < 5)

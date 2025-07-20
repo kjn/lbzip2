@@ -58,6 +58,10 @@ extern struct filespec ispec;
 extern struct filespec ospec;
 
 
+void *xmalloc(size_t);
+#define XMALLOC(type) ((type *)xmalloc(sizeof(type)))
+#define XNMALLOC(n, type) ((type *)xmalloc((n) * sizeof(type)))
+
 void info(const char *fmt, ...)
   __attribute__((format(printf, 1, 2)));
 void infof(const struct filespec *f, const char *fmt, ...)
