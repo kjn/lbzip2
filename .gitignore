@@ -1,15 +1,2 @@
 *~
-INSTALL
-Makefile
-Makefile.in
-aclocal.m4
-autom4te.cache
-config.log
-config.status
-configure
-lib/
-m4/
-clang_output_*
-lbzip2-*.tar.gz
-lbzip2-*.tar.bz2
-*.s
+build/
