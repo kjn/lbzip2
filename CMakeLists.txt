@@ -14,8 +14,6 @@ add_compile_options(-Wall -Wextra)
 
 find_package(Threads REQUIRED)
 
-include_directories(${CMAKE_SOURCE_DIR}/lib)
-
 set(SRC_FILES
     src/compress.c
     src/crctab.c
